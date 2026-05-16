@@ -1,6 +1,7 @@
 import { Activity, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
+import { Footer } from "@/components/footer";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { allowedForRole, navItems } from "@/lib/role-workflows";
 import { getSessionUser } from "@/lib/session";
@@ -65,6 +66,7 @@ export async function AppShell({ children, title, action }: { children: React.Re
           </div>
         </header>
         <div className="mx-auto max-w-7xl px-5 py-6">{children}</div>
+        <Footer />
       </main>
     </div>
   );
