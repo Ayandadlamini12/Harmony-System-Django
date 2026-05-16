@@ -1,0 +1,4 @@
+ingress:
+  - hostname: mis.harmonyhealthsz.com
+    service: http://harmony-django-frontend:3000
+  - service: http_status:404
