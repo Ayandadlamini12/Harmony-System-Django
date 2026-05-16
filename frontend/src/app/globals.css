@@ -1,0 +1,76 @@
+@import "tailwindcss";
+
+:root {
+  --hh-purple: #7030a0;
+  --hh-purple-dark: #481d64;
+  --hh-green: #10b950;
+  --hh-text: #2b2f38;
+  --hh-soft: #f7faf8;
+  --hh-border: #d9e3dd;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--hh-soft);
+  color: var(--hh-text);
+  font-family: Arial, Helvetica, sans-serif;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+.hh-input {
+  width: 100%;
+  border: 1px solid var(--hh-border);
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.875rem;
+  background: #fff;
+}
+
+.hh-input:focus {
+  outline: 2px solid #e8d5f3;
+  border-color: var(--hh-purple);
+}
+
+.hh-label {
+  display: block;
+  margin-bottom: 0.35rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: #53605a;
+  text-transform: uppercase;
+}
+
+.hh-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  border-radius: 8px;
+  padding: 0.65rem 0.95rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--hh-purple);
+}
+
+.hh-button-secondary {
+  color: var(--hh-text);
+  background: #fff;
+  border: 1px solid var(--hh-border);
+}
+
+.hh-panel {
+  border: 1px solid var(--hh-border);
+  border-radius: 8px;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(20, 35, 28, 0.06);
+}
