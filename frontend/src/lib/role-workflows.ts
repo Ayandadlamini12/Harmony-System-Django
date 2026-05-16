@@ -60,7 +60,7 @@ export const workflowCards: WorkflowCard[] = [
   {
     title: "Waiting list",
     description: "Patients who have arrived and are waiting to be seen by a clinician.",
-    href: "/patients/dashboard#waiting-list",
+    href: "/waiting-list",
     icon: Inbox,
     roles: ["admin", "clinician"],
     status: "planned"
@@ -68,7 +68,7 @@ export const workflowCards: WorkflowCard[] = [
   {
     title: "Approvals",
     description: "Authorize receptionist requests for elevated access to confidential records.",
-    href: "/patients/dashboard#approvals",
+    href: "/approvals",
     icon: ShieldCheck,
     roles: ["admin", "clinician"],
     status: "planned"
@@ -76,7 +76,7 @@ export const workflowCards: WorkflowCard[] = [
   {
     title: "Appointments",
     description: "Review booked appointments and check in patients who have arrived.",
-    href: "/patients/dashboard#appointments",
+    href: "/appointments",
     icon: CalendarCheck,
     roles: ["admin", "clinician", "receptionist"],
     status: "planned"
@@ -84,7 +84,7 @@ export const workflowCards: WorkflowCard[] = [
   {
     title: "Messages",
     description: "Internal chat foundation with future email, WhatsApp, and Telegram actions.",
-    href: "/patients/dashboard#messages",
+    href: "/messages",
     icon: MessageSquare,
     roles: ["admin", "clinician", "receptionist"],
     status: "planned"
@@ -92,7 +92,7 @@ export const workflowCards: WorkflowCard[] = [
   {
     title: "Inventory",
     description: "Open inventory management for remedies, supplies, stock movement, and reorder alerts.",
-    href: "/patients/dashboard#inventory",
+    href: "/inventory",
     icon: Package,
     roles: ["admin", "clinician"],
     status: "planned"
@@ -107,7 +107,7 @@ export const workflowCards: WorkflowCard[] = [
   {
     title: "Access requests",
     description: "Request temporary elevated access when non-clinical staff need medical context.",
-    href: "/patients/dashboard#access-requests",
+    href: "/access-requests",
     icon: LockKeyhole,
     roles: ["receptionist"],
     status: "planned"
@@ -115,7 +115,7 @@ export const workflowCards: WorkflowCard[] = [
   {
     title: "Reports",
     description: "Operational reporting, exports, patient activity, visit trends, and inventory reports.",
-    href: "/patients/dashboard#reports",
+    href: "/reports",
     icon: Archive,
     roles: ["admin", "clinician"],
     status: "planned"
@@ -123,7 +123,7 @@ export const workflowCards: WorkflowCard[] = [
   {
     title: "Check-in desk",
     description: "Mark arrivals, update demographic details, and move patients into the waiting list.",
-    href: "/patients/dashboard#check-ins",
+    href: "/check-ins",
     icon: ClipboardCheck,
     roles: ["admin", "receptionist"],
     status: "planned"

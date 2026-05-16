@@ -29,37 +29,37 @@ export default async function PatientManagementDashboard() {
     {
       title: "Check-ins",
       description: "Mark patients as arrived and move them into the waiting list.",
-      href: "#check-ins",
+      href: "/check-ins",
       icon: ClipboardCheck
     },
     {
       title: "Waiting list",
       description: "Patients waiting to be seen by the doctor or clinician.",
-      href: "#waiting-list",
+      href: "/waiting-list",
       icon: Inbox
     },
     {
       title: "Access requests",
       description: "Receptionist requests for elevated access to confidential records.",
-      href: "#access-requests",
+      href: "/access-requests",
       icon: LockKeyhole
     },
     {
       title: "Appointments",
       description: "Booked appointments and patients who have arrived for those appointments.",
-      href: "#appointments",
+      href: "/appointments",
       icon: CalendarCheck
     },
     {
       title: "Messages",
       description: "Internal chat foundation, later connected to email, WhatsApp, and Telegram.",
-      href: "#messages",
+      href: "/messages",
       icon: MessageSquare
     },
     {
       title: "Inventory",
       description: "Future inventory management for remedies, stock, and reorder workflow.",
-      href: "#inventory",
+      href: "/inventory",
       icon: Package
     }
   ];
