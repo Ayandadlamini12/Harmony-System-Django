@@ -31,9 +31,7 @@ services:
       - harmony-net
 
   backend:
-    image: harmony-django-backend:latest
-    build:
-      context: ./backend
+    image: ghcr.io/ayandadlamini12/harmony-backend:latest
     container_name: harmony-django-backend
     restart: always
     environment:
@@ -62,9 +60,7 @@ services:
       - harmony-net
 
   celery:
-    image: harmony-django-backend:latest
-    build:
-      context: ./backend
+    image: ghcr.io/ayandadlamini12/harmony-backend:latest
     container_name: harmony-django-celery
     restart: always
     environment:
@@ -85,9 +81,7 @@ services:
       - harmony-net
 
   celery-beat:
-    image: harmony-django-backend:latest
-    build:
-      context: ./backend
+    image: ghcr.io/ayandadlamini12/harmony-backend:latest
     container_name: harmony-django-beat
     restart: always
     environment:
@@ -108,9 +102,7 @@ services:
       - harmony-net
 
   frontend:
-    image: harmony-django-frontend:latest
-    build:
-      context: ./frontend
+    image: ghcr.io/ayandadlamini12/harmony-frontend:latest
     container_name: harmony-django-frontend
     restart: always
     environment:
