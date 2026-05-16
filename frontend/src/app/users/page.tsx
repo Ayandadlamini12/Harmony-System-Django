@@ -100,7 +100,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                     </span>
                   </td>
                   <td className="px-5 py-4">
-                    <span className={`rounded-full px-2 py-1 text-xs font-bold ${user.is_active ? "bg-[#d1f5de] text-[#0a7a35]" : "bg-red-100 text-red-700"}`}>
+                    <span className={`rounded-full px-2 py-1 text-xs font-bold ${user.is_active ? "bg-[var(--hh-green-light)] text-[var(--hh-green-dark)]" : "bg-red-100 text-red-700"}`}>
                       {user.is_active ? "Active" : "Inactive"}
                     </span>
                   </td>

@@ -1,12 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --hh-purple: #7030a0;
-  --hh-purple-dark: #481d64;
-  --hh-green: #10b950;
-  --hh-text: #2b2f38;
-  --hh-soft: #f7faf8;
-  --hh-border: #d9e3dd;
+  --hh-purple: #7030A0;
+  --hh-purple-dark: #481D64;
+  --hh-green: #50B860;
+  --hh-green-light: #E8F5E9;
+  --hh-green-dark: #2E7D32;
+  --hh-red: #E74C3C;
+  --hh-text: #2B2F38;
+  --hh-soft: #F7FAF8;
+  --hh-border: #D9E3DD;
 }
 
 * {

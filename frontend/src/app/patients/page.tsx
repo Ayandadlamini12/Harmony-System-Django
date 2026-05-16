@@ -45,7 +45,7 @@ export default async function PatientsPage({ searchParams }: { searchParams: Pro
                   <td className="px-5 py-4 text-[#66736d]">{patient.primary_phone || "No phone"}</td>
                   <td className="px-5 py-4 text-[#66736d]">{patient.last_visit_date || "--"}</td>
                   <td className="px-5 py-4">
-                    <span className="rounded-full bg-[#d1f5de] px-2 py-1 text-xs font-bold text-[#0a7a35]">{patient.status}</span>
+                    <span className="rounded-full bg-[var(--hh-green-light)] px-2 py-1 text-xs font-bold text-[var(--hh-green-dark)]">{patient.status}</span>
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex justify-end gap-2">

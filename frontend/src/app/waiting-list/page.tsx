@@ -20,7 +20,7 @@ export default async function WaitingListPage() {
                 <div className="font-bold">{visit.patient_name || "Unknown patient"}</div>
                 <div className="text-sm text-[#66736d]">{visit.main_complaint}</div>
               </div>
-              <span className="rounded-full bg-[#d1f5de] px-2 py-1 text-xs font-bold text-[#0a7a35]">Ready for clinician</span>
+              <span className="rounded-full bg-[var(--hh-green-light)] px-2 py-1 text-xs font-bold text-[var(--hh-green-dark)]">Ready for clinician</span>
             </div>
           ))}
           {visits.results.length === 0 && <div className="px-5 py-10 text-sm text-[#66736d]">No patients are waiting yet. Check-in status will be fully backed by appointments next.</div>}

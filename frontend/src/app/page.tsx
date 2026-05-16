@@ -12,7 +12,7 @@ export default async function DashboardPage() {
   const workflows = allowedForRole(workflowCards, session.role);
   const statCards = [
     { label: "Total patients", value: stats.total_patients, icon: UserRound, tone: "bg-[#e8d5f3] text-[var(--hh-purple)]" },
-    { label: "Today's visits", value: stats.today_visits, icon: CalendarDays, tone: "bg-[#d1f5de] text-[#0a7a35]" },
+    { label: "Today's visits", value: stats.today_visits, icon: CalendarDays, tone: "bg-[var(--hh-green-light)] text-[var(--hh-green-dark)]" },
     { label: "Access requests", value: stats.pending_drafts, icon: FileWarning, tone: "bg-amber-100 text-amber-700" },
     { label: "Follow-ups due", value: stats.follow_ups_due, icon: HeartPulse, tone: "bg-rose-100 text-rose-700" }
   ];
@@ -139,7 +139,7 @@ export default async function DashboardPage() {
                     <td className="px-5 py-4 font-mono text-xs text-[var(--hh-purple)]">{patient.patient_code}</td>
                     <td className="px-5 py-4 text-[#66736d]">{patient.primary_phone || "No phone"}</td>
                     <td className="px-5 py-4">
-                      <span className="rounded-full bg-[#d1f5de] px-2 py-1 text-xs font-bold text-[#0a7a35]">{patient.status}</span>
+                      <span className="rounded-full bg-[var(--hh-green-light)] px-2 py-1 text-xs font-bold text-[var(--hh-green-dark)]">{patient.status}</span>
                     </td>
                   </tr>
                 ))}

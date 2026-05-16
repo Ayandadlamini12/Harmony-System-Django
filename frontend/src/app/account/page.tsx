@@ -17,7 +17,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           </div>
           <h2 className="mt-4 text-xl font-bold">{session.name}</h2>
           <p className="mt-1 text-sm text-[#66736d]">{session.username}</p>
-          <span className="mt-4 inline-flex rounded-full bg-[#d1f5de] px-3 py-1 text-xs font-bold capitalize text-[#0a7a35]">{session.role}</span>
+          <span className="mt-4 inline-flex rounded-full bg-[var(--hh-green-light)] px-3 py-1 text-xs font-bold capitalize text-[var(--hh-green-dark)]">{session.role}</span>
         </div>
 
         <div className="grid gap-4">
