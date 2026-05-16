@@ -3,12 +3,13 @@ import Link from "next/link";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { getPatients } from "@/lib/api";
+import { getAccessRequests, getPatients } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
 
 export default async function PatientManagementDashboard() {
-  const [session, patients] = await Promise.all([getSessionUser(), getPatients()]);
+  const [session, patients, accessRequests] = await Promise.all([getSessionUser(), getPatients(), getAccessRequests()]);
   const canSeeClinical = session.role === "admin" || session.role === "clinician";
+  const pendingAccessRequests = accessRequests.results.filter((request) => request.status === "pending");
 
   const cards = [
     {
@@ -98,7 +99,6 @@ export default async function PatientManagementDashboard() {
       <section className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {cards.map((card) => {
           const Icon = card.icon;
-          const enabled = card.ready || card.href.startsWith("#");
           return (
             <Link key={card.title} href={card.href} className="hh-panel block p-5 transition hover:border-[#d1abe7] hover:shadow-md">
               <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#f5edfa] text-[var(--hh-purple)]">
@@ -121,7 +121,22 @@ export default async function PatientManagementDashboard() {
         </div>
         <div id="approvals" className="hh-panel p-5">
           <h2 className="font-bold">Approvals</h2>
-          <p className="mt-2 text-sm text-[#66736d]">Clinicians will authorize elevated access requests from reception here.</p>
+          <p className="mt-2 text-sm text-[#66736d]">Clinicians authorize elevated access requests from reception here.</p>
+          <div className="mt-4 divide-y divide-[var(--hh-border)]">
+            {pendingAccessRequests.slice(0, 5).map((request) => (
+              <div key={request.id} className="py-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-semibold">{request.patient_name || `Patient #${request.patient}`}</div>
+                  <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-bold uppercase text-amber-700">{request.status}</span>
+                </div>
+                <p className="mt-1 text-sm text-[#66736d]">{request.reason || "No reason provided."}</p>
+                <p className="mt-1 text-xs text-[#66736d]">Requested by {request.requested_by_name || "Reception"}</p>
+              </div>
+            ))}
+            {pendingAccessRequests.length === 0 && (
+              <div className="py-4 text-sm text-[#66736d]">No pending access requests.</div>
+            )}
+          </div>
         </div>
       </section>
     </AppShell>

@@ -26,4 +26,8 @@ class UserViewSet(viewsets.ModelViewSet):
         user.save(update_fields=["is_active"])
         return Response(self.get_serializer(user).data)
 
+    @action(detail=False, methods=["get"], permission_classes=[permissions.IsAuthenticated])
+    def me(self, request):
+        return Response(self.get_serializer(request.user).data)
+
 # Create your views here.

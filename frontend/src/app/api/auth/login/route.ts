@@ -5,11 +5,6 @@ const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BAS
 const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
 const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:3000";
 
-function decodeJwtPayload(token: string) {
-  const [, payload] = token.split(".");
-  return JSON.parse(Buffer.from(payload, "base64url").toString("utf8")) as { user_id: string };
-}
-
 export async function POST(request: Request) {
   const formData = await request.formData();
   const username = String(formData.get("username") || "");
@@ -28,21 +23,16 @@ export async function POST(request: Request) {
   const tokens = (await response.json()) as { access: string; refresh: string };
   let userProfile = { role: "receptionist", username, name: username };
   try {
-    const payload = decodeJwtPayload(tokens.access);
-    const usersResponse = await fetch(`${API_BASE_URL}/users/`, {
+    const userResponse = await fetch(`${API_BASE_URL}/users/me/`, {
       headers: { Authorization: `Bearer ${tokens.access}` }
     });
-    if (usersResponse.ok) {
-      const usersPayload = await usersResponse.json();
-      const users = Array.isArray(usersPayload.results) ? usersPayload.results : usersPayload;
-      const currentUser = users.find((user: { id: number }) => String(user.id) === String(payload.user_id));
-      if (currentUser) {
-        userProfile = {
-          role: currentUser.role || "receptionist",
-          username: currentUser.username || username,
-          name: currentUser.name || currentUser.email || currentUser.username || username
-        };
-      }
+    if (userResponse.ok) {
+      const currentUser = await userResponse.json();
+      userProfile = {
+        role: currentUser.role || "receptionist",
+        username: currentUser.username || username,
+        name: currentUser.name || currentUser.email || currentUser.username || username
+      };
     }
   } catch {
     userProfile = { role: "receptionist", username, name: username };

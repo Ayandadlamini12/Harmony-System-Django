@@ -13,7 +13,7 @@ export default async function DashboardPage() {
   const statCards = [
     { label: "Total patients", value: stats.total_patients, icon: UserRound, tone: "bg-[#e8d5f3] text-[var(--hh-purple)]" },
     { label: "Today's visits", value: stats.today_visits, icon: CalendarDays, tone: "bg-[#d1f5de] text-[#0a7a35]" },
-    { label: "Pending drafts", value: stats.pending_drafts, icon: FileWarning, tone: "bg-amber-100 text-amber-700" },
+    { label: "Access requests", value: stats.pending_drafts, icon: FileWarning, tone: "bg-amber-100 text-amber-700" },
     { label: "Follow-ups due", value: stats.follow_ups_due, icon: HeartPulse, tone: "bg-rose-100 text-rose-700" }
   ];
 

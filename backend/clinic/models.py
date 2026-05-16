@@ -117,6 +117,47 @@ class PatientCondition(TimeStampedModel):
         return self.condition_label
 
 
+class ElevatedAccessRequest(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        EXPIRED = "expired", "Expired"
+
+    class Scope(models.TextChoices):
+        MEDICAL_RECORDS = "medical_records", "Medical records"
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="access_requests")
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="clinical_access_requests",
+    )
+    reviewed_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_clinical_access_requests",
+    )
+    scope = models.CharField(max_length=40, choices=Scope.choices, default=Scope.MEDICAL_RECORDS)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING)
+    reason = models.TextField(blank=True)
+    review_note = models.TextField(blank=True)
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    expires_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["patient", "status"]),
+            models.Index(fields=["requested_by", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.patient.patient_code} access request by {self.requested_by}"
+
+
 class Visit(TimeStampedModel):
     class VisitType(models.TextChoices):
         NEW_CONSULTATION = "new_consultation", "New consultation"

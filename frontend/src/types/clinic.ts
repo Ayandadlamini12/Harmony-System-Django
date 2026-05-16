@@ -53,6 +53,24 @@ export type Visit = {
   };
 };
 
+export type ElevatedAccessRequest = {
+  id: number;
+  patient: number;
+  patient_name?: string;
+  patient_code?: string;
+  requested_by: number;
+  requested_by_name?: string;
+  reviewed_by?: number | null;
+  reviewed_by_name?: string | null;
+  scope: string;
+  status: "pending" | "approved" | "rejected" | "expired";
+  reason?: string;
+  review_note?: string;
+  reviewed_at?: string | null;
+  expires_at?: string | null;
+  created_at: string;
+};
+
 export type Paginated<T> = {
   count: number;
   next: string | null;

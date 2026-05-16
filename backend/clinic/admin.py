@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AuditLog, FollowUpEvaluation, Patient, PatientCondition, PatientProfile, Visit, Vital
+from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, Patient, PatientCondition, PatientProfile, Visit, Vital
 
 
 class PatientProfileInline(admin.StackedInline):
@@ -21,6 +21,13 @@ class VisitAdmin(admin.ModelAdmin):
     list_display = ("patient", "visit_type", "visit_date", "practitioner")
     search_fields = ("patient__full_name_display", "patient__patient_code", "main_complaint")
     list_filter = ("visit_type", "visit_date")
+
+
+@admin.register(ElevatedAccessRequest)
+class ElevatedAccessRequestAdmin(admin.ModelAdmin):
+    list_display = ("patient", "requested_by", "status", "reviewed_by", "expires_at", "created_at")
+    search_fields = ("patient__full_name_display", "patient__patient_code", "requested_by__username")
+    list_filter = ("status", "scope", "created_at", "expires_at")
 
 
 admin.site.register(PatientCondition)

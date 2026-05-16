@@ -1,7 +1,8 @@
 from django.db import transaction
 from rest_framework import serializers
 
-from .models import AuditLog, FollowUpEvaluation, Patient, PatientCondition, PatientProfile, Visit, Vital
+from .access import has_patient_clinical_access
+from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, Patient, PatientCondition, PatientProfile, Visit, Vital
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -144,6 +145,19 @@ class PatientDetailSerializer(PatientListSerializer):
     class Meta(PatientListSerializer.Meta):
         fields = PatientListSerializer.Meta.fields + ("profile", "conditions", "visits")
 
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        request = self.context.get("request")
+        user = request.user if request else None
+        if not has_patient_clinical_access(user, instance.id):
+            data.pop("profile", None)
+            data.pop("conditions", None)
+            data.pop("visits", None)
+            data["clinical_access"] = "approval_required"
+        else:
+            data["clinical_access"] = "active"
+        return data
+
     @transaction.atomic
     def create(self, validated_data):
         profile_data = validated_data.pop("profile", {})
@@ -192,3 +206,46 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "ip_address",
             "created_at",
         )
+
+
+class ElevatedAccessRequestSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
+    patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
+    requested_by_name = serializers.CharField(source="requested_by.get_full_name", read_only=True)
+    reviewed_by_name = serializers.CharField(source="reviewed_by.get_full_name", read_only=True)
+
+    class Meta:
+        model = ElevatedAccessRequest
+        fields = (
+            "id",
+            "patient",
+            "patient_name",
+            "patient_code",
+            "requested_by",
+            "requested_by_name",
+            "reviewed_by",
+            "reviewed_by_name",
+            "scope",
+            "status",
+            "reason",
+            "review_note",
+            "reviewed_at",
+            "expires_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "requested_by",
+            "reviewed_by",
+            "status",
+            "review_note",
+            "reviewed_at",
+            "expires_at",
+            "created_at",
+            "updated_at",
+        )
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        validated_data["requested_by"] = request.user
+        return super().create(validated_data)
