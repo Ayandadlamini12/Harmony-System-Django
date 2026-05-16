@@ -1,0 +1,55 @@
+"use server";
+
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
+
+const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
+
+function optionalText(formData: FormData, key: string) {
+  return String(formData.get(key) || "").trim();
+}
+
+export async function updatePatient(id: string, formData: FormData) {
+  const accessToken = (await cookies()).get("harmony_access")?.value;
+  if (!accessToken) redirect("/login");
+
+  const childrenCount = optionalText(formData, "children_count");
+  const body = {
+    first_name: optionalText(formData, "first_name"),
+    middle_name: optionalText(formData, "middle_name"),
+    last_name: optionalText(formData, "last_name"),
+    national_id: optionalText(formData, "national_id") || null,
+    date_of_birth: optionalText(formData, "date_of_birth") || null,
+    gender: optionalText(formData, "gender") || "prefer_not_to_say",
+    primary_phone: optionalText(formData, "primary_phone"),
+    secondary_phone: optionalText(formData, "secondary_phone"),
+    region: optionalText(formData, "region"),
+    town_or_locality: optionalText(formData, "town_or_locality"),
+    village: optionalText(formData, "village"),
+    status: optionalText(formData, "status") || "active",
+    profile: {
+      hiv_status: optionalText(formData, "hiv_status") || "undisclosed",
+      children_count: childrenCount ? Number(childrenCount) : null,
+      past_medical_history: optionalText(formData, "past_medical_history"),
+      family_medical_history: optionalText(formData, "family_medical_history"),
+      allopathic_medication: optionalText(formData, "allopathic_medication"),
+      other_important_information: optionalText(formData, "other_important_information")
+    }
+  };
+
+  const response = await fetch(`${API_BASE_URL}/patients/${id}/`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    redirect(`/patients/${id}/edit?error=${encodeURIComponent(errorText.slice(0, 180))}`);
+  }
+
+  redirect(`/patients/${id}`);
+}

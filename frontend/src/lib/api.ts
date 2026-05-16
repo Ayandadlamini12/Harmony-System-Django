@@ -37,6 +37,10 @@ export function getPatients(search = "") {
   });
 }
 
+export function getPatient(id: string | number) {
+  return apiGet<Patient | null>(`/patients/${id}/`, null);
+}
+
 export function getVisits() {
   return apiGet<Paginated<Visit>>("/visits/", {
     count: 0,

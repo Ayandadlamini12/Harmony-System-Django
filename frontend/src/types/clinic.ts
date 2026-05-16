@@ -10,6 +10,7 @@ export type Patient = {
   patient_code: string;
   national_id?: string | null;
   primary_phone?: string;
+  secondary_phone?: string;
   first_name: string;
   middle_name?: string;
   last_name: string;
@@ -23,6 +24,7 @@ export type Patient = {
   last_visit_date?: string | null;
   profile?: PatientProfile;
   visits?: Visit[];
+  clinical_access?: "active" | "approval_required";
 };
 
 export type PatientProfile = {
