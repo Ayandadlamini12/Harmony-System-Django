@@ -58,8 +58,11 @@ a {
   padding: 0.65rem 0.95rem;
   font-size: 0.875rem;
   font-weight: 700;
-  color: #fff !important;
   background: var(--hh-purple);
+}
+
+.hh-button:not(.hh-button-secondary) {
+  color: #fff;
 }
 
 .hh-button-secondary {
