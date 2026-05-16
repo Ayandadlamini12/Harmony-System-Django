@@ -1,5 +1,6 @@
 import { AppShell } from "@/components/app-shell";
 import { getVisits } from "@/lib/api";
+import Link from "next/link";
 
 function label(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
@@ -9,7 +10,7 @@ export default async function VisitsPage() {
   const visits = await getVisits();
 
   return (
-    <AppShell title="Visits">
+    <AppShell title="Visits" action={<Link className="hh-button" href="/visits/new">Add visit</Link>}>
       <div className="hh-panel overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">

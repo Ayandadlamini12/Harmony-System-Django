@@ -14,7 +14,15 @@ export default async function DashboardPage() {
   ];
 
   return (
-    <AppShell title="Dashboard" action={<Link className="hh-button" href="/patients/new">Register patient</Link>}>
+    <AppShell
+      title="Dashboard"
+      action={
+        <>
+          <Link className="hh-button hh-button-secondary" href="/visits/new">Add visit</Link>
+          <Link className="hh-button" href="/patients/new">Register patient</Link>
+        </>
+      }
+    >
       <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         {statCards.map((card) => {
           const Icon = card.icon;

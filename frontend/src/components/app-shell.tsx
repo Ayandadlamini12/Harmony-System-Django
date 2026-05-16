@@ -1,4 +1,4 @@
-import { Activity, ClipboardList, LayoutDashboard, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { Activity, ClipboardList, HeartPulse, LayoutDashboard, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
 import { cookies } from "next/headers";
 import Link from "next/link";
 
@@ -7,6 +7,7 @@ const nav = [
   { href: "/patients", label: "Patients", icon: Search },
   { href: "/patients/new", label: "Register", icon: UserPlus },
   { href: "/visits", label: "Visits", icon: ClipboardList },
+  { href: "/visits/new", label: "Add Visit", icon: HeartPulse },
   { href: "/staff", label: "Staff", icon: Users }
 ];
 
