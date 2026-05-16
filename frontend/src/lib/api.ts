@@ -59,4 +59,14 @@ export function getAccessRequests() {
   });
 }
 
+export function getUsers(search = "") {
+  const query = search ? `?search=${encodeURIComponent(search)}` : "";
+  return apiGet<Paginated<User>>(`/users/${query}`, {
+    count: 0,
+    next: null,
+    previous: null,
+    results: []
+  });
+}
+
 export { API_BASE_URL };

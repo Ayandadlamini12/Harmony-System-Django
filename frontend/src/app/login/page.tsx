@@ -1,6 +1,7 @@
 import { Activity } from "lucide-react";
+import Link from "next/link";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string; registered?: string }> }) {
   const params = await searchParams;
 
   return (
@@ -15,6 +16,12 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
             <p className="text-sm text-[#66736d]">Sign in to the clinic workspace</p>
           </div>
         </div>
+
+        {params.registered && (
+          <div className="mb-4 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700">
+            Account created successfully. Please sign in.
+          </div>
+        )}
 
         {params.error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
@@ -33,6 +40,11 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           </label>
           <button className="hh-button" type="submit">Sign in</button>
         </form>
+
+        <p className="mt-4 text-center text-sm text-[#66736d]">
+          Don&apos;t have an account?{" "}
+          <Link href="/register" className="font-semibold text-[var(--hh-purple)] hover:underline">Create one</Link>
+        </p>
       </section>
     </main>
   );

@@ -73,6 +73,17 @@ export type ElevatedAccessRequest = {
   created_at: string;
 };
 
+export type User = {
+  id: number;
+  username: string;
+  email: string;
+  first_name: string;
+  last_name: string;
+  name: string;
+  role: "admin" | "clinician" | "receptionist";
+  is_active: boolean;
+};
+
 export type Paginated<T> = {
   count: number;
   next: string | null;

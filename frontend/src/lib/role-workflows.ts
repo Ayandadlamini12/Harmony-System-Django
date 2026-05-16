@@ -45,7 +45,7 @@ export const navItems: NavItem[] = [
   { href: "/patients/new", label: "Register Patient", icon: UserPlus, roles: ["admin", "receptionist"] },
   { href: "/visits", label: "Visit Records", icon: ClipboardList, roles: ["admin", "clinician"] },
   { href: "/visits/new", label: "Add Visit", icon: HeartPulse, roles: ["admin", "clinician"] },
-  { href: "/staff", label: "Staff", icon: UserCog, roles: ["admin"] },
+  { href: "/users", label: "Users", icon: UserCog, roles: ["admin"] },
   { href: "/account", label: "Account", icon: Settings, roles: ["admin", "clinician", "receptionist"] }
 ];
 
