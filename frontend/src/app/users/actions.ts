@@ -63,7 +63,7 @@ export async function updateUser(id: number, formData: FormData) {
   return { error: null };
 }
 
-export async function toggleUserStatus(id: number) {
+export async function toggleUserStatus(id: number, formData?: FormData) {
   const response = await fetch(`${API_BASE_URL}/users/${id}/toggle_status/`, {
     method: "POST",
     headers: await authHeaders(),
