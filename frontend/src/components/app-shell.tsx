@@ -43,7 +43,7 @@ export async function AppShell({ children, title, action }: { children: React.Re
           {navLinks}
         </nav>
       </aside>
-      <main>
+      <main className="flex min-h-screen flex-col">
         <MobileSidebar role={session.role} name={session.name} />
 
         <header className="flex min-h-16 flex-col gap-3 border-b border-[var(--hh-border)] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
@@ -65,7 +65,7 @@ export async function AppShell({ children, title, action }: { children: React.Re
             )}
           </div>
         </header>
-        <div className="mx-auto max-w-7xl px-5 py-6">{children}</div>
+        <div className="mx-auto w-full max-w-7xl flex-1 px-5 py-6">{children}</div>
         <Footer />
       </main>
     </div>
