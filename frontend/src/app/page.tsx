@@ -1,11 +1,15 @@
-import { CalendarDays, FileWarning, HeartPulse, UserRound } from "lucide-react";
+import { CalendarDays, Clock, FileWarning, HeartPulse, LockKeyhole, UserRound } from "lucide-react";
 import Link from "next/link";
 
 import { AppShell } from "@/components/app-shell";
+import { Button } from "@/components/ui/button";
 import { getDashboardStats, getPatients, getVisits } from "@/lib/api";
+import { allowedForRole, workflowCards } from "@/lib/role-workflows";
+import { getSessionUser } from "@/lib/session";
 
 export default async function DashboardPage() {
-  const [stats, patients, visits] = await Promise.all([getDashboardStats(), getPatients(), getVisits()]);
+  const [session, stats, patients, visits] = await Promise.all([getSessionUser(), getDashboardStats(), getPatients(), getVisits()]);
+  const workflows = allowedForRole(workflowCards, session.role);
   const statCards = [
     { label: "Total patients", value: stats.total_patients, icon: UserRound, tone: "bg-[#e8d5f3] text-[var(--hh-purple)]" },
     { label: "Today's visits", value: stats.today_visits, icon: CalendarDays, tone: "bg-[#d1f5de] text-[#0a7a35]" },
@@ -15,11 +19,11 @@ export default async function DashboardPage() {
 
   return (
     <AppShell
-      title="Dashboard"
+      title={`${session.role.charAt(0).toUpperCase()}${session.role.slice(1)} dashboard`}
       action={
         <>
-          <Link className="hh-button hh-button-secondary" href="/visits/new">Add visit</Link>
-          <Link className="hh-button" href="/patients/new">Register patient</Link>
+          {session.role !== "receptionist" && <Button asChild variant="secondary"><Link href="/visits/new">Add visit</Link></Button>}
+          {(session.role === "admin" || session.role === "receptionist") && <Button asChild><Link href="/patients/new">Register patient</Link></Button>}
         </>
       }
     >
@@ -41,6 +45,77 @@ export default async function DashboardPage() {
           );
         })}
       </section>
+
+      <section className="mt-6">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <div>
+            <h2 className="text-base font-bold">Workspace functions</h2>
+            <p className="text-sm text-[#66736d]">Functions shown here are activated according to your role.</p>
+          </div>
+          <span className="rounded-full bg-[#f5edfa] px-3 py-1 text-xs font-bold capitalize text-[var(--hh-purple)]">{session.role}</span>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {workflows.map((workflow) => {
+            const Icon = workflow.icon;
+            return (
+              <Link key={workflow.title} href={workflow.href} className="hh-panel block p-5 transition hover:border-[#d1abe7] hover:shadow-md">
+                <div className="flex items-start gap-4">
+                  <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-[#f5edfa] text-[var(--hh-purple)]">
+                    <Icon size={22} />
+                  </div>
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-bold">{workflow.title}</h3>
+                      {workflow.status === "planned" && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-700">planned</span>}
+                    </div>
+                    <p className="mt-1 text-sm leading-6 text-[#66736d]">{workflow.description}</p>
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
+      </section>
+
+      {session.role === "receptionist" && (
+        <section className="mt-6 rounded-lg border border-amber-200 bg-amber-50 p-5">
+          <div className="flex items-start gap-3">
+            <LockKeyhole className="mt-0.5 text-amber-700" size={22} />
+            <div>
+              <h2 className="font-bold text-amber-900">Confidential record access requires approval</h2>
+              <p className="mt-1 text-sm leading-6 text-amber-800">
+                Reception can register and update non-confidential patient records. Medical notes, visits, diagnosis, remedy, and follow-up records require elevated access authorized by a clinician.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {session.role === "clinician" && (
+        <section className="mt-6 grid gap-4 lg:grid-cols-3">
+          <div className="hh-panel p-5">
+            <div className="flex items-center gap-3">
+              <Clock className="text-[var(--hh-purple)]" size={22} />
+              <h2 className="font-bold">Waiting list</h2>
+            </div>
+            <p className="mt-3 text-sm text-[#66736d]">Arrived patients will appear here once check-in is configured.</p>
+          </div>
+          <div className="hh-panel p-5">
+            <div className="flex items-center gap-3">
+              <LockKeyhole className="text-[var(--hh-purple)]" size={22} />
+              <h2 className="font-bold">Access approvals</h2>
+            </div>
+            <p className="mt-3 text-sm text-[#66736d]">Authorize temporary elevated access for reception requests.</p>
+          </div>
+          <div className="hh-panel p-5">
+            <div className="flex items-center gap-3">
+              <CalendarDays className="text-[var(--hh-purple)]" size={22} />
+              <h2 className="font-bold">Appointments</h2>
+            </div>
+            <p className="mt-3 text-sm text-[#66736d]">Booked patients and appointment check-ins will be shown here.</p>
+          </div>
+        </section>
+      )}
 
       <section className="mt-6 grid gap-6 xl:grid-cols-[1.15fr_0.85fr]">
         <div className="hh-panel overflow-hidden">

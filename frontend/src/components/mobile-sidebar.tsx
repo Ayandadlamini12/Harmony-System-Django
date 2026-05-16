@@ -1,23 +1,17 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { Activity, ClipboardList, HeartPulse, LayoutDashboard, Menu, Search, UserPlus, Users, X } from "lucide-react";
+import { Activity, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { allowedForRole, navItems } from "@/lib/role-workflows";
+import type { UserRole } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
-const nav = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/patients", label: "Patients", icon: Search },
-  { href: "/patients/new", label: "Register", icon: UserPlus },
-  { href: "/visits", label: "Visits", icon: ClipboardList },
-  { href: "/visits/new", label: "Add Visit", icon: HeartPulse },
-  { href: "/staff", label: "Staff", icon: Users }
-];
-
-function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
+function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRole; onNavigate?: () => void }) {
   const pathname = usePathname();
+  const nav = allowedForRole(navItems, role);
 
   return (
     <div className="flex h-full flex-col bg-[var(--hh-purple-dark)] text-white">
@@ -29,6 +23,10 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
           <div className="font-bold">Harmony Health</div>
           <div className="text-xs text-white/70">Clinic system</div>
         </div>
+      </div>
+      <div className="mx-3 mb-3 rounded-lg bg-white/8 px-3 py-3">
+        <div className="text-sm font-bold">{name}</div>
+        <div className="mt-1 text-xs capitalize text-white/65">{role} workspace</div>
       </div>
       <nav className="grid gap-1 px-3">
         {nav.map((item) => {
@@ -54,7 +52,7 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-export function MobileSidebar() {
+export function MobileSidebar({ name, role }: { name: string; role: UserRole }) {
   return (
     <Dialog.Root>
       <div className="flex h-16 items-center justify-between border-b border-[var(--hh-border)] bg-white px-4 lg:hidden">
@@ -81,7 +79,7 @@ export function MobileSidebar() {
             <X size={18} />
             <span className="sr-only">Close menu</span>
           </Dialog.Close>
-          <SidebarContent />
+          <SidebarContent name={name} role={role} />
         </Dialog.Content>
       </Dialog.Portal>
     </Dialog.Root>
