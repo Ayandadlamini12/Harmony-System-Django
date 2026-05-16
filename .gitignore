@@ -16,6 +16,7 @@ node_modules/
 out/
 *.tsbuildinfo
 npm-debug.log*
+*.log
 
 .DS_Store
 Thumbs.db
