@@ -2,6 +2,7 @@
 
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
 
@@ -32,10 +33,9 @@ export async function createUser(formData: FormData) {
 
   revalidatePath("/users");
   if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    return { error: Object.values(data as Record<string, unknown>).flat().join("; ") || "Failed to create user." };
+    redirect("/users?error=create_failed");
   }
-  return { error: null };
+  redirect("/users");
 }
 
 export async function updateUser(id: number, formData: FormData) {
@@ -57,21 +57,16 @@ export async function updateUser(id: number, formData: FormData) {
 
   revalidatePath("/users");
   if (!response.ok) {
-    const data = await response.json().catch(() => ({}));
-    return { error: Object.values(data as Record<string, unknown>).flat().join("; ") || "Failed to update user." };
+    redirect("/users?error=update_failed");
   }
-  return { error: null };
+  redirect("/users");
 }
 
-export async function toggleUserStatus(id: number, formData?: FormData) {
+export async function toggleUserStatus(id: number) {
   const response = await fetch(`${API_BASE_URL}/users/${id}/toggle_status/`, {
     method: "POST",
     headers: await authHeaders(),
   });
 
   revalidatePath("/users");
-  if (!response.ok) {
-    return { error: "Failed to toggle user status." };
-  }
-  return { error: null };
 }

@@ -7,15 +7,23 @@ import { getUsers } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
 import { toggleUserStatus, updateUser } from "./actions";
 
-export default async function UsersPage({ searchParams }: { searchParams: Promise<{ search?: string }> }) {
+export default async function UsersPage({ searchParams }: { searchParams: Promise<{ search?: string; error?: string }> }) {
   const params = await searchParams;
   const [data, session] = await Promise.all([getUsers(params.search || ""), getSessionUser()]);
 
   const editUser = params.search?.startsWith("edit:") ? Number(params.search.split(":")[1]) : null;
   const selectedUser = editUser ? data.results.find((u) => u.id === editUser) : null;
+  const errorMsg = params.error;
 
   return (
     <AppShell title="User management" action={<Link className="hh-button" href="/register">Add user</Link>}>
+      {errorMsg && (
+        <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+          {errorMsg === "create_failed" && "Failed to create user. Please try again."}
+          {errorMsg === "update_failed" && "Failed to update user. Please try again."}
+        </div>
+      )}
+
       <form className="mb-5 max-w-md">
         <input className="hh-input" name="search" defaultValue={selectedUser ? "" : params.search || ""} placeholder="Search by name, username, or email" />
       </form>
