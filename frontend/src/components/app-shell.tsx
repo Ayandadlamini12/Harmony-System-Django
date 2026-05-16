@@ -1,4 +1,5 @@
 import { Activity, ClipboardList, LayoutDashboard, Search, ShieldCheck, UserPlus, Users } from "lucide-react";
+import { cookies } from "next/headers";
 import Link from "next/link";
 
 const nav = [
@@ -9,7 +10,9 @@ const nav = [
   { href: "/staff", label: "Staff", icon: Users }
 ];
 
-export function AppShell({ children, title, action }: { children: React.ReactNode; title: string; action?: React.ReactNode }) {
+export async function AppShell({ children, title, action }: { children: React.ReactNode; title: string; action?: React.ReactNode }) {
+  const signedIn = Boolean((await cookies()).get("harmony_access")?.value);
+
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
       <aside className="bg-[var(--hh-purple-dark)] text-white">
@@ -43,7 +46,16 @@ export function AppShell({ children, title, action }: { children: React.ReactNod
               Role-based clinical workspace
             </div>
           </div>
-          {action}
+          <div className="flex items-center gap-3">
+            {action}
+            {signedIn ? (
+              <form action="/api/auth/logout" method="post">
+                <button className="hh-button hh-button-secondary" type="submit">Sign out</button>
+              </form>
+            ) : (
+              <Link className="hh-button hh-button-secondary" href="/login">Sign in</Link>
+            )}
+          </div>
         </header>
         <div className="mx-auto max-w-7xl px-5 py-6">{children}</div>
       </main>

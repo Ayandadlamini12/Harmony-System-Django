@@ -1,11 +1,15 @@
 import type { DashboardStats, Paginated, Patient, Visit } from "@/types/clinic";
+import { cookies } from "next/headers";
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
+const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
 
 async function apiGet<T>(path: string, fallback: T): Promise<T> {
   try {
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get("harmony_access")?.value;
     const response = await fetch(`${API_BASE_URL}${path}`, {
-      next: { revalidate: 10 }
+      headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {},
+      cache: "no-store"
     });
     if (!response.ok) return fallback;
     return (await response.json()) as T;
