@@ -1,4 +1,35 @@
+version: '3.8'
+
 services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: harmony-django-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-harmony}
+      POSTGRES_USER: ${DB_USERNAME:-harmony}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-harmony}
+    volumes:
+      - postgres_django_data:/var/lib/postgresql/data
+    ports:
+      - "54325:5432"  # Using non-standard port to avoid conflicts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-harmony} -d ${DB_DATABASE:-harmony}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - harmony-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: harmony-django-redis
+    restart: always
+    ports:
+      - "63795:6379"  # Using non-standard port to avoid conflicts
+    networks:
+      - harmony-net
+
   backend:
     build:
       context: ./backend
@@ -7,11 +38,11 @@ services:
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DEBUG: "false"
-      DJANGO_ALLOWED_HOSTS: ${APP_URL},localhost,127.0.0.1
-      DATABASE_URL: postgres://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE}
-      POSTGRES_DB: ${DB_DATABASE}
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      DJANGO_ALLOWED_HOSTS: ${APP_URL:-localhost},localhost,127.0.0.1,backend
+      DATABASE_URL: postgres://${DB_USERNAME:-harmony}:${DB_PASSWORD:-harmony}@postgres:5432/${DB_DATABASE:-harmony}
+      POSTGRES_DB: ${DB_DATABASE:-harmony}
+      POSTGRES_USER: ${DB_USERNAME:-harmony}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-harmony}
       POSTGRES_HOST: postgres
       POSTGRES_PORT: 5432
       CELERY_BROKER_URL: redis://redis:6379/0
@@ -33,10 +64,10 @@ services:
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DEBUG: "false"
-      DATABASE_URL: postgres://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE}
-      POSTGRES_DB: ${DB_DATABASE}
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      DATABASE_URL: postgres://${DB_USERNAME:-harmony}:${DB_PASSWORD:-harmony}@postgres:5432/${DB_DATABASE:-harmony}
+      POSTGRES_DB: ${DB_DATABASE:-harmony}
+      POSTGRES_USER: ${DB_USERNAME:-harmony}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-harmony}
       POSTGRES_HOST: postgres
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
@@ -55,10 +86,10 @@ services:
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DEBUG: "false"
-      DATABASE_URL: postgres://${DB_USERNAME}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE}
-      POSTGRES_DB: ${DB_DATABASE}
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      DATABASE_URL: postgres://${DB_USERNAME:-harmony}:${DB_PASSWORD:-harmony}@postgres:5432/${DB_DATABASE:-harmony}
+      POSTGRES_DB: ${DB_DATABASE:-harmony}
+      POSTGRES_USER: ${DB_USERNAME:-harmony}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-harmony}
       POSTGRES_HOST: postgres
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
@@ -81,35 +112,6 @@ services:
       COOKIE_SECURE: "true"
     depends_on:
       - backend
-    networks:
-      - harmony-net
-
-  postgres:
-    image: postgres:16-alpine
-    container_name: harmony-django-db
-    restart: always
-    environment:
-      POSTGRES_DB: ${DB_DATABASE}
-      POSTGRES_USER: ${DB_USERNAME}
-      POSTGRES_PASSWORD: ${DB_PASSWORD}
-    volumes:
-      - postgres_django_data:/var/lib/postgresql/data
-    ports:
-      - "54325:5432"
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME} -d ${DB_DATABASE}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - harmony-net
-
-  redis:
-    image: redis:7-alpine
-    container_name: harmony-django-redis
-    restart: always
-    ports:
-      - "63795:6379"
     networks:
       - harmony-net
 
