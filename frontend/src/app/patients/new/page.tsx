@@ -1,11 +1,20 @@
 import { Save } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
+import { createPatient } from "./actions";
 
-export default function NewPatientPage() {
+export default async function NewPatientPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+  const params = await searchParams;
+
   return (
     <AppShell title="Register patient">
-      <form className="grid gap-6">
+      {params.error && (
+        <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
+          The record could not be saved. Check required fields and duplicate ID values.
+        </div>
+      )}
+
+      <form action={createPatient} className="grid gap-6">
         <section className="hh-panel p-5">
           <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Identity</h2>
           <div className="grid gap-4 md:grid-cols-3">
@@ -52,11 +61,13 @@ export default function NewPatientPage() {
             <label><span className="hh-label">Children count</span><input className="hh-input" name="children_count" type="number" min="0" /></label>
             <label><span className="hh-label">Past medical history</span><textarea className="hh-input min-h-28" name="past_medical_history" /></label>
             <label><span className="hh-label">Family medical history</span><textarea className="hh-input min-h-28" name="family_medical_history" /></label>
+            <label><span className="hh-label">Allopathic medication</span><textarea className="hh-input min-h-28" name="allopathic_medication" /></label>
+            <label><span className="hh-label">Other important information</span><textarea className="hh-input min-h-28" name="other_important_information" /></label>
           </div>
         </section>
 
         <div>
-          <button className="hh-button" type="button"><Save size={17} /> Save draft UI</button>
+          <button className="hh-button" type="submit"><Save size={17} /> Save patient</button>
         </div>
       </form>
     </AppShell>

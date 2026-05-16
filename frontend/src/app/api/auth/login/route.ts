@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
 const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
+const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:3000";
 
 export async function POST(request: Request) {
   const formData = await request.formData();
@@ -16,7 +17,7 @@ export async function POST(request: Request) {
   });
 
   if (!response.ok) {
-    return NextResponse.redirect(new URL("/login?error=invalid", request.url), 303);
+    return NextResponse.redirect(new URL("/login?error=invalid", APP_BASE_URL), 303);
   }
 
   const tokens = (await response.json()) as { access: string; refresh: string };
@@ -36,5 +37,5 @@ export async function POST(request: Request) {
     maxAge: 60 * 60 * 24 * 7
   });
 
-  return NextResponse.redirect(new URL("/", request.url), 303);
+  return NextResponse.redirect(new URL("/", APP_BASE_URL), 303);
 }
