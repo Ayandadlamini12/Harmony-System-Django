@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:16-alpine
@@ -31,7 +29,7 @@ services:
       - harmony-net
 
   backend:
-    image: ghcr.io/ayandadlamini12/harmony-backend:latest
+    build: ./backend
     container_name: harmony-django-backend
     restart: always
     environment:
@@ -60,7 +58,7 @@ services:
       - harmony-net
 
   celery:
-    image: ghcr.io/ayandadlamini12/harmony-backend:latest
+    build: ./backend
     container_name: harmony-django-celery
     restart: always
     environment:
@@ -81,7 +79,7 @@ services:
       - harmony-net
 
   celery-beat:
-    image: ghcr.io/ayandadlamini12/harmony-backend:latest
+    build: ./backend
     container_name: harmony-django-beat
     restart: always
     environment:
@@ -102,7 +100,7 @@ services:
       - harmony-net
 
   frontend:
-    image: ghcr.io/ayandadlamini12/harmony-frontend:latest
+    build: ./frontend
     container_name: harmony-django-frontend
     restart: always
     environment:
