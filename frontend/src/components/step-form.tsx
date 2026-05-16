@@ -63,7 +63,13 @@ export function StepForm({ steps, submitLabel }: { steps: Step[]; submitLabel: s
             <h2 className="mt-1 text-lg font-bold">{activeStep.title}</h2>
             <p className="mt-1 text-sm text-[#66736d]">{activeStep.description}</p>
           </div>
-          <div className="p-5">{activeStep.content}</div>
+          <div className="p-5">
+            {steps.map((step, index) => (
+              <div key={step.id} className={cn(index === activeIndex ? "block" : "hidden")}>
+                {step.content}
+              </div>
+            ))}
+          </div>
         </div>
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
