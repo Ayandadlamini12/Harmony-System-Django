@@ -1,10 +1,91 @@
-import { Save } from "lucide-react";
-
 import { AppShell } from "@/components/app-shell";
+import { StepForm } from "@/components/step-form";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { createPatient } from "./actions";
 
 export default async function NewPatientPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const params = await searchParams;
+  const fieldClass = "grid gap-1.5";
+  const twoColumn = "grid gap-4 md:grid-cols-2";
+  const threeColumn = "grid gap-4 md:grid-cols-3";
+  const steps = [
+    {
+      id: "identity",
+      title: "Identity",
+      description: "Name, ID, date of birth, and gender.",
+      content: (
+        <div className={threeColumn}>
+          <label className={fieldClass}><Label>First name</Label><Input name="first_name" required /></label>
+          <label className={fieldClass}><Label>Middle name</Label><Input name="middle_name" /></label>
+          <label className={fieldClass}><Label>Last name</Label><Input name="last_name" required /></label>
+          <label className={fieldClass}><Label>National ID</Label><Input name="national_id" /></label>
+          <label className={fieldClass}><Label>Date of birth</Label><Input name="date_of_birth" type="date" /></label>
+          <label className={fieldClass}>
+            <Label>Gender</Label>
+            <Select name="gender" defaultValue="female">
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+              <option value="other">Other</option>
+              <option value="prefer_not_to_say">Prefer not to say</option>
+            </Select>
+          </label>
+        </div>
+      )
+    },
+    {
+      id: "contact",
+      title: "Contact and location",
+      description: "Phones, region, locality, and village.",
+      content: (
+        <div className={threeColumn}>
+          <label className={fieldClass}><Label>Primary phone</Label><Input name="primary_phone" /></label>
+          <label className={fieldClass}><Label>Secondary phone</Label><Input name="secondary_phone" /></label>
+          <label className={fieldClass}><Label>Region</Label><Input name="region" /></label>
+          <label className={fieldClass}><Label>Town or locality</Label><Input name="town_or_locality" /></label>
+          <label className={fieldClass}><Label>Village</Label><Input name="village" /></label>
+        </div>
+      )
+    },
+    {
+      id: "clinical",
+      title: "Clinical profile",
+      description: "Semi-stable medical history and important patient notes.",
+      content: (
+        <div className={twoColumn}>
+          <label className={fieldClass}>
+            <Label>HIV status</Label>
+            <Select name="hiv_status" defaultValue="undisclosed">
+              <option value="undisclosed">Undisclosed</option>
+              <option value="unknown">Unknown</option>
+              <option value="reactive">Reactive</option>
+              <option value="non_reactive">Non-reactive</option>
+            </Select>
+          </label>
+          <label className={fieldClass}><Label>Children count</Label><Input name="children_count" type="number" min="0" /></label>
+          <label className={fieldClass}><Label>Past medical history</Label><Textarea name="past_medical_history" /></label>
+          <label className={fieldClass}><Label>Family medical history</Label><Textarea name="family_medical_history" /></label>
+          <label className={fieldClass}><Label>Allopathic medication</Label><Textarea name="allopathic_medication" /></label>
+          <label className={fieldClass}><Label>Other important information</Label><Textarea name="other_important_information" /></label>
+        </div>
+      )
+    },
+    {
+      id: "review",
+      title: "Review and save",
+      description: "Confirm the intake details before creating the patient record.",
+      content: (
+        <div className="rounded-lg border border-dashed border-[var(--hh-border)] bg-[#f7faf8] p-5">
+          <h3 className="text-base font-bold">Ready to save</h3>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#66736d]">
+            Use Back to review each section. The system will generate the patient code automatically if one was not provided.
+          </p>
+        </div>
+      )
+    }
+  ];
 
   return (
     <AppShell title="Register patient">
@@ -14,61 +95,8 @@ export default async function NewPatientPage({ searchParams }: { searchParams: P
         </div>
       )}
 
-      <form action={createPatient} className="grid gap-6">
-        <section className="hh-panel p-5">
-          <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Identity</h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            <label><span className="hh-label">First name</span><input className="hh-input" name="first_name" /></label>
-            <label><span className="hh-label">Middle name</span><input className="hh-input" name="middle_name" /></label>
-            <label><span className="hh-label">Last name</span><input className="hh-input" name="last_name" /></label>
-            <label><span className="hh-label">National ID</span><input className="hh-input" name="national_id" /></label>
-            <label><span className="hh-label">Date of birth</span><input className="hh-input" name="date_of_birth" type="date" /></label>
-            <label>
-              <span className="hh-label">Gender</span>
-              <select className="hh-input" name="gender" defaultValue="female">
-                <option value="female">Female</option>
-                <option value="male">Male</option>
-                <option value="other">Other</option>
-                <option value="prefer_not_to_say">Prefer not to say</option>
-              </select>
-            </label>
-          </div>
-        </section>
-
-        <section className="hh-panel p-5">
-          <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Contact</h2>
-          <div className="grid gap-4 md:grid-cols-3">
-            <label><span className="hh-label">Primary phone</span><input className="hh-input" name="primary_phone" /></label>
-            <label><span className="hh-label">Secondary phone</span><input className="hh-input" name="secondary_phone" /></label>
-            <label><span className="hh-label">Region</span><input className="hh-input" name="region" /></label>
-            <label><span className="hh-label">Town or locality</span><input className="hh-input" name="town_or_locality" /></label>
-            <label><span className="hh-label">Village</span><input className="hh-input" name="village" /></label>
-          </div>
-        </section>
-
-        <section className="hh-panel p-5">
-          <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Clinical profile</h2>
-          <div className="grid gap-4 md:grid-cols-2">
-            <label>
-              <span className="hh-label">HIV status</span>
-              <select className="hh-input" name="hiv_status" defaultValue="undisclosed">
-                <option value="undisclosed">Undisclosed</option>
-                <option value="unknown">Unknown</option>
-                <option value="reactive">Reactive</option>
-                <option value="non_reactive">Non-reactive</option>
-              </select>
-            </label>
-            <label><span className="hh-label">Children count</span><input className="hh-input" name="children_count" type="number" min="0" /></label>
-            <label><span className="hh-label">Past medical history</span><textarea className="hh-input min-h-28" name="past_medical_history" /></label>
-            <label><span className="hh-label">Family medical history</span><textarea className="hh-input min-h-28" name="family_medical_history" /></label>
-            <label><span className="hh-label">Allopathic medication</span><textarea className="hh-input min-h-28" name="allopathic_medication" /></label>
-            <label><span className="hh-label">Other important information</span><textarea className="hh-input min-h-28" name="other_important_information" /></label>
-          </div>
-        </section>
-
-        <div>
-          <button className="hh-button" type="submit"><Save size={17} /> Save patient</button>
-        </div>
+      <form action={createPatient}>
+        <StepForm steps={steps} submitLabel="Save patient" />
       </form>
     </AppShell>
   );

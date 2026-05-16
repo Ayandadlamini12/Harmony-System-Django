@@ -13,10 +13,23 @@ const nav = [
 
 export async function AppShell({ children, title, action }: { children: React.ReactNode; title: string; action?: React.ReactNode }) {
   const signedIn = Boolean((await cookies()).get("harmony_access")?.value);
+  const navLinks = (
+    <>
+      {nav.map((item) => {
+        const Icon = item.icon;
+        return (
+          <Link key={item.href} href={item.href} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-white/82 hover:bg-white/10">
+            <Icon size={18} />
+            {item.label}
+          </Link>
+        );
+      })}
+    </>
+  );
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[260px_1fr]">
-      <aside className="bg-[var(--hh-purple-dark)] text-white">
+      <aside className="hidden bg-[var(--hh-purple-dark)] text-white lg:block">
         <div className="flex h-16 items-center gap-3 px-5">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/12">
             <Activity size={22} />
@@ -27,19 +40,34 @@ export async function AppShell({ children, title, action }: { children: React.Re
           </div>
         </div>
         <nav className="grid gap-1 px-3 pb-4 lg:pb-0">
-          {nav.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link key={item.href} href={item.href} className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-white/82 hover:bg-white/10">
-                <Icon size={18} />
-                {item.label}
-              </Link>
-            );
-          })}
+          {navLinks}
         </nav>
       </aside>
       <main>
-        <header className="flex min-h-16 items-center justify-between border-b border-[var(--hh-border)] bg-white px-5">
+        <div className="bg-[var(--hh-purple-dark)] px-3 py-3 text-white lg:hidden">
+          <div className="mb-3 flex items-center gap-3 px-2">
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/12">
+              <Activity size={22} />
+            </div>
+            <div>
+              <div className="font-bold">Harmony Health</div>
+              <div className="text-xs text-white/70">Clinic system</div>
+            </div>
+          </div>
+          <nav className="flex gap-2 overflow-x-auto pb-1">
+            {nav.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Link key={item.href} href={item.href} className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-white/8 px-3 py-2 text-sm font-semibold text-white/86">
+                  <Icon size={16} />
+                  {item.label}
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
+
+        <header className="flex min-h-16 flex-col gap-3 border-b border-[var(--hh-border)] bg-white px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="text-lg font-bold">{title}</h1>
             <div className="mt-1 flex items-center gap-2 text-xs text-[#62706a]">
@@ -47,7 +75,7 @@ export async function AppShell({ children, title, action }: { children: React.Re
               Role-based clinical workspace
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             {action}
             {signedIn ? (
               <form action="/api/auth/logout" method="post">
