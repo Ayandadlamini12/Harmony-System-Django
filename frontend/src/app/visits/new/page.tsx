@@ -1,9 +1,14 @@
 import { Save } from "lucide-react";
+import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { getPatients } from "@/lib/api";
+import { getSessionUser } from "@/lib/session";
 
 export default async function NewVisitPage({ searchParams }: { searchParams: Promise<{ error?: string; patient?: string }> }) {
+  const session = await getSessionUser();
+  if (!session.signedIn) redirect("/login");
+
   const [params, patients] = await Promise.all([searchParams, getPatients()]);
   const today = new Date().toISOString().slice(0, 10);
 

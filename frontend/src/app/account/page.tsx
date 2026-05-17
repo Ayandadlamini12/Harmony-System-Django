@@ -1,10 +1,13 @@
 import { KeyRound, ShieldCheck, UserRound } from "lucide-react";
+import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { getSessionUser } from "@/lib/session";
 
 export default async function AccountPage({ searchParams }: { searchParams: Promise<{ password?: string }> }) {
   const session = await getSessionUser();
+  if (!session.signedIn) redirect("/login");
+
   const params = await searchParams;
   const pwMsg = params.password;
 

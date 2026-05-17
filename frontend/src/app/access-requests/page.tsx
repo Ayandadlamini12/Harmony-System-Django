@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -6,9 +7,11 @@ import { getAccessRequests, getPatients } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
 
 export default async function AccessRequestsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const [params, session, patients, requests] = await Promise.all([
+  const session = await getSessionUser();
+  if (!session.signedIn) redirect("/login");
+
+  const [params, patients, requests] = await Promise.all([
     searchParams,
-    getSessionUser(),
     getPatients(),
     getAccessRequests()
   ]);

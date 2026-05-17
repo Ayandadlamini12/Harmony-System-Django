@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { getPatient } from "@/lib/api";
+import { getSessionUser } from "@/lib/session";
 
 import { updatePatient } from "./actions";
 
@@ -19,9 +20,13 @@ export default async function EditPatientPage({
   searchParams
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<Record<string, string | undefined>>;
+  searchParams: Promise<{ error?: string }>;
 }) {
-  const [{ id }, query] = await Promise.all([params, searchParams]);
+  const session = await getSessionUser();
+  if (!session.signedIn) redirect("/login");
+
+  const { id } = await params;
+  const query = await searchParams;
   const patient = await getPatient(id);
   if (!patient) notFound();
 

@@ -1,12 +1,17 @@
 import { AppShell } from "@/components/app-shell";
 import { getVisits } from "@/lib/api";
+import { getSessionUser } from "@/lib/session";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 function label(value: string) {
   return value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
 export default async function VisitsPage() {
+  const session = await getSessionUser();
+  if (!session.signedIn) redirect("/login");
+
   const visits = await getVisits();
 
   return (

@@ -1,10 +1,15 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { getAccessRequests } from "@/lib/api";
+import { getSessionUser } from "@/lib/session";
 
 export default async function ApprovalsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const session = await getSessionUser();
+  if (!session.signedIn) redirect("/login");
+
   const [params, requests] = await Promise.all([searchParams, getAccessRequests()]);
   const pending = requests.results.filter((request) => request.status === "pending");
 
