@@ -1,17 +1,14 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
+import { AccessRequestForm } from "@/components/access-request-form";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { getAccessRequests, getPatients } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
 
-export default async function AccessRequestsPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
-  const session = await getSessionUser();
-  if (!session.signedIn) redirect("/login");
-
-  const [params, patients, requests] = await Promise.all([
-    searchParams,
+export default async function AccessRequestsPage() {
+  const [session, patients, requests] = await Promise.all([
+    getSessionUser(),
     getPatients(),
     getAccessRequests()
   ]);
@@ -19,9 +16,6 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
 
   return (
     <AppShell title="Access requests" action={<Button asChild variant="secondary"><Link href="/patients/dashboard">Patient Hub</Link></Button>}>
-      {params.created && <div className="mb-5 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-700">Access request submitted.</div>}
-      {params.error && <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{params.error}</div>}
-
       <section className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <div className="hh-panel p-5">
           <h2 className="text-base font-bold">Request elevated access</h2>
@@ -29,22 +23,9 @@ export default async function AccessRequestsPage({ searchParams }: { searchParam
             Reception can request temporary access to confidential patient records. A clinician must approve the request before medical visits are visible.
           </p>
           {canRequest ? (
-            <form action="/api/access-requests/create" method="post" className="mt-5 grid gap-4">
-              <label>
-                <span className="hh-label">Patient</span>
-                <select className="hh-input" name="patient" required>
-                  <option value="">Select patient</option>
-                  {patients.results.map((patient) => (
-                    <option key={patient.id} value={patient.id}>{patient.full_name_display} - {patient.patient_code}</option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span className="hh-label">Reason</span>
-                <textarea className="hh-input min-h-28" name="reason" placeholder="Explain why temporary clinical access is needed." required />
-              </label>
-              <Button type="submit">Submit request</Button>
-            </form>
+            <div className="mt-5">
+              <AccessRequestForm patients={patients.results} />
+            </div>
           ) : (
             <div className="mt-5 rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4 text-sm text-[#66736d]">
               Clinicians review requests on the Approvals page.

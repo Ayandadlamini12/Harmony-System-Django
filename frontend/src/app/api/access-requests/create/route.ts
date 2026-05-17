@@ -2,17 +2,14 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
-const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:3000";
 
 export async function POST(request: Request) {
   const accessToken = (await cookies()).get("harmony_access")?.value;
   if (!accessToken) {
-    return NextResponse.redirect(new URL("/login", APP_BASE_URL), 303);
+    return NextResponse.json({ success: false, error: "unauthorized" }, { status: 401 });
   }
 
-  const formData = await request.formData();
-  const patient = Number(formData.get("patient"));
-  const reason = String(formData.get("reason") || "").trim();
+  const body = (await request.json()) as { patient?: number; reason?: string };
 
   const response = await fetch(`${API_BASE_URL}/access-requests/`, {
     method: "POST",
@@ -20,13 +17,13 @@ export async function POST(request: Request) {
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json"
     },
-    body: JSON.stringify({ patient, reason })
+    body: JSON.stringify({ patient: body.patient, reason: (body.reason || "").trim() })
   });
 
   if (!response.ok) {
     const errorText = await response.text();
-    return NextResponse.redirect(new URL(`/access-requests?error=${encodeURIComponent(errorText.slice(0, 180))}`, APP_BASE_URL), 303);
+    return NextResponse.json({ success: false, error: errorText.slice(0, 180) }, { status: 400 });
   }
 
-  return NextResponse.redirect(new URL("/access-requests?created=1", APP_BASE_URL), 303);
+  return NextResponse.json({ success: true });
 }

@@ -2,18 +2,14 @@ import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
-const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:3000";
 
 export async function POST(request: Request) {
-  const formData = await request.formData();
-  const old_password = String(formData.get("old_password") || "");
-  const new_password = String(formData.get("new_password") || "");
-
+  const body = (await request.json()) as { old_password?: string; new_password?: string };
   const cookieStore = await cookies();
   const accessToken = cookieStore.get("harmony_access")?.value;
 
   if (!accessToken) {
-    return NextResponse.redirect(new URL("/login", APP_BASE_URL), 303);
+    return NextResponse.json({ success: false, error: "unauthorized" }, { status: 401 });
   }
 
   const response = await fetch(`${API_BASE_URL}/auth/change-password/`, {
@@ -22,11 +18,11 @@ export async function POST(request: Request) {
       "Content-Type": "application/json",
       Authorization: `Bearer ${accessToken}`,
     },
-    body: JSON.stringify({ old_password, new_password }),
+    body: JSON.stringify({ old_password: body.old_password, new_password: body.new_password }),
   });
 
   if (response.ok) {
-    return NextResponse.redirect(new URL("/account?password=changed", APP_BASE_URL), 303);
+    return NextResponse.json({ success: true });
   }
 
   let error = "unknown";
@@ -41,5 +37,5 @@ export async function POST(request: Request) {
     error = "unknown";
   }
 
-  return NextResponse.redirect(new URL(`/account?password=${error}`, APP_BASE_URL), 303);
+  return NextResponse.json({ success: false, error }, { status: 400 });
 }

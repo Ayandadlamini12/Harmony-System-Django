@@ -1,16 +1,13 @@
 import { CalendarDays, Clock, FileWarning, HeartPulse, LockKeyhole, UserRound } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
-
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { getDashboardStats, getPatients, getVisits } from "@/lib/api";
-import { allowedForRole, workflowCards } from "@/lib/role-workflows";
 import { getSessionUser } from "@/lib/session";
+import { allowedForRole, workflowCards } from "@/lib/role-workflows";
 
-export default async function DashboardPage() {
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const session = await getSessionUser();
-  if (!session.signedIn) redirect("/login");
 
   const [stats, patients, visits] = await Promise.all([getDashboardStats(), getPatients(), getVisits()]);
   const workflows = allowedForRole(workflowCards, session.role);

@@ -1,18 +1,15 @@
-import { redirect } from "next/navigation";
-
 import { AppShell } from "@/components/app-shell";
-import { StepForm } from "@/components/step-form";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { StepForm } from "@/components/step-form";
 import { createPatient } from "./actions";
 import { getSessionUser } from "@/lib/session";
 
-export default async function NewPatientPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
+export default async function RegisterPatientPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const session = await getSessionUser();
-  if (!session.signedIn) redirect("/login");
-
   const params = await searchParams;
   const fieldClass = "grid gap-1.5";
   const twoColumn = "grid gap-4 md:grid-cols-2";

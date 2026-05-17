@@ -1,17 +1,14 @@
+import Link from "next/link";
+
 import { AppShell } from "@/components/app-shell";
 import { getVisits } from "@/lib/api";
-import { getSessionUser } from "@/lib/session";
-import Link from "next/link";
-import { redirect } from "next/navigation";
 
-function label(value: string) {
-  return value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+function label(type: string) {
+  const map: Record<string, string> = { new_consultation: "New consultation", follow_up: "Follow up", review: "Review" };
+  return map[type] || type;
 }
 
-export default async function VisitsPage() {
-  const session = await getSessionUser();
-  if (!session.signedIn) redirect("/login");
-
+export default async function VisitListPage() {
   const visits = await getVisits();
 
   return (

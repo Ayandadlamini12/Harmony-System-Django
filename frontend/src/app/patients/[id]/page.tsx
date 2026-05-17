@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -11,10 +11,8 @@ function value(text?: string | null) {
 }
 
 export default async function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const session = await getSessionUser();
-  if (!session.signedIn) redirect("/login");
+  const [{ id }, session] = await Promise.all([params, getSessionUser()]);
 
-  const { id } = await params;
   const patient = await getPatient(id);
   if (!patient) notFound();
 

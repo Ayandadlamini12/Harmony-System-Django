@@ -1,6 +1,5 @@
 import { ShieldCheck, UserRound } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -9,11 +8,8 @@ import { getSessionUser } from "@/lib/session";
 import { toggleUserStatus, updateUser } from "./actions";
 
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ search?: string; error?: string }> }) {
-  const session = await getSessionUser();
-  if (!session.signedIn) redirect("/login");
-
   const params = await searchParams;
-  const data = await getUsers(params.search || "");
+  const [data, session] = await Promise.all([getUsers(params.search || ""), getSessionUser()]);
 
   const editUser = params.search?.startsWith("edit:") ? Number(params.search.split(":")[1]) : null;
   const selectedUser = editUser ? data.results.find((u) => u.id === editUser) : null;

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { notFound, redirect } from "next/navigation";
+import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
@@ -22,12 +22,10 @@ export default async function EditPatientPage({
   params: Promise<{ id: string }>;
   searchParams: Promise<{ error?: string }>;
 }) {
-  const session = await getSessionUser();
-  if (!session.signedIn) redirect("/login");
-
   const { id } = await params;
   const query = await searchParams;
   const patient = await getPatient(id);
+  const session = await getSessionUser();
   if (!patient) notFound();
 
   const submit = updatePatient.bind(null, id);

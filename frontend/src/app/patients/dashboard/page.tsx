@@ -1,15 +1,13 @@
 import { CalendarCheck, ClipboardCheck, Inbox, LockKeyhole, MessageSquare, Package, Search, UserPlus } from "lucide-react";
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { getAccessRequests, getPatients } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
 
-export default async function PatientManagementDashboard() {
+export default async function PatientHubPage() {
   const session = await getSessionUser();
-  if (!session.signedIn) redirect("/login");
 
   const [patients, accessRequests] = await Promise.all([getPatients(), getAccessRequests()]);
   const canSeeClinical = session.role === "admin" || session.role === "clinician";

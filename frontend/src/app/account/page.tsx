@@ -1,15 +1,11 @@
-import { KeyRound, ShieldCheck, UserRound } from "lucide-react";
-import { redirect } from "next/navigation";
+import { ShieldCheck, UserRound } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
+import { ChangePasswordForm } from "@/components/change-password-form";
 import { getSessionUser } from "@/lib/session";
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ password?: string }> }) {
+export default async function AccountPage() {
   const session = await getSessionUser();
-  if (!session.signedIn) redirect("/login");
-
-  const params = await searchParams;
-  const pwMsg = params.password;
 
   return (
     <AppShell title="Profile and account">
@@ -33,40 +29,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
               Account permissions control which dashboards and confidential records are visible. Reception users see non-confidential patient records. Clinicians and admins can access medical records and approval workflows.
             </p>
           </div>
-          <div className="hh-panel p-5">
-            <div className="flex items-center gap-3">
-              <KeyRound className="text-[var(--hh-purple)]" size={22} />
-              <h2 className="font-bold">Change password</h2>
-            </div>
-
-            {pwMsg === "changed" && (
-              <div className="mt-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-semibold text-green-700">
-                Password updated successfully.
-              </div>
-            )}
-            {pwMsg === "wrong" && (
-              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
-                Current password is incorrect.
-              </div>
-            )}
-            {pwMsg === "weak" && (
-              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
-                New password is too weak. Minimum 8 characters, not too common.
-              </div>
-            )}
-
-            <form action="/api/auth/change-password" method="post" className="mt-3 grid gap-4">
-              <label>
-                <span className="hh-label">Current password</span>
-                <input className="hh-input" name="old_password" type="password" autoComplete="current-password" required />
-              </label>
-              <label>
-                <span className="hh-label">New password</span>
-                <input className="hh-input" name="new_password" type="password" autoComplete="new-password" required minLength={8} />
-              </label>
-              <button className="hh-button" type="submit">Update password</button>
-            </form>
-          </div>
+          <ChangePasswordForm />
         </div>
       </section>
     </AppShell>

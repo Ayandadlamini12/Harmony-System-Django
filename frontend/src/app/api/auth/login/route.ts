@@ -3,12 +3,11 @@ import { NextResponse } from "next/server";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
 const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
-const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:3000";
 
 export async function POST(request: Request) {
-  const formData = await request.formData();
-  const username = String(formData.get("username") || "");
-  const password = String(formData.get("password") || "");
+  const body = (await request.json()) as { username?: string; password?: string };
+  const username = body.username || "";
+  const password = body.password || "";
 
   const response = await fetch(`${API_BASE_URL}/auth/token/`, {
     method: "POST",
@@ -17,7 +16,7 @@ export async function POST(request: Request) {
   });
 
   if (!response.ok) {
-    return NextResponse.redirect(new URL("/login?error=invalid", APP_BASE_URL), 303);
+    return NextResponse.json({ success: false, error: "invalid" }, { status: 401 });
   }
 
   const tokens = (await response.json()) as { access: string; refresh: string };
@@ -75,5 +74,5 @@ export async function POST(request: Request) {
     maxAge: 60 * 60 * 24 * 7
   });
 
-  return NextResponse.redirect(new URL("/", APP_BASE_URL), 303);
+  return NextResponse.json({ success: true });
 }

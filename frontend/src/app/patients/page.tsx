@@ -1,14 +1,12 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { getPatients } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
 
-export default async function PatientsPage({ searchParams }: { searchParams: Promise<{ search?: string }> }) {
+export default async function PatientListPage({ searchParams }: { searchParams: Promise<{ search?: string }> }) {
   const session = await getSessionUser();
-  if (!session.signedIn) redirect("/login");
 
   const params = await searchParams;
   const patients = await getPatients(params.search || "");

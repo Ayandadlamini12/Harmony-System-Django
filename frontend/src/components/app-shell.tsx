@@ -3,6 +3,7 @@ import Link from "next/link";
 
 import { Footer } from "@/components/footer";
 import { MobileSidebar } from "@/components/mobile-sidebar";
+import { SignOutButton } from "@/components/sign-out-button";
 import { allowedForRole, navItems } from "@/lib/role-workflows";
 import { getSessionUser } from "@/lib/session";
 
@@ -57,9 +58,7 @@ export async function AppShell({ children, title, action }: { children: React.Re
           <div className="flex flex-wrap items-center gap-3">
             {action}
             {session.signedIn ? (
-              <form action="/api/auth/logout" method="post">
-                <button className="hh-button hh-button-secondary" type="submit">Sign out</button>
-              </form>
+              <SignOutButton />
             ) : (
               <Link className="hh-button hh-button-secondary" href="/login">Sign in</Link>
             )}

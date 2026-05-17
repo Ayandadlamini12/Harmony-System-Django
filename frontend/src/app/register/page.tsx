@@ -1,8 +1,45 @@
+"use client";
+
 import { Activity } from "lucide-react";
 import Link from "next/link";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, Suspense, useState } from "react";
 
-export default async function RegisterPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const params = await searchParams;
+function RegisterForm() {
+  const router = useRouter();
+  const params = useSearchParams();
+  const [error, setError] = useState<string | null>(params.get("error") || null);
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setLoading(true);
+    setError(null);
+
+    const form = new FormData(e.currentTarget);
+    const body = {
+      username: String(form.get("username") || ""),
+      email: String(form.get("email") || ""),
+      first_name: String(form.get("first_name") || ""),
+      last_name: String(form.get("last_name") || ""),
+      password: String(form.get("password") || ""),
+      confirm_password: String(form.get("confirm_password") || ""),
+    };
+
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json();
+    if (data.success) {
+      router.push("/login?registered=1");
+    } else {
+      setError(data.error || "unknown");
+      setLoading(false);
+    }
+  }
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--hh-soft)] px-5">
@@ -17,16 +54,16 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
           </div>
         </div>
 
-        {params.error && (
+        {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
-            {params.error === "exists" && "A user with that username already exists."}
-            {params.error === "mismatch" && "Passwords do not match."}
-            {params.error === "weak" && "Password is too weak. Minimum 8 characters required."}
-            {params.error === "unknown" && "Registration failed. Please try again."}
+            {error === "exists" && "A user with that username already exists."}
+            {error === "mismatch" && "Passwords do not match."}
+            {error === "weak" && "Password is too weak. Minimum 8 characters required."}
+            {error === "unknown" && "Registration failed. Please try again."}
           </div>
         )}
 
-        <form action="/api/auth/register" method="post" className="grid gap-4">
+        <form onSubmit={handleSubmit} className="grid gap-4">
           <div className="grid grid-cols-2 gap-3">
             <label>
               <span className="hh-label">First name</span>
@@ -53,7 +90,9 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
             <span className="hh-label">Confirm password</span>
             <input className="hh-input" name="confirm_password" type="password" autoComplete="new-password" required minLength={8} />
           </label>
-          <button className="hh-button" type="submit">Create account</button>
+          <button className="hh-button" type="submit" disabled={loading}>
+            {loading ? "Creating..." : "Create account"}
+          </button>
         </form>
 
         <p className="mt-4 text-center text-sm text-[#66736d]">
@@ -62,5 +101,13 @@ export default async function RegisterPage({ searchParams }: { searchParams: Pro
         </p>
       </section>
     </main>
+  );
+}
+
+export default function RegisterPage() {
+  return (
+    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[var(--hh-soft)]"><p className="text-[#66736d]">Loading...</p></div>}>
+      <RegisterForm />
+    </Suspense>
   );
 }
