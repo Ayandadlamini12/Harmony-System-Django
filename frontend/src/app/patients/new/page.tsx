@@ -5,6 +5,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StepForm } from "@/components/step-form";
+import { ConditionChecklist } from "@/components/condition-checklist";
 import { createPatient } from "./actions";
 import { getSessionUser } from "@/lib/session";
 
@@ -72,6 +73,22 @@ export default async function RegisterPatientPage({ searchParams }: { searchPara
           <label className={fieldClass}><Label>Family medical history</Label><Textarea name="family_medical_history" /></label>
           <label className={fieldClass}><Label>Allopathic medication</Label><Textarea name="allopathic_medication" /></label>
           <label className={fieldClass}><Label>Other important information</Label><Textarea name="other_important_information" /></label>
+        </div>
+      )
+    },
+    {
+      id: "conditions",
+      title: "Confidential records",
+      description: "Sickness record flags. Yes uses a tick; No uses an X.",
+      content: (
+        <div className="grid gap-4">
+          <div className="rounded-lg border border-[#e7d7ef] bg-[#f7f0fb] p-4">
+            <h3 className="text-sm font-bold text-[var(--hh-purple-dark)]">Confidential sickness records</h3>
+            <p className="mt-1 text-sm leading-6 text-[#66736d]">
+              These records are treated as confidential clinical information and should require elevated access when viewed later.
+            </p>
+          </div>
+          <ConditionChecklist />
         </div>
       )
     },

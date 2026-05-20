@@ -23,6 +23,7 @@ export type Patient = {
   status: string;
   last_visit_date?: string | null;
   profile?: PatientProfile;
+  conditions?: PatientCondition[];
   visits?: Visit[];
   clinical_access?: "active" | "approval_required";
 };
@@ -34,6 +35,17 @@ export type PatientProfile = {
   allopathic_medication?: string;
   other_important_information?: string;
   children_count?: number | null;
+};
+
+export type PatientCondition = {
+  id: number;
+  condition_code: string;
+  condition_label: string;
+  present: boolean;
+  is_confidential: boolean;
+  status: "active" | "historical" | "suspected";
+  notes?: string;
+  recorded_at?: string;
 };
 
 export type Visit = {

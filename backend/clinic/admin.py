@@ -30,7 +30,13 @@ class ElevatedAccessRequestAdmin(admin.ModelAdmin):
     list_filter = ("status", "scope", "created_at", "expires_at")
 
 
-admin.site.register(PatientCondition)
+@admin.register(PatientCondition)
+class PatientConditionAdmin(admin.ModelAdmin):
+    list_display = ("patient", "condition_label", "present", "is_confidential", "status", "recorded_at")
+    search_fields = ("patient__full_name_display", "patient__patient_code", "condition_label", "condition_code")
+    list_filter = ("present", "is_confidential", "status", "recorded_at")
+
+
 admin.site.register(Vital)
 admin.site.register(FollowUpEvaluation)
 admin.site.register(AuditLog)

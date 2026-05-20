@@ -26,10 +26,13 @@ class PatientConditionSerializer(serializers.ModelSerializer):
             "id",
             "condition_code",
             "condition_label",
+            "present",
+            "is_confidential",
             "status",
             "notes",
             "recorded_at",
         )
+        read_only_fields = ("id", "recorded_at")
 
 
 class VitalSerializer(serializers.ModelSerializer):
@@ -139,7 +142,7 @@ class PatientListSerializer(serializers.ModelSerializer):
 
 class PatientDetailSerializer(PatientListSerializer):
     profile = PatientProfileSerializer(required=False)
-    conditions = PatientConditionSerializer(many=True, read_only=True)
+    conditions = PatientConditionSerializer(many=True, required=False)
     visits = VisitSerializer(many=True, read_only=True)
 
     class Meta(PatientListSerializer.Meta):
@@ -161,6 +164,7 @@ class PatientDetailSerializer(PatientListSerializer):
     @transaction.atomic
     def create(self, validated_data):
         profile_data = validated_data.pop("profile", {})
+        conditions_data = validated_data.pop("conditions", [])
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             validated_data["created_by"] = request.user
@@ -170,11 +174,13 @@ class PatientDetailSerializer(PatientListSerializer):
             updated_by=patient.created_by,
             **profile_data,
         )
+        self._sync_conditions(patient, conditions_data)
         return patient
 
     @transaction.atomic
     def update(self, instance, validated_data):
         profile_data = validated_data.pop("profile", None)
+        conditions_data = validated_data.pop("conditions", None)
         for field, value in validated_data.items():
             setattr(instance, field, value)
         instance.save()
@@ -186,7 +192,30 @@ class PatientDetailSerializer(PatientListSerializer):
             if request and request.user.is_authenticated:
                 profile.updated_by = request.user
             profile.save()
+        if conditions_data is not None:
+            self._sync_conditions(instance, conditions_data)
         return instance
+
+    def _sync_conditions(self, patient, conditions_data):
+        request = self.context.get("request")
+        recorded_by = request.user if request and request.user.is_authenticated else None
+        for condition_data in conditions_data:
+            condition_code = condition_data.get("condition_code")
+            if not condition_code:
+                continue
+            defaults = {
+                "condition_label": condition_data.get("condition_label", condition_code),
+                "present": condition_data.get("present", False),
+                "is_confidential": condition_data.get("is_confidential", True),
+                "status": condition_data.get("status", PatientCondition.Status.ACTIVE),
+                "notes": condition_data.get("notes", ""),
+                "recorded_by": recorded_by,
+            }
+            PatientCondition.objects.update_or_create(
+                patient=patient,
+                condition_code=condition_code,
+                defaults=defaults,
+            )
 
 
 class AuditLogSerializer(serializers.ModelSerializer):

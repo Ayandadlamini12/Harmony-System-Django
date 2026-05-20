@@ -3,7 +3,9 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { Check, X } from "lucide-react";
 import { getPatient } from "@/lib/api";
+import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
 import { getSessionUser } from "@/lib/session";
 
 function value(text?: string | null) {
@@ -65,13 +67,19 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         <div className="hh-panel p-5">
           <h2 className="font-bold">Clinical profile</h2>
           {patient.profile ? (
-            <div className="mt-4 grid gap-4">
-              <Info label="HIV status" value={patient.profile.hiv_status.replaceAll("_", " ")} />
-              <Info label="Past medical history" value={value(patient.profile.past_medical_history)} />
-              <Info label="Family medical history" value={value(patient.profile.family_medical_history)} />
-              <Info label="Allopathic medication" value={value(patient.profile.allopathic_medication)} />
-              <Info label="Other important information" value={value(patient.profile.other_important_information)} />
-            </div>
+            <>
+              <div className="mt-4 grid gap-4">
+                <Info label="HIV status" value={patient.profile.hiv_status.replaceAll("_", " ")} />
+                <Info label="Past medical history" value={value(patient.profile.past_medical_history)} />
+                <Info label="Family medical history" value={value(patient.profile.family_medical_history)} />
+                <Info label="Allopathic medication" value={value(patient.profile.allopathic_medication)} />
+                <Info label="Other important information" value={value(patient.profile.other_important_information)} />
+              </div>
+              <div className="mt-5 border-t border-[var(--hh-border)] pt-5">
+                <h3 className="text-sm font-bold uppercase text-[#66736d]">Confidential sickness records</h3>
+                <ConditionSummary conditions={patient.conditions || []} />
+              </div>
+            </>
           ) : (
             <p className="mt-2 text-sm text-[#66736d]">Clinical profile is hidden until access is approved.</p>
           )}
@@ -98,6 +106,31 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         </div>
       </section>
     </AppShell>
+  );
+}
+
+function ConditionSummary({ conditions }: { conditions: NonNullable<Awaited<ReturnType<typeof getPatient>>>["conditions"] }) {
+  const conditionMap = new Map((conditions || []).map((condition) => [condition.condition_code, condition.present]));
+
+  return (
+    <div className="mt-4 grid gap-2 md:grid-cols-2">
+      {CONFIDENTIAL_CONDITIONS.map((condition) => {
+        const present = conditionMap.get(condition.code) ?? false;
+        return (
+          <div key={condition.code} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--hh-border)] bg-white px-3 py-2">
+            <span className="text-sm font-semibold">{condition.label}</span>
+            <span
+              className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
+                present ? "bg-[var(--hh-green-light)] text-[var(--hh-green-dark)]" : "bg-slate-100 text-slate-600"
+              }`}
+              aria-label={present ? "Yes" : "No"}
+            >
+              {present ? <Check size={17} /> : <X size={17} />}
+            </span>
+          </div>
+        );
+      })}
+    </div>
   );
 }
 

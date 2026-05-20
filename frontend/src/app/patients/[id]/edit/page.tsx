@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { ConditionChecklist } from "@/components/condition-checklist";
 import { getPatient } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
 
@@ -78,25 +79,32 @@ export default async function EditPatientPage({
         </section>
 
         {profile ? (
-          <section className="hh-panel p-5">
-            <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Clinical profile</h2>
-            <div className="grid gap-4 md:grid-cols-2">
-              <label className={fieldClass}>
-                <Label>HIV status</Label>
-                <Select name="hiv_status" defaultValue={profile.hiv_status}>
-                  <option value="undisclosed">Undisclosed</option>
-                  <option value="unknown">Unknown</option>
-                  <option value="reactive">Reactive</option>
-                  <option value="non_reactive">Non-reactive</option>
-                </Select>
-              </label>
-              <label className={fieldClass}><Label>Children count</Label><Input name="children_count" type="number" min="0" defaultValue={profile.children_count ?? ""} /></label>
-              <label className={fieldClass}><Label>Past medical history</Label><Textarea name="past_medical_history" defaultValue={profile.past_medical_history || ""} /></label>
-              <label className={fieldClass}><Label>Family medical history</Label><Textarea name="family_medical_history" defaultValue={profile.family_medical_history || ""} /></label>
-              <label className={fieldClass}><Label>Allopathic medication</Label><Textarea name="allopathic_medication" defaultValue={profile.allopathic_medication || ""} /></label>
-              <label className={fieldClass}><Label>Other important information</Label><Textarea name="other_important_information" defaultValue={profile.other_important_information || ""} /></label>
-            </div>
-          </section>
+          <>
+            <section className="hh-panel p-5">
+              <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Clinical profile</h2>
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className={fieldClass}>
+                  <Label>HIV status</Label>
+                  <Select name="hiv_status" defaultValue={profile.hiv_status}>
+                    <option value="undisclosed">Undisclosed</option>
+                    <option value="unknown">Unknown</option>
+                    <option value="reactive">Reactive</option>
+                    <option value="non_reactive">Non-reactive</option>
+                  </Select>
+                </label>
+                <label className={fieldClass}><Label>Children count</Label><Input name="children_count" type="number" min="0" defaultValue={profile.children_count ?? ""} /></label>
+                <label className={fieldClass}><Label>Past medical history</Label><Textarea name="past_medical_history" defaultValue={profile.past_medical_history || ""} /></label>
+                <label className={fieldClass}><Label>Family medical history</Label><Textarea name="family_medical_history" defaultValue={profile.family_medical_history || ""} /></label>
+                <label className={fieldClass}><Label>Allopathic medication</Label><Textarea name="allopathic_medication" defaultValue={profile.allopathic_medication || ""} /></label>
+                <label className={fieldClass}><Label>Other important information</Label><Textarea name="other_important_information" defaultValue={profile.other_important_information || ""} /></label>
+              </div>
+            </section>
+
+            <section className="hh-panel p-5">
+              <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Confidential sickness records</h2>
+              <ConditionChecklist conditions={patient.conditions || []} />
+            </section>
+          </>
         ) : (
           <section className="hh-panel p-5">
             <h2 className="font-bold">Clinical profile locked</h2>

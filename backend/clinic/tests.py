@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import ElevatedAccessRequest, Patient, PatientProfile, Visit
+from .models import ElevatedAccessRequest, Patient, PatientCondition, PatientProfile, Visit
 
 User = get_user_model()
 
@@ -30,6 +30,20 @@ class PatientApiTests(APITestCase):
                     "hiv_status": "undisclosed",
                     "past_medical_history": "Hypertension",
                 },
+                "conditions": [
+                    {
+                        "condition_code": "tuberculosis",
+                        "condition_label": "Tuberculosis",
+                        "present": True,
+                        "is_confidential": True,
+                    },
+                    {
+                        "condition_code": "epilepsy",
+                        "condition_label": "Epilepsy",
+                        "present": False,
+                        "is_confidential": True,
+                    },
+                ],
             },
             format="json",
         )
@@ -39,6 +53,9 @@ class PatientApiTests(APITestCase):
         self.assertTrue(patient.patient_code.startswith("PAT-"))
         self.assertEqual(patient.full_name_display, "Nomsa Dlamini")
         self.assertEqual(patient.profile.past_medical_history, "Hypertension")
+        self.assertEqual(patient.conditions.count(), 2)
+        self.assertTrue(PatientCondition.objects.get(patient=patient, condition_code="tuberculosis").present)
+        self.assertFalse(PatientCondition.objects.get(patient=patient, condition_code="epilepsy").present)
 
     def test_creates_visit_with_vitals_for_patient(self):
         patient = Patient.objects.create(first_name="John", last_name="Nkosi", gender="male")

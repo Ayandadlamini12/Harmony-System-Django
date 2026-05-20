@@ -102,6 +102,8 @@ class PatientCondition(TimeStampedModel):
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="conditions")
     condition_code = models.CharField(max_length=80)
     condition_label = models.CharField(max_length=180)
+    present = models.BooleanField(default=True)
+    is_confidential = models.BooleanField(default=True)
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.ACTIVE)
     notes = models.TextField(blank=True)
     recorded_at = models.DateTimeField(default=timezone.now)
@@ -112,6 +114,12 @@ class PatientCondition(TimeStampedModel):
         on_delete=models.SET_NULL,
         related_name="recorded_conditions",
     )
+
+    class Meta:
+        ordering = ("condition_label",)
+        constraints = [
+            models.UniqueConstraint(fields=["patient", "condition_code"], name="unique_patient_condition_code"),
+        ]
 
     def __str__(self) -> str:
         return self.condition_label
