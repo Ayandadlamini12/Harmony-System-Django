@@ -1,5 +1,4 @@
 export const CONFIDENTIAL_CONDITIONS = [
-  { code: "hiv", label: "HIV" },
   { code: "epilepsy", label: "Epilepsy" },
   { code: "mental_disorders", label: "Mental disorders" },
   { code: "tuberculosis", label: "Tuberculosis" },

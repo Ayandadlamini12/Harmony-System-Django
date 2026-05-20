@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { Check, X } from "lucide-react";
+import { Check, ShieldCheck, X } from "lucide-react";
 import { getPatient } from "@/lib/api";
 import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
 import { getSessionUser } from "@/lib/session";
@@ -69,7 +69,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
           {patient.profile ? (
             <>
               <div className="mt-4 grid gap-4">
-                <Info label="HIV status" value={patient.profile.hiv_status.replaceAll("_", " ")} />
+                <HivStatusCard status={patient.profile.hiv_status} />
                 <Info label="Past medical history" value={value(patient.profile.past_medical_history)} />
                 <Info label="Family medical history" value={value(patient.profile.family_medical_history)} />
                 <Info label="Allopathic medication" value={value(patient.profile.allopathic_medication)} />
@@ -121,7 +121,7 @@ function ConditionSummary({ conditions }: { conditions: NonNullable<Awaited<Retu
             <span className="text-sm font-semibold">{condition.label}</span>
             <span
               className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                present ? "bg-[var(--hh-green-light)] text-[var(--hh-green-dark)]" : "bg-slate-100 text-slate-600"
+                present ? "bg-[var(--hh-green)] text-white" : "bg-slate-100 text-slate-600"
               }`}
               aria-label={present ? "Yes" : "No"}
             >
@@ -130,6 +130,27 @@ function ConditionSummary({ conditions }: { conditions: NonNullable<Awaited<Retu
           </div>
         );
       })}
+    </div>
+  );
+}
+
+function HivStatusCard({ status }: { status: string }) {
+  const label = status.replaceAll("_", " ");
+
+  return (
+    <div className="rounded-lg border border-[#e7d7ef] bg-[#f7f0fb] p-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-bold uppercase text-[var(--hh-purple)]">
+            <ShieldCheck size={15} />
+            Confidential HIV status
+          </div>
+          <div className="mt-2 text-lg font-bold capitalize text-[var(--hh-purple-dark)]">{label}</div>
+        </div>
+        <span className="inline-flex min-h-9 items-center rounded-full border border-[#d8c0e8] bg-white px-3 text-xs font-bold uppercase text-[var(--hh-purple)]">
+          Clinician access only
+        </span>
+      </div>
     </div>
   );
 }

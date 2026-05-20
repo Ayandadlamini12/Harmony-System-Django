@@ -22,7 +22,7 @@ export function ConditionChecklist({ conditions = [] }: { conditions?: PatientCo
                   value="yes"
                   defaultChecked={present}
                 />
-                <Check size={16} />
+                <Check size={16} className="text-[var(--hh-green-dark)]" />
                 Yes
               </label>
               <label className="flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-1.5 text-sm font-bold has-[:checked]:bg-slate-100 has-[:checked]:text-slate-700">

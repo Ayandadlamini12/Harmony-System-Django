@@ -74,7 +74,6 @@ const timeline = [
 ] as const;
 
 const confidentialConditionRows = [
-  ["HIV", true],
   ["Epilepsy", false],
   ["Mental disorders", false],
   ["Tuberculosis", false],
@@ -404,13 +403,30 @@ function PatientWorkspace() {
                   </button>
                 </div>
               </div>
+              <div className="rounded-lg border border-[#d8c0e8] bg-white p-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="text-xs font-bold uppercase text-[var(--hh-purple)]">Confidential HIV status</div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-bold text-slate-600">Reactive</span>
+                      <span className="rounded-full border border-[#bde5c4] bg-[var(--hh-green-light)] px-3 py-1 text-sm font-bold text-[var(--hh-green-dark)]">
+                        Non-reactive
+                      </span>
+                      <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-sm font-bold text-slate-600">Unknown</span>
+                    </div>
+                  </div>
+                  <span className="inline-flex min-h-9 items-center rounded-full border border-[#d8c0e8] bg-[#f7f0fb] px-3 text-xs font-bold uppercase text-[var(--hh-purple)]">
+                    Clinician access only
+                  </span>
+                </div>
+              </div>
               <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
                 {confidentialConditionRows.map(([label, present]) => (
                   <div key={label} className="flex items-center justify-between gap-3 rounded-lg border border-[#dfe7e2] bg-white px-3 py-2">
                     <span className="text-sm font-semibold">{label}</span>
                     <span
                       className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
-                        present ? "bg-[var(--hh-green-light)] text-[var(--hh-green-dark)]" : "bg-slate-100 text-slate-600"
+                        present ? "bg-[var(--hh-green)] text-white" : "bg-slate-100 text-slate-600"
                       }`}
                     >
                       {present ? <Check size={17} /> : <X size={17} />}
