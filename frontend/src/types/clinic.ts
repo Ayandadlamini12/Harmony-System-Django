@@ -55,9 +55,15 @@ export type Visit = {
   patient_code?: string;
   visit_type: string;
   visit_date: string;
+  visit_time?: string | null;
   main_complaint: string;
+  initial_complaints?: string;
+  physical_examination?: string;
   diagnosis?: string;
   remedy?: string;
+  reason_for_remedy?: string;
+  dietary_recommendation?: string;
+  lifestyle_recommendation?: string;
   vitals?: {
     bp_first_reading?: string;
     bp_second_reading?: string;
