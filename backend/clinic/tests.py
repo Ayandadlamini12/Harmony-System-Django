@@ -71,6 +71,9 @@ class PatientApiTests(APITestCase):
                     "bp_first_reading": "120",
                     "bp_second_reading": "80",
                     "pulse": 72,
+                    "glucose_mmol_l": "5.6",
+                    "glucose_context": "after_meals",
+                    "glucose_food_type": "Porridge and fruit",
                 },
             },
             format="json",
@@ -80,6 +83,8 @@ class PatientApiTests(APITestCase):
         visit = Visit.objects.select_related("vitals").get()
         self.assertEqual(visit.patient, patient)
         self.assertEqual(visit.vitals.pulse, 72)
+        self.assertEqual(str(visit.vitals.glucose_mmol_l), "5.6")
+        self.assertEqual(visit.vitals.glucose_food_type, "Porridge and fruit")
 
 
 class DashboardApiTests(APITestCase):

@@ -48,6 +48,7 @@ class VitalSerializer(serializers.ModelSerializer):
             "weight",
             "glucose_mmol_l",
             "glucose_context",
+            "glucose_food_type",
             "medication_taken_status",
             "recorded_at",
         )

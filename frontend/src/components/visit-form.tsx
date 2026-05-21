@@ -43,6 +43,7 @@ export function VisitForm({ patients, patientId, error: initialError }: { patien
         weight: num("weight"),
         glucose_mmol_l: num("glucose_mmol_l"),
         glucose_context: val("glucose_context") || "unknown",
+        glucose_food_type: val("glucose_food_type"),
         medication_taken_status: "unknown",
       },
     };
@@ -108,6 +109,7 @@ export function VisitForm({ patients, patientId, error: initialError }: { patien
           <label><span className="hh-label">Temperature</span><input className="hh-input" name="temperature" type="number" step="0.1" /></label>
           <label><span className="hh-label">Weight</span><input className="hh-input" name="weight" type="number" step="0.1" /></label>
           <label><span className="hh-label">Glucose</span><input className="hh-input" name="glucose_mmol_l" type="number" step="0.1" /></label>
+          <label><span className="hh-label">Food type</span><input className="hh-input" name="glucose_food_type" placeholder="e.g. porridge, bread, fruit" /></label>
           <label>
             <span className="hh-label">Glucose context</span>
             <select className="hh-input" name="glucose_context" defaultValue="unknown">

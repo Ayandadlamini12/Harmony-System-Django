@@ -62,8 +62,12 @@ export type Visit = {
     bp_first_reading?: string;
     bp_second_reading?: string;
     pulse?: number;
+    resp_rate?: number;
     temperature?: string;
     weight?: string;
+    glucose_mmol_l?: string;
+    glucose_context?: string;
+    glucose_food_type?: string;
   };
 };
 

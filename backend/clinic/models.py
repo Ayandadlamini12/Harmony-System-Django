@@ -219,6 +219,7 @@ class Vital(TimeStampedModel):
     weight = models.DecimalField(max_digits=5, decimal_places=1, null=True, blank=True)
     glucose_mmol_l = models.DecimalField(max_digits=4, decimal_places=1, null=True, blank=True)
     glucose_context = models.CharField(max_length=30, choices=GlucoseContext.choices, default=GlucoseContext.UNKNOWN)
+    glucose_food_type = models.CharField(max_length=180, blank=True)
     medication_taken_status = models.CharField(
         max_length=30,
         choices=MedicationStatus.choices,
