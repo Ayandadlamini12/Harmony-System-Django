@@ -50,10 +50,10 @@ export function AppSidebar({
   }
 
   return (
-    <div className={cn("min-h-screen bg-[#f7faf8] lg:grid", collapsed ? "lg:grid-cols-[76px_1fr]" : "lg:grid-cols-[260px_1fr]")}>
+    <div className="min-h-screen bg-[#f7faf8]">
       <TopBar action={action} name={name} onToggle={toggleCollapsed} signedIn={signedIn} signOut={signOut} title={title} />
       <DesktopSidebar collapsed={collapsed} name={name} role={role} />
-      <main className="min-w-0 lg:pt-16">
+      <main className={cn("min-w-0 transition-[margin] duration-200 lg:pt-16", collapsed ? "lg:ml-[76px]" : "lg:ml-[260px]")}>
         <div className="mx-auto w-full max-w-[1540px] px-4 py-5 sm:px-6">{children}</div>
       </main>
     </div>
