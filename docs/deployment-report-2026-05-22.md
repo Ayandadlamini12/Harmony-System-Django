@@ -98,3 +98,51 @@ A live test patient was added for UI review:
 ## Recommended Follow-up
 
 Keep this current deployment method for the immediate safe release. Later, convert the Portainer stack to a Git-backed deployment so GitHub becomes the source of truth and `/data/compose/69` is no longer manually synced.
+
+## Deployment Completed
+
+The deployment was completed using the safe current-stack method:
+
+1. Local commits were pushed to GitHub.
+2. The previous `/data/compose/69` stack workspace was backed up locally.
+3. The committed source at `2b4b465` was archived with `git archive`.
+4. The archive was uploaded into Portainer's `/data/compose/69` workspace.
+5. The `harmony` stack was rebuilt from `/data/compose/69` with:
+
+   ```sh
+   docker compose -p harmony -f remote-deployment-stack.yml up -d --build --remove-orphans
+   ```
+
+6. The temporary Docker CLI deployment container exited successfully and was removed.
+
+## Post-Deployment Verification
+
+The live backend containers were recreated and the backend startup command applied the new migrations:
+
+```text
+Applying clinic.0003_patientcondition_confidential_flags... OK
+Applying clinic.0004_vital_glucose_food_type... OK
+```
+
+Confirmed live migration state:
+
+```text
+[X] 0001_initial
+[X] 0002_elevatedaccessrequest
+[X] 0003_patientcondition_confidential_flags
+[X] 0004_vital_glucose_food_type
+```
+
+Confirmed live model fields:
+
+```text
+glucose_food_type True
+condition_present True
+condition_confidential True
+```
+
+Confirmed public app health:
+
+- `https://mis.harmonyhealthsz.com` returned HTTP `200`
+- `https://mis.harmonyhealthsz.com/login` returned HTTP `200`
+- `https://mis.harmonyhealthsz.com/patients/1` correctly redirected unauthenticated users to `/login?redirect=%2Fpatients%2F1`
