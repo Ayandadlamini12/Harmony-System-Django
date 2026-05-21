@@ -1,7 +1,7 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
+const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
 
 export async function POST(request: Request) {
@@ -9,11 +9,16 @@ export async function POST(request: Request) {
   const username = body.username || "";
   const password = body.password || "";
 
-  const response = await fetch(`${API_BASE_URL}/auth/token/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password })
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/auth/token/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+  } catch {
+    return NextResponse.json({ success: false, error: "backend_unavailable" }, { status: 503 });
+  }
 
   if (!response.ok) {
     return NextResponse.json({ success: false, error: "invalid" }, { status: 401 });

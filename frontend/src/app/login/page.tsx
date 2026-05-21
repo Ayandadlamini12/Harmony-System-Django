@@ -18,17 +18,22 @@ function LoginForm() {
     setError(null);
 
     const form = new FormData(e.currentTarget);
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username: form.get("username"), password: form.get("password") }),
-    });
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: form.get("username"), password: form.get("password") }),
+      });
 
-    const data = await res.json();
-    if (data.success) {
-      const redirectTo = params.get("redirect") || "/";
-      router.push(redirectTo);
-    } else {
+      const data = (await res.json().catch(() => ({ success: false }))) as { success?: boolean };
+      if (data.success) {
+        const redirectTo = params.get("redirect") || "/";
+        router.push(redirectTo);
+      } else {
+        setError("invalid");
+        setLoading(false);
+      }
+    } catch {
       setError("invalid");
       setLoading(false);
     }
