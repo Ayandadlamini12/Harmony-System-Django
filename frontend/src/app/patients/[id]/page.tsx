@@ -106,7 +106,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         <div className="flex flex-wrap gap-2 border-b border-[var(--hh-border)] bg-white px-4 py-3 sm:px-6">
           {canCreateVisit && (
             <Button asChild>
-              <Link href={`/visits/new?patient=${patient.id}`}>
+              <Link className="!text-white" href={`/visits/new?patient=${patient.id}`}>
                 <HeartPulse size={16} />
                 New visit note
               </Link>
