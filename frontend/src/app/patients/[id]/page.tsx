@@ -2,11 +2,15 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
+import { ClinicalPanel } from "@/components/clinical-panel";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
 import { getPatient } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
-import { CalendarCheck, Check, ClipboardList, Eye, HeartPulse, LockKeyhole, MoreHorizontal, Pencil, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
+import { CalendarCheck, Check, ClipboardList, Eye, HeartPulse, LockKeyhole, Pencil, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
 
 const tabs = ["Overview", "Complaints", "Assessments", "Diagnosis", "Remedies", "Vitals", "Follow-ups", "Documents", "Notes"];
 
@@ -61,11 +65,11 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                   <span>{value(patient.town_or_locality || patient.region)}</span>
                 </div>
                 <div className="mt-3 flex flex-wrap gap-2">
-                  <Badge tone="green">{patient.status === "active" ? "Active patient" : patient.status}</Badge>
-                  <Badge tone={clinicalAccessActive ? "purple" : "neutral"}>
+                  <Badge variant="success">{patient.status === "active" ? "Active patient" : patient.status}</Badge>
+                  <Badge variant={clinicalAccessActive ? "harmony" : "default"}>
                     {clinicalAccessActive ? "Clinician access active" : "Approval required"}
                   </Badge>
-                  {latestVisit && <Badge tone="amber">Last visit {formatDate(latestVisit.visit_date)}</Badge>}
+                  {latestVisit && <Badge variant="warning">Last visit {formatDate(latestVisit.visit_date)}</Badge>}
                 </div>
               </div>
             </div>
@@ -88,21 +92,15 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         </div>
 
         <div className="sticky top-16 z-10 border-b border-[var(--hh-border)] bg-white px-4 sm:px-6">
-          <div className="flex gap-1 overflow-x-auto">
-            {tabs.map((tab) => (
-              <button
-                key={tab}
-                className={`min-h-12 shrink-0 border-b-2 px-3 text-sm font-semibold ${
-                  tab === "Overview"
-                    ? "border-[var(--hh-purple)] text-[var(--hh-purple)]"
-                    : "border-transparent text-[#3f4d47] hover:border-[var(--hh-border)] hover:text-[#111827]"
-                }`}
-                type="button"
-              >
-                {tab}
-              </button>
-            ))}
-          </div>
+          <Tabs defaultValue="Overview">
+            <TabsList>
+              {tabs.map((tab) => (
+                <TabsTrigger key={tab} value={tab}>
+                  {tab}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+          </Tabs>
         </div>
 
         <div className="flex flex-wrap gap-2 border-b border-[var(--hh-border)] bg-white px-4 py-3 sm:px-6">
@@ -133,7 +131,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
 
       <section className="grid gap-5 py-5 xl:grid-cols-[0.9fr_1.1fr]">
         <div className="grid gap-5">
-          <Panel title="Patient details" icon={<UserRound size={17} />}>
+          <ClinicalPanel title="Patient details" icon={<UserRound size={17} />}>
             <InfoGrid
               rows={[
                 ["Patient code", patient.patient_code],
@@ -144,9 +142,9 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                 ["Status", patient.status]
               ]}
             />
-          </Panel>
+          </ClinicalPanel>
 
-          <Panel title="Homeopathy profile" icon={<Stethoscope size={17} />}>
+          <ClinicalPanel title="Homeopathy profile" icon={<Stethoscope size={17} />}>
             {patient.profile ? (
               <InfoGrid
                 rows={[
@@ -159,9 +157,9 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             ) : (
               <LockedClinicalNotice />
             )}
-          </Panel>
+          </ClinicalPanel>
 
-          <Panel title="Latest vitals" icon={<HeartPulse size={17} />}>
+          <ClinicalPanel title="Latest vitals" icon={<HeartPulse size={17} />}>
             {vitals ? (
               <InfoGrid
                 rows={[
@@ -178,20 +176,20 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             ) : (
               <p className="text-sm text-[#66736d]">No vitals recorded yet.</p>
             )}
-          </Panel>
+          </ClinicalPanel>
 
           <ConfidentialRecords patient={patient} />
         </div>
 
         <div className="grid gap-5">
-          <Panel title="History of present complaint" icon={<ClipboardList size={17} />} action>
+          <ClinicalPanel title="History of present complaint" icon={<ClipboardList size={17} />} action>
             <div className="space-y-4 text-sm leading-6 text-[#3f4d47]">
               <p>{latestVisit?.initial_complaints || latestVisit?.main_complaint || "No complaint history recorded yet."}</p>
               {latestVisit?.physical_examination && <p>{latestVisit.physical_examination}</p>}
             </div>
-          </Panel>
+          </ClinicalPanel>
 
-          <Panel title="Clinical assessment" icon={<Stethoscope size={17} />} action>
+          <ClinicalPanel title="Clinical assessment" icon={<Stethoscope size={17} />} action>
             {latestVisit ? (
               <InfoGrid
                 rows={[
@@ -204,9 +202,9 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             ) : (
               <p className="text-sm text-[#66736d]">No visit assessment recorded yet.</p>
             )}
-          </Panel>
+          </ClinicalPanel>
 
-          <Panel title="Visit timeline" icon={<ClipboardList size={17} />}>
+          <ClinicalPanel title="Visit timeline" icon={<ClipboardList size={17} />}>
             <div className="divide-y divide-[#eef2ef]">
               {patient.visits?.map((visit) => (
                 <div key={visit.id} className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[110px_1fr]">
@@ -219,7 +217,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
               ))}
               {(!patient.visits || patient.visits.length === 0) && <p className="text-sm text-[#66736d]">No visit history visible.</p>}
             </div>
-          </Panel>
+          </ClinicalPanel>
         </div>
       </section>
     </AppShell>
@@ -229,14 +227,14 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
 function ConfidentialRecords({ patient }: { patient: NonNullable<Awaited<ReturnType<typeof getPatient>>> }) {
   if (!patient.profile) {
     return (
-      <Panel title="Confidential records" icon={<LockKeyhole size={17} />}>
+      <ClinicalPanel title="Confidential records" icon={<LockKeyhole size={17} />}>
         <LockedClinicalNotice />
-      </Panel>
+      </ClinicalPanel>
     );
   }
 
   return (
-    <Panel title="Confidential records" icon={<LockKeyhole size={17} />}>
+    <ClinicalPanel title="Confidential records" icon={<LockKeyhole size={17} />}>
       <div className="space-y-4">
         <div className="rounded-lg border border-[#e7d7ef] bg-[#f7f0fb] p-4">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -255,7 +253,7 @@ function ConfidentialRecords({ patient }: { patient: NonNullable<Awaited<ReturnT
         <HivStatusCard status={patient.profile.hiv_status} />
         <ConditionSummary conditions={patient.conditions || []} />
       </div>
-    </Panel>
+    </ClinicalPanel>
   );
 }
 
@@ -286,8 +284,8 @@ function ConditionSummary({ conditions }: { conditions: NonNullable<Awaited<Retu
 
 function HivStatusCard({ status }: { status: string }) {
   return (
-    <div className="rounded-lg border border-[#d8c0e8] bg-white p-4">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+    <Card className="border-[#d8c0e8]">
+      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <div className="flex items-center gap-2 text-xs font-bold uppercase text-[var(--hh-purple)]">
             <ShieldCheck size={15} />
@@ -309,11 +307,11 @@ function HivStatusCard({ status }: { status: string }) {
             })}
           </div>
         </div>
-        <span className="inline-flex min-h-9 items-center rounded-full border border-[#d8c0e8] bg-[#f7f0fb] px-3 text-xs font-bold uppercase text-[var(--hh-purple)]">
+        <Badge className="min-h-9 px-3 uppercase" variant="harmony">
           Clinician access only
-        </span>
-      </div>
-    </div>
+        </Badge>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -321,33 +319,6 @@ function LockedClinicalNotice() {
   return (
     <div className="rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4 text-sm leading-6 text-[#66736d]">
       Clinical records are hidden until elevated access is approved.
-    </div>
-  );
-}
-
-function Badge({ children, tone = "neutral" }: { children: React.ReactNode; tone?: "green" | "amber" | "purple" | "neutral" }) {
-  const tones = {
-    green: "border-green-200 bg-green-50 text-green-800",
-    amber: "border-amber-200 bg-amber-50 text-amber-800",
-    purple: "border-[#e7d7ef] bg-[#f7f0fb] text-[var(--hh-purple)]",
-    neutral: "border-slate-200 bg-slate-50 text-slate-700"
-  };
-  return <span className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-bold ${tones[tone]}`}>{children}</span>;
-}
-
-function Panel({ title, icon, children, action = false }: { title: string; icon: React.ReactNode; children: React.ReactNode; action?: boolean }) {
-  return (
-    <div className="rounded-lg border border-[var(--hh-border)] bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-[#eef2ef] px-4 py-3">
-        <div className="flex items-center gap-2 font-bold">
-          {icon}
-          {title}
-        </div>
-        <button className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#53605a] hover:bg-[#f7faf8]" type="button">
-          {action ? <Pencil size={15} /> : <MoreHorizontal size={16} />}
-        </button>
-      </div>
-      <div className="p-4">{children}</div>
     </div>
   );
 }

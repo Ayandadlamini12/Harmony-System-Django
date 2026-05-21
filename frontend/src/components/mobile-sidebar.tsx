@@ -1,10 +1,11 @@
 "use client";
 
-import * as Dialog from "@radix-ui/react-dialog";
 import { Activity, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { allowedForRole, navItems } from "@/lib/role-workflows";
 import type { UserRole } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -54,7 +55,7 @@ function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRo
 
 export function MobileSidebar({ name, role }: { name: string; role: UserRole }) {
   return (
-    <Dialog.Root>
+    <Sheet>
       <div className="flex h-16 items-center justify-between border-b border-[var(--hh-border)] bg-white px-4 lg:hidden">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hh-purple)] text-white">
@@ -65,23 +66,22 @@ export function MobileSidebar({ name, role }: { name: string; role: UserRole }) 
             <div className="text-xs text-[#66736d]">Clinic system</div>
           </div>
         </div>
-        <Dialog.Trigger className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--hh-border)] bg-white text-[var(--hh-text)]">
-          <Menu size={21} />
-          <span className="sr-only">Open menu</span>
-        </Dialog.Trigger>
+        <SheetTrigger asChild>
+          <Button size="icon" type="button" variant="secondary">
+            <Menu size={21} />
+            <span className="sr-only">Open menu</span>
+          </Button>
+        </SheetTrigger>
       </div>
 
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/45 lg:hidden" />
-        <Dialog.Content className="fixed inset-y-0 left-0 z-50 w-[min(84vw,320px)] shadow-2xl outline-none lg:hidden">
-          <Dialog.Title className="sr-only">Navigation menu</Dialog.Title>
-          <Dialog.Close className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white">
-            <X size={18} />
-            <span className="sr-only">Close menu</span>
-          </Dialog.Close>
-          <SidebarContent name={name} role={role} />
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+      <SheetContent className="lg:hidden">
+        <SheetTitle className="sr-only">Navigation menu</SheetTitle>
+        <SheetClose className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white">
+          <X size={18} />
+          <span className="sr-only">Close menu</span>
+        </SheetClose>
+        <SidebarContent name={name} role={role} />
+      </SheetContent>
+    </Sheet>
   );
 }

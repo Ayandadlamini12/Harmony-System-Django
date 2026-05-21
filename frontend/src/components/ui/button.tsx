@@ -12,7 +12,7 @@ const buttonVariants = cva(
         default: "bg-[var(--hh-purple)] text-white hover:bg-[#5c2680]",
         secondary: "border border-[var(--hh-border)] bg-white text-[var(--hh-text)] hover:bg-[#f7faf8]",
         success: "bg-[var(--hh-green)] text-white hover:bg-[#3DA34D]",
-        ghost: "text-[var(--hh-text)] hover:bg-white/10"
+        ghost: "text-[var(--hh-text)] hover:bg-[#f7faf8]"
       },
       size: {
         default: "h-10",
