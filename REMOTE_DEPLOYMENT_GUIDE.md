@@ -3,6 +3,28 @@
 ## Overview
 This guide explains how to deploy the Harmony Health Django system to your remote server using Portainer, ensuring it doesn't interfere with your existing CyberPanel installations.
 
+## Current Live Stack
+
+The current live deployment is a Portainer stack named `harmony`.
+
+- Stack ID: `69`
+- Endpoint ID: `5`
+- Stack file: `remote-deployment-stack.yml`
+- Portainer project path: `/data/compose/69`
+- Public URL: `https://mis.harmonyhealthsz.com`
+
+Important: the current stack builds from local folders inside `/data/compose/69`:
+
+```yaml
+backend:
+  build: ./backend
+
+frontend:
+  build: ./frontend
+```
+
+This means GitHub commits are not deployed automatically. Before rebuilding the stack, the committed source must be synced into `/data/compose/69`.
+
 ## Prerequisites
 1. Access to your Portainer instance at https://portainer.fmtagency.online
 2. Valid Portainer API token
@@ -97,21 +119,25 @@ try {
 ```
 
 ### 4. Post-Deployment Configuration
-After deployment, you may need to:
+The current `remote-deployment-stack.yml` runs backend migrations automatically when the backend container starts:
 
-1. Run database migrations:
-   ```bash
-   docker exec harmony-django-backend python manage.py migrate
-   ```
+```yaml
+command: >
+  sh -c "python manage.py migrate --noinput &&
+         python manage.py collectstatic --noinput &&
+         gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+```
 
-2. Create a superuser:
+After deployment, you may still need to:
+
+1. Create a superuser:
    ```bash
    docker exec harmony-django-backend python manage.py createsuperuser
    ```
 
-3. Collect static files:
+2. Verify migrations:
    ```bash
-   docker exec harmony-django-backend python manage.py collectstatic --noinput
+   docker exec harmony-django-backend python manage.py showmigrations clinic
    ```
 
 ### 5. Verify Deployment
@@ -147,7 +173,8 @@ If containers fail to start:
 4. Check that ports are not conflicting with existing CyberPanel services
 
 ## Important Notes
-- This deployment uses standard ports (5432, 6379, 8000, 3000) which should not conflict with typical CyberPanel installations
+- The live stack uses non-standard host ports for supporting services to avoid CyberPanel conflicts
 - All containers are isolated in their own network (`harmony-net`)
 - The Cloudflare tunnel container handles external access without exposing ports publicly
 - Data is persisted in Docker volumes to survive container restarts
+- Current deployment source of truth is `/data/compose/69`; move to Git-backed Portainer deployments later if GitHub should become the deployment source of truth
