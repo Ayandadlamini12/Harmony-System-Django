@@ -120,105 +120,99 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             <CalendarCheck size={16} />
             Book follow-up
           </Button>
-          <Button asChild variant="secondary">
-            <Link href={clinicalAccessActive ? `/patients/${patient.id}/edit` : "/access-requests"}>
-              <LockKeyhole size={16} />
-              {clinicalAccessActive ? "Edit record" : "Request access"}
-            </Link>
+          <Button variant="secondary" type="button">
+            <LockKeyhole size={16} />
+            Access log
           </Button>
         </div>
       </section>
 
-      <section className="grid gap-5 py-5 xl:grid-cols-[0.9fr_1.1fr]">
-        <div className="grid gap-5">
-          <ClinicalPanel title="Patient details" icon={<UserRound size={17} />}>
+      <section className="grid gap-5 py-5">
+        <ClinicalPanel title="Patient details" icon={<UserRound size={17} />}>
+          <InfoGrid
+            rows={[
+              ["Patient code", patient.patient_code],
+              ["Date of birth", formatDate(patient.date_of_birth)],
+              ["Primary phone", value(patient.primary_phone)],
+              ["Locality", value(patient.town_or_locality || patient.region)],
+              ["Secondary phone", value(patient.secondary_phone)],
+              ["Status", patient.status]
+            ]}
+          />
+        </ClinicalPanel>
+
+        <ClinicalPanel title="Homeopathy profile" icon={<Stethoscope size={17} />}>
+          {patient.profile ? (
             <InfoGrid
               rows={[
-                ["Patient code", patient.patient_code],
-                ["Date of birth", formatDate(patient.date_of_birth)],
-                ["Primary phone", value(patient.primary_phone)],
-                ["Locality", value(patient.town_or_locality || patient.region)],
-                ["National ID", value(patient.national_id)],
-                ["Status", patient.status]
+                ["Past medical history", value(patient.profile.past_medical_history)],
+                ["Family medical history", value(patient.profile.family_medical_history)],
+                ["Allopathic medication", value(patient.profile.allopathic_medication)],
+                ["Children count", patient.profile.children_count?.toString() || "--"]
               ]}
             />
-          </ClinicalPanel>
+          ) : (
+            <LockedClinicalNotice />
+          )}
+        </ClinicalPanel>
 
-          <ClinicalPanel title="Homeopathy profile" icon={<Stethoscope size={17} />}>
-            {patient.profile ? (
-              <InfoGrid
-                rows={[
-                  ["Past medical history", value(patient.profile.past_medical_history)],
-                  ["Family medical history", value(patient.profile.family_medical_history)],
-                  ["Allopathic medication", value(patient.profile.allopathic_medication)],
-                  ["Children count", patient.profile.children_count?.toString() || "--"]
-                ]}
-              />
-            ) : (
-              <LockedClinicalNotice />
-            )}
-          </ClinicalPanel>
+        <ClinicalPanel title="Latest vitals" icon={<HeartPulse size={17} />}>
+          {vitals ? (
+            <InfoGrid
+              rows={[
+                ["Blood pressure", `${value(vitals.bp_first_reading)} / ${value(vitals.bp_second_reading)}`],
+                ["Pulse", vitals.pulse ? `${vitals.pulse} bpm` : "--"],
+                ["Temperature", vitals.temperature ? `${vitals.temperature} C` : "--"],
+                ["Weight", vitals.weight ? `${vitals.weight} kg` : "--"],
+                ["Respiration", vitals.resp_rate ? `${vitals.resp_rate} / min` : "--"],
+                ["Glucose", vitals.glucose_mmol_l ? `${vitals.glucose_mmol_l} mmol/L` : "--"],
+                ["Food type", value(vitals.glucose_food_type)],
+                ["Context", value(vitals.glucose_context?.replaceAll("_", " "))]
+              ]}
+            />
+          ) : (
+            <p className="text-sm text-[#66736d]">No vitals recorded yet.</p>
+          )}
+        </ClinicalPanel>
 
-          <ClinicalPanel title="Latest vitals" icon={<HeartPulse size={17} />}>
-            {vitals ? (
-              <InfoGrid
-                rows={[
-                  ["Blood pressure", `${value(vitals.bp_first_reading)} / ${value(vitals.bp_second_reading)}`],
-                  ["Pulse", vitals.pulse ? `${vitals.pulse} bpm` : "--"],
-                  ["Temperature", vitals.temperature ? `${vitals.temperature} C` : "--"],
-                  ["Weight", vitals.weight ? `${vitals.weight} kg` : "--"],
-                  ["Respiration", vitals.resp_rate ? `${vitals.resp_rate} / min` : "--"],
-                  ["Glucose", vitals.glucose_mmol_l ? `${vitals.glucose_mmol_l} mmol/L` : "--"],
-                  ["Food type", value(vitals.glucose_food_type)],
-                  ["Context", value(vitals.glucose_context?.replaceAll("_", " "))]
-                ]}
-              />
-            ) : (
-              <p className="text-sm text-[#66736d]">No vitals recorded yet.</p>
-            )}
-          </ClinicalPanel>
+        <ConfidentialRecords patient={patient} />
 
-          <ConfidentialRecords patient={patient} />
-        </div>
+        <ClinicalPanel title="History of present complaint" icon={<ClipboardList size={17} />} action>
+          <div className="space-y-4 text-sm leading-6 text-[#3f4d47]">
+            <p>{latestVisit?.initial_complaints || latestVisit?.main_complaint || "No complaint history recorded yet."}</p>
+            {latestVisit?.physical_examination && <p>{latestVisit.physical_examination}</p>}
+          </div>
+        </ClinicalPanel>
 
-        <div className="grid gap-5">
-          <ClinicalPanel title="History of present complaint" icon={<ClipboardList size={17} />} action>
-            <div className="space-y-4 text-sm leading-6 text-[#3f4d47]">
-              <p>{latestVisit?.initial_complaints || latestVisit?.main_complaint || "No complaint history recorded yet."}</p>
-              {latestVisit?.physical_examination && <p>{latestVisit.physical_examination}</p>}
-            </div>
-          </ClinicalPanel>
+        <ClinicalPanel title="Clinical assessment" icon={<Stethoscope size={17} />} action>
+          {latestVisit ? (
+            <InfoGrid
+              rows={[
+                ["Main complaint", latestVisit.main_complaint],
+                ["Diagnosis", value(latestVisit.diagnosis)],
+                ["Remedy", value(latestVisit.remedy)],
+                ["Visit type", latestVisit.visit_type.replaceAll("_", " ")]
+              ]}
+            />
+          ) : (
+            <p className="text-sm text-[#66736d]">No visit assessment recorded yet.</p>
+          )}
+        </ClinicalPanel>
 
-          <ClinicalPanel title="Clinical assessment" icon={<Stethoscope size={17} />} action>
-            {latestVisit ? (
-              <InfoGrid
-                rows={[
-                  ["Main complaint", latestVisit.main_complaint],
-                  ["Diagnosis", value(latestVisit.diagnosis)],
-                  ["Remedy", value(latestVisit.remedy)],
-                  ["Visit type", latestVisit.visit_type.replaceAll("_", " ")]
-                ]}
-              />
-            ) : (
-              <p className="text-sm text-[#66736d]">No visit assessment recorded yet.</p>
-            )}
-          </ClinicalPanel>
-
-          <ClinicalPanel title="Visit timeline" icon={<ClipboardList size={17} />}>
-            <div className="divide-y divide-[#eef2ef]">
-              {patient.visits?.map((visit) => (
-                <div key={visit.id} className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[110px_1fr]">
-                  <div className="text-xs font-bold uppercase text-[#66736d]">{formatDate(visit.visit_date)}</div>
-                  <div>
-                    <div className="font-bold capitalize">{visit.visit_type.replaceAll("_", " ")}</div>
-                    <p className="mt-1 text-sm leading-6 text-[#53605a]">{visit.main_complaint}</p>
-                  </div>
+        <ClinicalPanel title="Visit timeline" icon={<ClipboardList size={17} />}>
+          <div className="divide-y divide-[#eef2ef]">
+            {patient.visits?.map((visit) => (
+              <div key={visit.id} className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[110px_1fr]">
+                <div className="text-xs font-bold uppercase text-[#66736d]">{formatDate(visit.visit_date)}</div>
+                <div>
+                  <div className="font-bold capitalize">{visit.visit_type.replaceAll("_", " ")}</div>
+                  <p className="mt-1 text-sm leading-6 text-[#53605a]">{visit.main_complaint}</p>
                 </div>
-              ))}
-              {(!patient.visits || patient.visits.length === 0) && <p className="text-sm text-[#66736d]">No visit history visible.</p>}
-            </div>
-          </ClinicalPanel>
-        </div>
+              </div>
+            ))}
+            {(!patient.visits || patient.visits.length === 0) && <p className="text-sm text-[#66736d]">No visit history visible.</p>}
+          </div>
+        </ClinicalPanel>
       </section>
     </AppShell>
   );

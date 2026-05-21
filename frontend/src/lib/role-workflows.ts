@@ -2,19 +2,15 @@ import {
   Archive,
   CalendarCheck,
   ClipboardCheck,
-  ClipboardList,
-  HeartPulse,
   Inbox,
   LayoutDashboard,
   LockKeyhole,
   MessageSquare,
   Package,
-  Search,
+  FileText,
   Settings,
   ShieldCheck,
   Stethoscope,
-  UserCog,
-  UserPlus,
   Users,
   type LucideIcon
 } from "lucide-react";
@@ -40,13 +36,14 @@ export type WorkflowCard = {
 
 export const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "clinician", "receptionist"] },
-  { href: "/patients/dashboard", label: "Patient Hub", icon: Users, roles: ["admin", "clinician", "receptionist"] },
-  { href: "/patients", label: "Patient Records", icon: Search, roles: ["admin", "clinician", "receptionist"] },
-  { href: "/patients/new", label: "Register Patient", icon: UserPlus, roles: ["admin", "receptionist"] },
-  { href: "/visits", label: "Visit Records", icon: ClipboardList, roles: ["admin", "clinician"] },
-  { href: "/visits/new", label: "Add Visit", icon: HeartPulse, roles: ["admin", "clinician"] },
-  { href: "/users", label: "Users", icon: UserCog, roles: ["admin"] },
-  { href: "/account", label: "Account", icon: Settings, roles: ["admin", "clinician", "receptionist"] }
+  { href: "/patients", label: "Patients", icon: Users, roles: ["admin", "clinician", "receptionist"] },
+  { href: "/visits", label: "Visits", icon: Stethoscope, roles: ["admin", "clinician"] },
+  { href: "/appointments", label: "Appointments", icon: CalendarCheck, roles: ["admin", "clinician", "receptionist"] },
+  { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "clinician"] },
+  { href: "/messages", label: "Messages", icon: MessageSquare, roles: ["admin", "clinician", "receptionist"] },
+  { href: "/inventory", label: "Inventory", icon: Package, roles: ["admin", "clinician"] },
+  { href: "/reports", label: "Reports", icon: FileText, roles: ["admin", "clinician"] },
+  { href: "/account", label: "Settings", icon: Settings, roles: ["admin", "clinician", "receptionist"] }
 ];
 
 export const workflowCards: WorkflowCard[] = [
