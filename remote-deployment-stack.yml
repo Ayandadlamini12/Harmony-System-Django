@@ -49,6 +49,8 @@ services:
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
              gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+    volumes:
+      - backend_django_media:/app/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -129,6 +131,7 @@ services:
 
 volumes:
   postgres_django_data:
+  backend_django_media:
 
 networks:
   harmony-net:

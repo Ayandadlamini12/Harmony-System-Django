@@ -19,12 +19,14 @@ import { cn } from "@/lib/utils";
 
 export function AppSidebar({
   children,
+  avatarUrl,
   name,
   role,
   title,
   signedIn
 }: {
   action?: React.ReactNode;
+  avatarUrl?: string;
   children: React.ReactNode;
   name: string;
   role: UserRole;
@@ -48,7 +50,7 @@ export function AppSidebar({
 
   return (
     <div className="min-h-screen bg-[#f7faf8]">
-      <TopBar name={name} onToggle={toggleCollapsed} signedIn={signedIn} title={title} />
+      <TopBar avatarUrl={avatarUrl} name={name} onToggle={toggleCollapsed} signedIn={signedIn} title={title} />
       <DesktopSidebar collapsed={collapsed} name={name} role={role} />
       <main className={cn("min-w-0 transition-[margin] duration-200 lg:pt-16", collapsed ? "lg:ml-[76px]" : "lg:ml-[260px]")}>
         <div className="mx-auto w-full max-w-[1540px] px-4 py-5 sm:px-6">{children}</div>
@@ -58,11 +60,13 @@ export function AppSidebar({
 }
 
 function TopBar({
+  avatarUrl,
   name,
   onToggle,
   signedIn,
   title
 }: {
+  avatarUrl?: string;
   name: string;
   onToggle: () => void;
   signedIn: boolean;
@@ -99,7 +103,7 @@ function TopBar({
               href="/account"
               title={name || title}
             >
-              <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon.png" />
+              <img alt="" className="h-9 w-9 rounded-md object-cover" src={avatarUrl || "/brand/harmony-icon.png"} />
             </Link>
           ) : (
             <Link

@@ -8,6 +8,7 @@ User = get_user_model()
 class UserSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source="get_full_name", read_only=True)
     password = serializers.CharField(write_only=True, required=False, min_length=8)
+    avatar_url = serializers.SerializerMethodField()
 
     class Meta:
         model = User
@@ -20,8 +21,14 @@ class UserSerializer(serializers.ModelSerializer):
             "name",
             "role",
             "is_active",
+            "avatar_url",
             "password",
         )
+
+    def get_avatar_url(self, obj):
+        if not obj.profile_image:
+            return None
+        return "/api/account/avatar"
 
     def create(self, validated_data):
         password = validated_data.pop("password", None)

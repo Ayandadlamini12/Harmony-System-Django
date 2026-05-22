@@ -25,7 +25,7 @@ export async function POST(request: Request) {
   }
 
   const tokens = (await response.json()) as { access: string; refresh: string };
-  let userProfile = { role: "receptionist", username, name: username };
+  let userProfile = { role: "receptionist", username, name: username, avatarUrl: null as string | null };
   try {
     const userResponse = await fetch(`${API_BASE_URL}/users/me/`, {
       headers: { Authorization: `Bearer ${tokens.access}` }
@@ -35,11 +35,12 @@ export async function POST(request: Request) {
       userProfile = {
         role: currentUser.role || "receptionist",
         username: currentUser.username || username,
-        name: currentUser.name || currentUser.email || currentUser.username || username
+        name: currentUser.name || currentUser.email || currentUser.username || username,
+        avatarUrl: currentUser.avatar_url || null
       };
     }
   } catch {
-    userProfile = { role: "receptionist", username, name: username };
+    userProfile = { role: "receptionist", username, name: username, avatarUrl: null };
   }
 
   const cookieStore = await cookies();
@@ -78,6 +79,17 @@ export async function POST(request: Request) {
     path: "/",
     maxAge: 60 * 60 * 24 * 7
   });
+  if (userProfile.avatarUrl) {
+    cookieStore.set("harmony_avatar_url", `${userProfile.avatarUrl}?v=${Date.now()}`, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: COOKIE_SECURE,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7
+    });
+  } else {
+    cookieStore.delete("harmony_avatar_url");
+  }
 
   return NextResponse.json({ success: true });
 }

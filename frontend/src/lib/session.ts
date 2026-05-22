@@ -7,6 +7,7 @@ export type SessionUser = {
   role: UserRole;
   name: string;
   username: string;
+  avatarUrl?: string;
 };
 
 export async function getSessionUser(): Promise<SessionUser> {
@@ -15,6 +16,7 @@ export async function getSessionUser(): Promise<SessionUser> {
     signedIn: Boolean(cookieStore.get("harmony_access")?.value),
     role: (cookieStore.get("harmony_role")?.value as UserRole) || "receptionist",
     name: cookieStore.get("harmony_name")?.value || "Local Admin",
-    username: cookieStore.get("harmony_username")?.value || "localadmin"
+    username: cookieStore.get("harmony_username")?.value || "localadmin",
+    avatarUrl: cookieStore.get("harmony_avatar_url")?.value
   };
 }

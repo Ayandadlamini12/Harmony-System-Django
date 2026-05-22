@@ -12,6 +12,7 @@ export async function AppShell({ children, title, action }: { children: React.Re
       <MobileSidebar role={session.role} name={session.name} />
       <AppSidebar
         action={action}
+        avatarUrl={session.avatarUrl}
         name={session.name}
         role={session.role}
         signedIn={session.signedIn}

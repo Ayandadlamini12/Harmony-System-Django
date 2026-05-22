@@ -104,6 +104,7 @@ export type User = {
   name: string;
   role: "admin" | "clinician" | "receptionist";
   is_active: boolean;
+  avatar_url?: string | null;
 };
 
 export type Paginated<T> = {

@@ -48,6 +48,8 @@ services:
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       HARMONY_WEBHOOK_SECRET: ${HARMONY_WEBHOOK_SECRET}
+    volumes:
+      - backend_django_media:/app/media
     depends_on:
       postgres:
         condition: service_healthy
@@ -129,6 +131,7 @@ services:
 
 volumes:
   postgres_django_data:
+  backend_django_media:
 
 networks:
   harmony-net:

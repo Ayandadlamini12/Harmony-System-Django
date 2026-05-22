@@ -1,7 +1,8 @@
-import { ShieldCheck, UserRound } from "lucide-react";
+import { ShieldCheck } from "lucide-react";
 
 import { AppShell } from "@/components/app-shell";
 import { ChangePasswordForm } from "@/components/change-password-form";
+import { ProfilePhotoUploader } from "@/components/profile-photo-uploader";
 import { getSessionUser } from "@/lib/session";
 
 export default async function AccountPage() {
@@ -11,12 +12,15 @@ export default async function AccountPage() {
     <AppShell title="Profile and account">
       <section className="grid gap-6 lg:grid-cols-[360px_1fr]">
         <div className="hh-panel p-5">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#f5edfa] text-[var(--hh-purple)]">
-            <UserRound size={30} />
-          </div>
+          <img
+            alt={`${session.name} profile`}
+            className="h-16 w-16 rounded-2xl border border-[#d9c7e8] bg-white object-cover"
+            src={session.avatarUrl || "/brand/harmony-icon.png"}
+          />
           <h2 className="mt-4 text-xl font-bold">{session.name}</h2>
           <p className="mt-1 text-sm text-[#66736d]">{session.username}</p>
           <span className="mt-4 inline-flex rounded-full bg-[var(--hh-green-light)] px-3 py-1 text-xs font-bold capitalize text-[var(--hh-green-dark)]">{session.role}</span>
+          <ProfilePhotoUploader avatarUrl={session.avatarUrl} name={session.name} />
         </div>
 
         <div className="grid gap-4">

@@ -8,6 +8,7 @@ export async function POST() {
   cookieStore.delete("harmony_role");
   cookieStore.delete("harmony_username");
   cookieStore.delete("harmony_name");
+  cookieStore.delete("harmony_avatar_url");
 
   return NextResponse.json({ success: true });
 }
