@@ -40,14 +40,14 @@ function LoginForm() {
 
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--hh-soft)] px-5">
-      <section className="hh-panel w-full max-w-md p-6">
-        <div className="mb-6 text-center">
+      <section className="hh-panel w-full max-w-md px-6 pb-6 pt-3">
+        <div className="mb-5 text-center">
           <img
             alt="Harmony Health"
-            className="mx-auto h-auto w-full max-w-[280px]"
+            className="mx-auto -mt-1 h-auto w-full max-w-[320px]"
             src="/brand/harmony-logo.png"
           />
-          <p className="mt-3 text-sm text-[#66736d]">Sign in to the clinic workspace</p>
+          <p className="mt-1 text-sm text-[#66736d]">Sign in to the clinic workspace</p>
         </div>
 
         {registered && (
