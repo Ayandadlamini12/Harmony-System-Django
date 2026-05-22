@@ -3,7 +3,11 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   title: "Harmony Health System",
-  description: "Django REST and Next.js redesign for Harmony Health"
+  description: "Django REST and Next.js redesign for Harmony Health",
+  icons: {
+    icon: "/brand/harmony-icon.png",
+    apple: "/brand/harmony-icon.png"
+  }
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {

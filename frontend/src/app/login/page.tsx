@@ -1,6 +1,5 @@
 "use client";
 
-import { Activity } from "lucide-react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
@@ -42,14 +41,13 @@ function LoginForm() {
   return (
     <main className="flex min-h-screen items-center justify-center bg-[var(--hh-soft)] px-5">
       <section className="hh-panel w-full max-w-md p-6">
-        <div className="mb-6 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[var(--hh-purple)] text-white">
-            <Activity size={22} />
-          </div>
-          <div>
-            <h1 className="text-xl font-bold">Harmony Health</h1>
-            <p className="text-sm text-[#66736d]">Sign in to the clinic workspace</p>
-          </div>
+        <div className="mb-6 text-center">
+          <img
+            alt="Harmony Health"
+            className="mx-auto h-auto w-full max-w-[280px]"
+            src="/brand/harmony-logo.png"
+          />
+          <p className="mt-3 text-sm text-[#66736d]">Sign in to the clinic workspace</p>
         </div>
 
         {registered && (
