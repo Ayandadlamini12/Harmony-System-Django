@@ -18,13 +18,11 @@ import type { UserRole } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
 export function AppSidebar({
-  action,
   children,
   name,
   role,
   title,
-  signedIn,
-  signOut
+  signedIn
 }: {
   action?: React.ReactNode;
   children: React.ReactNode;
@@ -50,7 +48,7 @@ export function AppSidebar({
 
   return (
     <div className="min-h-screen bg-[#f7faf8]">
-      <TopBar action={action} name={name} onToggle={toggleCollapsed} signedIn={signedIn} signOut={signOut} title={title} />
+      <TopBar name={name} onToggle={toggleCollapsed} signedIn={signedIn} title={title} />
       <DesktopSidebar collapsed={collapsed} name={name} role={role} />
       <main className={cn("min-w-0 transition-[margin] duration-200 lg:pt-16", collapsed ? "lg:ml-[76px]" : "lg:ml-[260px]")}>
         <div className="mx-auto w-full max-w-[1540px] px-4 py-5 sm:px-6">{children}</div>
@@ -60,18 +58,14 @@ export function AppSidebar({
 }
 
 function TopBar({
-  action,
   name,
   onToggle,
   signedIn,
-  signOut,
   title
 }: {
-  action?: React.ReactNode;
   name: string;
   onToggle: () => void;
   signedIn: boolean;
-  signOut: React.ReactNode;
   title: string;
 }) {
   return (
@@ -98,15 +92,25 @@ function TopBar({
             <Bell size={19} />
             <span className="sr-only">Notifications</span>
           </Button>
-          {action}
           {signedIn ? (
-            <div className="hidden sm:block">{signOut}</div>
+            <Link
+              aria-label={`${name || title} profile and account`}
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-white text-[var(--hh-purple)] ring-1 ring-white/25 hover:bg-[#f7f0fb]"
+              href="/account"
+              title={name || title}
+            >
+              <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon.png" />
+            </Link>
           ) : (
-            <Button asChild variant="secondary">
-              <Link href="/login">Sign in</Link>
-            </Button>
+            <Link
+              aria-label="Sign in"
+              className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-white text-[var(--hh-purple)] ring-1 ring-white/25 hover:bg-[#f7f0fb]"
+              href="/login"
+              title="Sign in"
+            >
+              <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon.png" />
+            </Link>
           )}
-          <div className="hidden min-h-10 items-center rounded-lg bg-white/12 px-3 text-sm font-bold sm:inline-flex">{name || title}</div>
         </div>
       </div>
     </header>
