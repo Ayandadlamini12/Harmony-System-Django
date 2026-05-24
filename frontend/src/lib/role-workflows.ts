@@ -8,11 +8,13 @@ import {
   MessageSquare,
   Package,
   FileText,
+  HeartPulse,
   Settings,
   ShieldCheck,
   Stethoscope,
   Users,
   UserRoundCog,
+  UserPlus,
   type LucideIcon
 } from "lucide-react";
 
@@ -38,8 +40,20 @@ export type WorkflowCard = {
 
 export const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "clinician", "receptionist"] },
-  { href: "/patients", label: "Patients", icon: Users, roles: ["admin", "clinician", "receptionist"] },
-  { href: "/visits", label: "Visits", icon: Stethoscope, roles: ["admin", "clinician"] },
+  {
+    href: "/patients",
+    label: "Patients",
+    icon: Users,
+    roles: ["admin", "clinician", "receptionist"],
+    children: [
+      { href: "/patients/new", label: "Add Patient", icon: UserPlus, roles: ["admin", "receptionist"] },
+      { href: "/patients", label: "Patient List", icon: Users, roles: ["admin", "clinician", "receptionist"] },
+      { href: "/visits/new", label: "Add Visit", icon: Stethoscope, roles: ["admin", "clinician"] },
+      { href: "/check-ins", label: "Check-In", icon: ClipboardCheck, roles: ["admin", "receptionist"] },
+      { href: "/vitals/new", label: "Add Vitals", icon: HeartPulse, roles: ["admin", "clinician"], status: "planned" },
+      { href: "/messages", label: "Send Message", icon: MessageSquare, roles: ["admin", "clinician", "receptionist"], status: "planned" }
+    ]
+  },
   { href: "/appointments", label: "Appointments", icon: CalendarCheck, roles: ["admin", "clinician", "receptionist"] },
   { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "clinician"] },
   { href: "/messages", label: "Messages", icon: MessageSquare, roles: ["admin", "clinician", "receptionist"] },
@@ -51,6 +65,8 @@ export const navItems: NavItem[] = [
     icon: UserRoundCog,
     roles: ["admin"],
     children: [
+      { href: "/employees/enrollment", label: "Employee Enrollment", icon: UserPlus, roles: ["admin"], status: "planned" },
+      { href: "/users/enrol", label: "Enrol User", icon: UserRoundCog, roles: ["admin"] },
       { href: "/users", label: "Users", icon: Users, roles: ["admin"] },
       { href: "/roles", label: "Roles", icon: ShieldCheck, roles: ["admin"], status: "planned" },
       { href: "/teams", label: "Teams", icon: Users, roles: ["admin"], status: "planned" }

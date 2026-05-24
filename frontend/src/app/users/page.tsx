@@ -16,7 +16,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
   const errorMsg = params.error;
 
   return (
-    <AppShell title="User management" action={<Link className="hh-button" href="/register">Add user</Link>}>
+    <AppShell title="User management" action={<Link className="hh-button" href="/users/enrol">Enrol user</Link>}>
       {errorMsg && (
         <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
           {errorMsg === "create_failed" && "Failed to create user. Please try again."}
