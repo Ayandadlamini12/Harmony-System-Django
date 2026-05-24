@@ -7,7 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { StepForm } from "@/components/step-form";
 import { ConditionChecklist } from "@/components/condition-checklist";
 import { NextOfKinFields } from "@/components/next-of-kin-fields";
-import { PhoneNumberInput } from "@/components/phone-number-input";
+import { PatientContactFields } from "@/components/patient-contact-fields";
 import { createPatient } from "./actions";
 
 export default async function RegisterPatientPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
@@ -43,16 +43,7 @@ export default async function RegisterPatientPage({ searchParams }: { searchPara
       id: "contact",
       title: "Contact and location",
       description: "Country code, phones, email, region, locality, and village.",
-      content: (
-        <div className={threeColumn}>
-          <PhoneNumberInput label="Primary phone" name="primary_phone" required />
-          <PhoneNumberInput label="Secondary phone" name="secondary_phone" />
-          <label className={fieldClass}><Label>Email</Label><Input name="email" type="email" /></label>
-          <label className={fieldClass}><Label>Region</Label><Input name="region" /></label>
-          <label className={fieldClass}><Label>Town or locality</Label><Input name="town_or_locality" /></label>
-          <label className={fieldClass}><Label>Village</Label><Input name="village" /></label>
-        </div>
-      )
+      content: <PatientContactFields />
     },
     {
       id: "clinical",

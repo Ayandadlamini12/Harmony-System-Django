@@ -1,3 +1,5 @@
+"use client";
+
 import { getCountries, getCountryCallingCode } from "libphonenumber-js";
 
 import { Input } from "@/components/ui/input";
@@ -5,7 +7,7 @@ import { Label } from "@/components/ui/label";
 
 const countryNameFormatter = new Intl.DisplayNames(["en"], { type: "region" });
 
-const countryCodeOptions = getCountries()
+export const countryCodeOptions = getCountries()
   .map((country) => {
     const dialCode = `+${getCountryCallingCode(country)}`;
     return {
@@ -18,7 +20,7 @@ const countryCodeOptions = getCountries()
 
 const dialCodes = Array.from(new Set(countryCodeOptions.map((option) => option.dialCode))).sort((a, b) => b.length - a.length);
 
-function parsePhone(value?: string) {
+export function parsePhone(value?: string) {
   const text = value || "";
   const compact = text.replace(/\s/g, "");
   const dialCode = dialCodes.find((code) => compact.startsWith(code));
@@ -30,12 +32,14 @@ export function PhoneNumberInput({
   label,
   name,
   defaultValue,
-  required = false
+  required = false,
+  onCountryCodeChange
 }: {
   label: string;
   name: "primary_phone" | "secondary_phone" | "next_of_kin_phone";
   defaultValue?: string;
   required?: boolean;
+  onCountryCodeChange?: (countryCode: string) => void;
 }) {
   const parsed = parsePhone(defaultValue);
   const listId = `${name}-country-codes`;
@@ -49,6 +53,7 @@ export function PhoneNumberInput({
           defaultValue={parsed.countryCode}
           list={listId}
           name={`${name}_country_code`}
+          onChange={(event) => onCountryCodeChange?.(event.currentTarget.value)}
           pattern="^\+\d{1,4}$"
           placeholder="+268"
           required={required}

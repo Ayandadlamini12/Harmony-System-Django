@@ -8,7 +8,17 @@ import { toast } from "sonner";
 import { LoadingButton } from "@/components/harmony-loading";
 import type { Patient } from "@/types/clinic";
 
-export function VisitForm({ patients, patientId, error: initialError }: { patients: Patient[]; patientId?: string; error?: string }) {
+export function VisitForm({
+  patients,
+  patientId,
+  defaultVisitType = "new_consultation",
+  error: initialError
+}: {
+  patients: Patient[];
+  patientId?: string;
+  defaultVisitType?: string;
+  error?: string;
+}) {
   const router = useRouter();
   const [error, setError] = useState(initialError || null);
   const [loading, setLoading] = useState(false);
@@ -92,7 +102,7 @@ export function VisitForm({ patients, patientId, error: initialError }: { patien
           </label>
           <label>
             <span className="hh-label">Visit type</span>
-            <select className="hh-input" name="visit_type" defaultValue="new_consultation">
+            <select className="hh-input" name="visit_type" defaultValue={defaultVisitType}>
               <option value="new_consultation">New consultation</option>
               <option value="follow_up">Follow up</option>
               <option value="review">Review</option>

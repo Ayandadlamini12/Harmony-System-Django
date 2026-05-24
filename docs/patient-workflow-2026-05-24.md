@@ -12,6 +12,8 @@ New patient enrollment now records non-clinical intake details separately from t
   - searchable country dialing extension
   - local phone number
 - The submitted phone value is stored as one international string, for example `+26876000000`.
+- For Eswatini primary phone codes (`+268`), registration and edit forms show controlled `Region` and `Town or locality` dropdowns.
+- For other country codes, region/province and town/locality remain typed fields until those country datasets are added.
 - Next of kin details are part of non-confidential intake:
   - full name(s)
   - phone number with country dialing extension
@@ -37,3 +39,14 @@ Where:
 - `301048` is the last 6 digits of the primary phone number.
 
 Older `PAT-YYYY-000001` patient numbers are not rewritten. The new format is used for newly created patients.
+
+## Existing Patient Check-In
+
+Already registered patients are checked in from `/check-ins`.
+
+- Reception can search by cell number, Harmony patient ID, or National / Passport ID.
+- The search uses the backend patient search endpoint through `/api/patients/search`, so it is not limited to the first visible page of patients.
+- Matched patients expose two visit choices:
+  - `New visit`
+  - `Follow up`
+- The selected visit type is passed into `/visits/new` and preselects the visit type field.

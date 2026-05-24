@@ -9,7 +9,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConditionChecklist } from "@/components/condition-checklist";
 import { NextOfKinFields } from "@/components/next-of-kin-fields";
-import { PhoneNumberInput } from "@/components/phone-number-input";
+import { PatientContactFields } from "@/components/patient-contact-fields";
 import { getPatient } from "@/lib/api";
 
 import { updatePatient } from "./actions";
@@ -69,14 +69,14 @@ export default async function EditPatientPage({
 
         <section className="hh-panel p-5">
           <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Contact and location</h2>
-          <div className={gridClass}>
-            <PhoneNumberInput label="Primary phone" name="primary_phone" defaultValue={patient.primary_phone || ""} required />
-            <PhoneNumberInput label="Secondary phone" name="secondary_phone" defaultValue={patient.secondary_phone || ""} />
-            <label className={fieldClass}><Label>Email</Label><Input name="email" type="email" defaultValue={patient.email || ""} /></label>
-            <label className={fieldClass}><Label>Region</Label><Input name="region" defaultValue={patient.region || ""} /></label>
-            <label className={fieldClass}><Label>Town or locality</Label><Input name="town_or_locality" defaultValue={patient.town_or_locality || ""} /></label>
-            <label className={fieldClass}><Label>Village</Label><Input name="village" defaultValue={patient.village || ""} /></label>
-          </div>
+          <PatientContactFields
+            defaultEmail={patient.email || ""}
+            defaultPrimaryPhone={patient.primary_phone || ""}
+            defaultSecondaryPhone={patient.secondary_phone || ""}
+            defaultRegion={patient.region || ""}
+            defaultTownOrLocality={patient.town_or_locality || ""}
+            defaultVillage={patient.village || ""}
+          />
         </section>
 
         <section className="hh-panel p-5">
