@@ -7,7 +7,8 @@ from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
-from .serializers import ChangePasswordSerializer, RegisterSerializer, UserSerializer
+from .models import ClinicianProfile
+from .serializers import ChangePasswordSerializer, ClinicianProfileSerializer, RegisterSerializer, UserSerializer
 
 User = get_user_model()
 
@@ -33,6 +34,33 @@ class UserViewSet(viewsets.ModelViewSet):
     @action(detail=False, methods=["get"], permission_classes=[permissions.IsAuthenticated])
     def me(self, request):
         return Response(self.get_serializer(request.user).data)
+
+    @action(
+        detail=False,
+        methods=["get", "patch"],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path="me/clinician-profile",
+    )
+    def me_clinician_profile(self, request):
+        if request.user.role not in {"admin", "clinician"}:
+            return Response(
+                {"detail": "Only clinicians and admins can maintain a clinician profile."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        profile, _ = ClinicianProfile.objects.get_or_create(
+            user=request.user,
+            defaults={
+                "display_name": request.user.get_full_name() or request.user.username,
+                "professional_email": request.user.email,
+            },
+        )
+        if request.method == "GET":
+            return Response(ClinicianProfileSerializer(profile).data)
+
+        serializer = ClinicianProfileSerializer(profile, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
 
     @action(
         detail=False,

@@ -2,6 +2,8 @@ from django.contrib.auth import get_user_model, password_validation
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
+from .models import ClinicianProfile
+
 User = get_user_model()
 
 
@@ -48,6 +50,60 @@ class UserSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+
+class ClinicianProfileSerializer(serializers.ModelSerializer):
+    user_name = serializers.CharField(source="user.get_full_name", read_only=True)
+    username = serializers.CharField(source="user.username", read_only=True)
+    missing_sections = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ClinicianProfile
+        fields = (
+            "id",
+            "user",
+            "user_name",
+            "username",
+            "professional_title",
+            "display_name",
+            "professional_email",
+            "professional_phone",
+            "bio",
+            "clinical_interests",
+            "education",
+            "career_details",
+            "awards_certifications",
+            "affiliations",
+            "profile_completion",
+            "completed_sections",
+            "missing_sections",
+            "last_profile_reminder_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "user",
+            "user_name",
+            "username",
+            "profile_completion",
+            "completed_sections",
+            "missing_sections",
+            "last_profile_reminder_at",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_missing_sections(self, obj):
+        labels = {
+            "personal_details": "Personal details",
+            "education": "Education",
+            "career_details": "Career details",
+            "awards_certifications": "Awards / certifications",
+            "affiliations": "Affiliations",
+        }
+        completed = set(obj.completed_sections or [])
+        return [{"key": key, "label": labels[key]} for key in ClinicianProfile.SECTION_KEYS if key not in completed]
 
 
 class RegisterSerializer(serializers.ModelSerializer):

@@ -150,6 +150,31 @@ export type User = {
   avatar_url?: string | null;
 };
 
+export type ClinicianProfileEntry = Record<string, string>;
+
+export type ClinicianProfile = {
+  id: number;
+  user: number;
+  user_name?: string;
+  username?: string;
+  professional_title: string;
+  display_name: string;
+  professional_email: string;
+  professional_phone: string;
+  bio: string;
+  clinical_interests: string;
+  education: ClinicianProfileEntry[];
+  career_details: ClinicianProfileEntry[];
+  awards_certifications: ClinicianProfileEntry[];
+  affiliations: ClinicianProfileEntry[];
+  profile_completion: number;
+  completed_sections: string[];
+  missing_sections: { key: string; label: string }[];
+  last_profile_reminder_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Paginated<T> = {
   count: number;
   next: string | null;

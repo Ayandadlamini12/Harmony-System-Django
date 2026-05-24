@@ -1,4 +1,4 @@
-import type { DashboardStats, ElevatedAccessRequest, FormDraft, Paginated, Patient, PatientCheckIn, User, Visit } from "@/types/clinic";
+import type { ClinicianProfile, DashboardStats, ElevatedAccessRequest, FormDraft, Paginated, Patient, PatientCheckIn, User, Visit } from "@/types/clinic";
 import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -92,6 +92,10 @@ export function getUsers(search = "") {
     previous: null,
     results: []
   });
+}
+
+export function getMyClinicianProfile() {
+  return apiGet<ClinicianProfile | null>("/users/me/clinician-profile/", null);
 }
 
 export { API_BASE_URL };
