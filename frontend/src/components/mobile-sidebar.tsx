@@ -18,7 +18,7 @@ function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRo
     <div className="flex h-full flex-col bg-[var(--hh-purple-dark)] text-white">
       <div className="flex h-16 items-center gap-3 px-5">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/12">
-          <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon.png" />
+          <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon-sm.webp" />
         </div>
         <div>
           <div className="font-bold">Harmony Health</div>
@@ -59,7 +59,7 @@ export function MobileSidebar({ name, role }: { name: string; role: UserRole }) 
       <div className="flex h-16 items-center justify-between border-b border-[var(--hh-border)] bg-white px-4 lg:hidden">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hh-purple)] text-white">
-            <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon.png" />
+            <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon-sm.webp" />
           </div>
           <div>
             <div className="font-bold">Harmony Health</div>

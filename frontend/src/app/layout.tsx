@@ -5,8 +5,8 @@ export const metadata: Metadata = {
   title: "Harmony Health System",
   description: "Django REST and Next.js redesign for Harmony Health",
   icons: {
-    icon: "/brand/favicon.ico",
-    apple: "/brand/harmony-icon.png"
+    icon: "/brand/favicon-32.png",
+    apple: "/brand/favicon-32.png"
   }
 };
 

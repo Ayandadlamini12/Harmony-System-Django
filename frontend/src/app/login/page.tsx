@@ -45,7 +45,11 @@ function LoginForm() {
           <img
             alt="Harmony Health"
             className="mx-auto -mt-1 h-auto w-full max-w-[320px]"
-            src="/brand/harmony-logo.png"
+            decoding="async"
+            fetchPriority="high"
+            height="291"
+            src="/brand/harmony-login-logo.webp"
+            width="420"
           />
           <p className="mt-1 text-sm text-[#66736d]">Sign in to the clinic workspace</p>
         </div>

@@ -15,7 +15,7 @@ export default async function AccountPage() {
           <img
             alt={`${session.name} profile`}
             className="h-16 w-16 rounded-2xl border border-[#d9c7e8] bg-white object-cover"
-            src={session.avatarUrl || "/brand/harmony-icon.png"}
+            src={session.avatarUrl || "/brand/harmony-icon-sm.webp"}
           />
           <h2 className="mt-4 text-xl font-bold">{session.name}</h2>
           <p className="mt-1 text-sm text-[#66736d]">{session.username}</p>

@@ -81,7 +81,7 @@ function TopBar({
             <span className="sr-only">Toggle sidebar</span>
           </Button>
           <Link href="/" className="flex min-w-0 items-center gap-2 font-bold">
-            <img alt="" className="h-7 w-7 rounded-md bg-white object-cover" src="/brand/harmony-icon.png" />
+            <img alt="" className="h-7 w-7 rounded-md bg-white object-cover" src="/brand/harmony-icon-sm.webp" />
             <span className="hidden sm:inline">Harmony Health MIS</span>
           </Link>
         </div>
@@ -103,7 +103,7 @@ function TopBar({
               href="/account"
               title={name || title}
             >
-              <img alt="" className="h-9 w-9 rounded-md object-cover" src={avatarUrl || "/brand/harmony-icon.png"} />
+              <img alt="" className="h-9 w-9 rounded-md object-cover" src={avatarUrl || "/brand/harmony-icon-sm.webp"} />
             </Link>
           ) : (
             <Link
@@ -112,7 +112,7 @@ function TopBar({
               href="/login"
               title="Sign in"
             >
-              <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon.png" />
+              <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon-sm.webp" />
             </Link>
           )}
         </div>
@@ -139,7 +139,7 @@ function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: s
             </>
           ) : (
             <div className="flex h-11 items-center justify-center rounded-lg bg-[#f7f0fb] text-[var(--hh-purple)]">
-              <img alt="Harmony Health" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon.png" />
+              <img alt="Harmony Health" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon-sm.webp" />
             </div>
           )}
         </div>

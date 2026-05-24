@@ -101,7 +101,7 @@ export function ProfilePhotoUploader({ avatarUrl, name }: { avatarUrl?: string; 
     setError("The profile image could not be removed.");
   }
 
-  const displayUrl = previewUrl || avatarUrl || "/brand/harmony-icon.png";
+  const displayUrl = previewUrl || avatarUrl || "/brand/harmony-icon-sm.webp";
 
   return (
     <div className="mt-5 rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4">
