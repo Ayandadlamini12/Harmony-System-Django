@@ -1,4 +1,4 @@
-import type { ClinicianProfile, DashboardStats, ElevatedAccessRequest, FormDraft, Paginated, Patient, PatientCheckIn, User, Visit } from "@/types/clinic";
+import type { ClinicianProfile, DashboardStats, ElevatedAccessRequest, FormDraft, Paginated, Patient, PatientCheckIn, User, Visit, Vital } from "@/types/clinic";
 import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -44,6 +44,15 @@ export function getPatient(id: string | number) {
 
 export function getVisits() {
   return apiGet<Paginated<Visit>>("/visits/", {
+    count: 0,
+    next: null,
+    previous: null,
+    results: []
+  });
+}
+
+export function getVitals() {
+  return apiGet<Paginated<Vital>>("/vitals/", {
     count: 0,
     next: null,
     previous: null,

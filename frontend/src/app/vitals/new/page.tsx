@@ -1,29 +1,33 @@
-import { HeartPulse } from "lucide-react";
-import Link from "next/link";
-
 import { AppShell } from "@/components/app-shell";
-import { Button } from "@/components/ui/button";
+import { VitalsForm } from "@/components/vitals-form";
+import { getPatients, getVisits, getVitals } from "@/lib/api";
 
-export default function AddVitalsPage() {
+export default async function AddVitalsPage({ searchParams }: { searchParams: Promise<{ patient?: string; visit?: string }> }) {
+  const params = await searchParams;
+  const [patients, visits, vitals] = await Promise.all([getPatients(), getVisits(), getVitals()]);
+
   return (
     <AppShell title="Add vitals">
-      <section className="hh-panel p-5">
-        <div className="flex items-center gap-3">
-          <HeartPulse className="text-[var(--hh-purple)]" size={22} />
-          <h2 className="font-bold">Add Vitals</h2>
+      <section className="mb-5 grid gap-4 lg:grid-cols-[1fr_360px]">
+        <div className="hh-panel p-5">
+          <h2 className="font-bold">Record visit vitals</h2>
+          <p className="mt-2 max-w-3xl text-sm leading-6 text-[#66736d]">
+            Vitals are recorded separately from visit notes and linked to a specific visit with their own date and time. A visit can have multiple vitals records.
+          </p>
         </div>
-        <p className="mt-2 max-w-3xl text-sm leading-6 text-[#66736d]">
-          Future patient vitals entry screen. For now vitals can still be captured inside the visit workflow, and this route is ready for the dedicated vitals form.
-        </p>
-        <div className="mt-5 flex flex-wrap gap-3">
-          <Button asChild>
-            <Link href="/visits/new">Open visit form</Link>
-          </Button>
-          <Button asChild variant="secondary">
-            <Link href="/patients">Find patient</Link>
-          </Button>
+        <div className="hh-panel p-5">
+          <div className="text-sm font-bold">Recent vitals records</div>
+          <div className="mt-2 text-2xl font-bold text-[var(--hh-purple)]">{vitals.count}</div>
+          <p className="mt-1 text-sm text-[#66736d]">Total records visible to your account.</p>
         </div>
       </section>
+
+      <VitalsForm
+        patientId={params.patient}
+        patients={patients.results}
+        visitId={params.visit}
+        visits={visits.results}
+      />
     </AppShell>
   );
 }

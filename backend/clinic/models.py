@@ -320,7 +320,7 @@ class Vital(TimeStampedModel):
         NOT_TAKEN = "not_taken", "Not taken"
         UNKNOWN = "unknown", "Unknown"
 
-    visit = models.OneToOneField(Visit, on_delete=models.CASCADE, related_name="vitals")
+    visit = models.ForeignKey(Visit, on_delete=models.CASCADE, related_name="vitals")
     bp_first_reading = models.CharField(max_length=50, blank=True)
     bp_second_reading = models.CharField(max_length=50, blank=True)
     pulse = models.PositiveIntegerField(null=True, blank=True)
@@ -336,6 +336,19 @@ class Vital(TimeStampedModel):
         default=MedicationStatus.UNKNOWN,
     )
     recorded_at = models.DateTimeField(default=timezone.now)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="recorded_vitals",
+    )
+
+    class Meta:
+        ordering = ("-recorded_at", "-created_at")
+        indexes = [
+            models.Index(fields=["visit", "recorded_at"]),
+        ]
 
     def __str__(self) -> str:
         return f"Vitals for visit {self.visit_id}"

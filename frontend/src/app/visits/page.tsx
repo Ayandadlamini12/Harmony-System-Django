@@ -38,7 +38,7 @@ export default async function VisitListPage() {
                   </td>
                   <td className="max-w-md px-5 py-4 text-[#66736d]">{visit.main_complaint}</td>
                   <td className="px-5 py-4 text-[#66736d]">
-                    BP {visit.vitals?.bp_first_reading || "--"}/{visit.vitals?.bp_second_reading || "--"}, pulse {visit.vitals?.pulse || "--"}
+                    {visit.vitals?.length ? `${visit.vitals.length} record${visit.vitals.length === 1 ? "" : "s"}` : "No vitals"}
                   </td>
                 </tr>
               ))}

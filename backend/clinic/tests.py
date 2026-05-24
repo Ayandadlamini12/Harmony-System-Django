@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit
+from .models import AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit, Vital
 
 User = get_user_model()
 
@@ -71,7 +71,7 @@ class PatientApiTests(APITestCase):
         self.assertEqual(first.patient_code, f"HHPAT-100{year_suffix}012345")
         self.assertEqual(second.patient_code, f"HHPAT-101{year_suffix}557788")
 
-    def test_creates_visit_with_vitals_for_patient(self):
+    def test_creates_visit_without_embedded_vitals_for_patient(self):
         patient = Patient.objects.create(first_name="John", last_name="Nkosi", gender="male")
         PatientProfile.objects.create(patient=patient)
 
@@ -81,24 +81,42 @@ class PatientApiTests(APITestCase):
                 "visit_type": "new_consultation",
                 "visit_date": "2026-05-16",
                 "main_complaint": "Headache and fatigue",
-                "vitals": {
-                    "bp_first_reading": "120",
-                    "bp_second_reading": "80",
-                    "pulse": 72,
-                    "glucose_mmol_l": "5.6",
-                    "glucose_context": "after_meals",
-                    "glucose_food_type": "Porridge and fruit",
-                },
             },
             format="json",
         )
 
         self.assertEqual(response.status_code, 201)
-        visit = Visit.objects.select_related("vitals").get()
+        visit = Visit.objects.get()
         self.assertEqual(visit.patient, patient)
-        self.assertEqual(visit.vitals.pulse, 72)
-        self.assertEqual(str(visit.vitals.glucose_mmol_l), "5.6")
-        self.assertEqual(visit.vitals.glucose_food_type, "Porridge and fruit")
+        self.assertEqual(visit.vitals.count(), 0)
+
+    def test_clinician_can_create_multiple_vitals_for_one_visit(self):
+        patient = Patient.objects.create(first_name="John", last_name="Nkosi", gender="male")
+        visit = Visit.objects.create(patient=patient, visit_date="2026-05-16", main_complaint="Headache")
+
+        first_response = self.client.post(
+            "/api/vitals/",
+            {
+                "visit": visit.id,
+                "bp_first_reading": "120",
+                "bp_second_reading": "80",
+                "pulse": 72,
+                "glucose_mmol_l": "5.6",
+                "glucose_context": "after_meals",
+                "glucose_food_type": "Porridge and fruit",
+            },
+            format="json",
+        )
+        second_response = self.client.post(
+            "/api/vitals/",
+            {"visit": visit.id, "bp_first_reading": "118", "bp_second_reading": "78", "pulse": 70},
+            format="json",
+        )
+
+        self.assertEqual(first_response.status_code, 201)
+        self.assertEqual(second_response.status_code, 201)
+        self.assertEqual(Vital.objects.filter(visit=visit).count(), 2)
+        self.assertTrue(AuditLog.objects.filter(entity_type="vital", action="create").exists())
 
 
 class DashboardApiTests(APITestCase):

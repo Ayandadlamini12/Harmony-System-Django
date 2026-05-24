@@ -36,10 +36,20 @@ class PatientConditionSerializer(serializers.ModelSerializer):
 
 
 class VitalSerializer(serializers.ModelSerializer):
+    patient = serializers.IntegerField(source="visit.patient_id", read_only=True)
+    patient_name = serializers.CharField(source="visit.patient.full_name_display", read_only=True)
+    patient_code = serializers.CharField(source="visit.patient.patient_code", read_only=True)
+    visit_label = serializers.SerializerMethodField()
+
     class Meta:
         model = Vital
         fields = (
             "id",
+            "visit",
+            "patient",
+            "patient_name",
+            "patient_code",
+            "visit_label",
             "bp_first_reading",
             "bp_second_reading",
             "pulse",
@@ -51,7 +61,18 @@ class VitalSerializer(serializers.ModelSerializer):
             "glucose_food_type",
             "medication_taken_status",
             "recorded_at",
+            "created_at",
         )
+        read_only_fields = ("id", "patient", "patient_name", "patient_code", "visit_label", "created_at")
+
+    def get_visit_label(self, obj):
+        return f"{obj.visit.get_visit_type_display()} - {obj.visit.visit_date}"
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            validated_data["recorded_by"] = request.user
+        return super().create(validated_data)
 
 
 class FollowUpEvaluationSerializer(serializers.ModelSerializer):
@@ -69,7 +90,7 @@ class FollowUpEvaluationSerializer(serializers.ModelSerializer):
 
 
 class VisitSerializer(serializers.ModelSerializer):
-    vitals = VitalSerializer(required=False)
+    vitals = VitalSerializer(many=True, read_only=True)
     follow_up_evaluation = FollowUpEvaluationSerializer(required=False)
     patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
     patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
@@ -100,13 +121,11 @@ class VisitSerializer(serializers.ModelSerializer):
 
     @transaction.atomic
     def create(self, validated_data):
-        vitals_data = validated_data.pop("vitals", None)
         follow_up_data = validated_data.pop("follow_up_evaluation", None)
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             validated_data["practitioner"] = request.user
         visit = Visit.objects.create(**validated_data)
-        Vital.objects.create(visit=visit, **(vitals_data or {}))
         if follow_up_data:
             FollowUpEvaluation.objects.create(visit=visit, **follow_up_data)
         return visit

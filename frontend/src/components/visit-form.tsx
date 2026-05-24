@@ -32,8 +32,6 @@ export function VisitForm({
     const form = new FormData(e.currentTarget);
 
     function val(key: string) { return String(form.get(key) || "").trim(); }
-    function num(key: string) { const v = val(key); return v ? Number(v) : null; }
-
     const body = {
       patient: Number(val("patient")),
       visit_type: val("visit_type") || "new_consultation",
@@ -47,18 +45,6 @@ export function VisitForm({
       reason_for_remedy: val("reason_for_remedy"),
       dietary_recommendation: val("dietary_recommendation"),
       lifestyle_recommendation: val("lifestyle_recommendation"),
-      vitals: {
-        bp_first_reading: val("bp_first_reading"),
-        bp_second_reading: val("bp_second_reading"),
-        pulse: num("pulse"),
-        resp_rate: num("resp_rate"),
-        temperature: num("temperature"),
-        weight: num("weight"),
-        glucose_mmol_l: num("glucose_mmol_l"),
-        glucose_context: val("glucose_context") || "unknown",
-        glucose_food_type: val("glucose_food_type"),
-        medication_taken_status: "unknown",
-      },
     };
 
     const res = await fetch("/api/visits/create", {
@@ -111,28 +97,6 @@ export function VisitForm({
           <label><span className="hh-label">Visit date</span><input className="hh-input" name="visit_date" type="date" defaultValue={today} required /></label>
           <label><span className="hh-label">Visit time</span><input className="hh-input" name="visit_time" type="time" /></label>
           <label className="md:col-span-2"><span className="hh-label">Main complaint</span><input className="hh-input" name="main_complaint" required /></label>
-        </div>
-      </section>
-
-      <section className="hh-panel p-5">
-        <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Vitals</h2>
-        <div className="grid gap-4 md:grid-cols-4">
-          <label><span className="hh-label">BP first</span><input className="hh-input" name="bp_first_reading" placeholder="120" /></label>
-          <label><span className="hh-label">BP second</span><input className="hh-input" name="bp_second_reading" placeholder="80" /></label>
-          <label><span className="hh-label">Pulse</span><input className="hh-input" name="pulse" type="number" min="0" /></label>
-          <label><span className="hh-label">Resp. rate</span><input className="hh-input" name="resp_rate" type="number" min="0" /></label>
-          <label><span className="hh-label">Temperature</span><input className="hh-input" name="temperature" type="number" step="0.1" /></label>
-          <label><span className="hh-label">Weight</span><input className="hh-input" name="weight" type="number" step="0.1" /></label>
-          <label><span className="hh-label">Glucose</span><input className="hh-input" name="glucose_mmol_l" type="number" step="0.1" /></label>
-          <label><span className="hh-label">Food type</span><input className="hh-input" name="glucose_food_type" placeholder="e.g. porridge, bread, fruit" /></label>
-          <label>
-            <span className="hh-label">Glucose context</span>
-            <select className="hh-input" name="glucose_context" defaultValue="unknown">
-              <option value="unknown">Unknown</option>
-              <option value="fasting">Fasting</option>
-              <option value="after_meals">After meals</option>
-            </select>
-          </label>
         </div>
       </section>
 

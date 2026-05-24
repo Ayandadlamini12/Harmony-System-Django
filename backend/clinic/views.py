@@ -10,7 +10,7 @@ from rest_framework.response import Response
 
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
-from .models import AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientProfile, Visit
+from .models import AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientProfile, Visit, Vital
 from .serializers import (
     AuditLogSerializer,
     ElevatedAccessRequestSerializer,
@@ -19,6 +19,7 @@ from .serializers import (
     PatientDetailSerializer,
     PatientListSerializer,
     VisitSerializer,
+    VitalSerializer,
 )
 
 
@@ -111,7 +112,7 @@ class PatientViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
         if request.method == "GET":
-            visits = patient.visits.select_related("vitals", "follow_up_evaluation")
+            visits = patient.visits.prefetch_related("vitals").select_related("follow_up_evaluation")
             serializer = VisitSerializer(visits, many=True, context={"request": request})
             return Response(serializer.data)
 
@@ -124,7 +125,7 @@ class PatientViewSet(viewsets.ModelViewSet):
 
 
 class VisitViewSet(viewsets.ModelViewSet):
-    queryset = Visit.objects.select_related("patient", "vitals", "follow_up_evaluation").order_by("-visit_date", "-created_at")
+    queryset = Visit.objects.select_related("patient", "follow_up_evaluation").prefetch_related("vitals").order_by("-visit_date", "-created_at")
     serializer_class = VisitSerializer
     search_fields = ("patient__full_name_display", "patient__patient_code", "main_complaint", "diagnosis")
     ordering_fields = ("visit_date", "created_at")
@@ -178,6 +179,67 @@ class VisitViewSet(viewsets.ModelViewSet):
             entity_id=entity_id,
             before_data=before_data,
             details="Visit record deleted.",
+        )
+
+
+class VitalViewSet(viewsets.ModelViewSet):
+    queryset = Vital.objects.select_related("visit", "visit__patient", "recorded_by").order_by("-recorded_at", "-created_at")
+    serializer_class = VitalSerializer
+    search_fields = ("visit__patient__full_name_display", "visit__patient__patient_code")
+    filterset_fields = ("visit", "visit__patient", "glucose_context", "medication_taken_status")
+    ordering_fields = ("recorded_at", "created_at")
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if is_clinical_user(self.request.user):
+            return queryset
+        now = timezone.now()
+        return queryset.filter(
+            visit__patient__access_requests__requested_by=self.request.user,
+            visit__patient__access_requests__status=ElevatedAccessRequest.Status.APPROVED,
+            visit__patient__access_requests__expires_at__gt=now,
+        ).distinct()
+
+    def create(self, request, *args, **kwargs):
+        if not is_clinical_user(request.user):
+            return Response({"detail": "Only clinical users can record vitals."}, status=status.HTTP_403_FORBIDDEN)
+        return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        vital = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=vital,
+            entity_type="vital",
+            after_data=snapshot_instance(vital),
+            details="Vitals record created.",
+        )
+
+    def perform_update(self, serializer):
+        before_data = snapshot_instance(self.get_object())
+        vital = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="update",
+            instance=vital,
+            entity_type="vital",
+            before_data=before_data,
+            after_data=snapshot_instance(vital),
+            details="Vitals record updated.",
+        )
+
+    def perform_destroy(self, instance):
+        before_data = snapshot_instance(instance)
+        entity_id = instance.pk
+        instance.delete()
+        write_audit_log(
+            request=self.request,
+            action="delete",
+            entity_type="vital",
+            entity_id=entity_id,
+            before_data=before_data,
+            details="Vitals record deleted.",
         )
 
 

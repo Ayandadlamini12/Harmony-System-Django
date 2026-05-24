@@ -71,17 +71,28 @@ export type Visit = {
   reason_for_remedy?: string;
   dietary_recommendation?: string;
   lifestyle_recommendation?: string;
-  vitals?: {
-    bp_first_reading?: string;
-    bp_second_reading?: string;
-    pulse?: number;
-    resp_rate?: number;
-    temperature?: string;
-    weight?: string;
-    glucose_mmol_l?: string;
-    glucose_context?: string;
-    glucose_food_type?: string;
-  };
+  vitals?: Vital[];
+};
+
+export type Vital = {
+  id: number;
+  visit: number;
+  patient?: number;
+  patient_name?: string;
+  patient_code?: string;
+  visit_label?: string;
+  bp_first_reading?: string;
+  bp_second_reading?: string;
+  pulse?: number | null;
+  resp_rate?: number | null;
+  temperature?: string | null;
+  weight?: string | null;
+  glucose_mmol_l?: string | null;
+  glucose_context?: string;
+  glucose_food_type?: string;
+  medication_taken_status?: string;
+  recorded_at?: string;
+  created_at?: string;
 };
 
 export type PatientCheckIn = {

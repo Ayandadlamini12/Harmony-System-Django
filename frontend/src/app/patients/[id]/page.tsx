@@ -43,7 +43,11 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
   const canCreateVisit = session.role === "admin" || session.role === "clinician";
   const clinicalAccessActive = patient.clinical_access === "active";
   const latestVisit = patient.visits?.[0];
-  const vitals = latestVisit?.vitals;
+  const vitals = patient.visits?.flatMap((visit) => visit.vitals || []).sort((a, b) => {
+    const left = new Date(a.recorded_at || a.created_at || "").getTime();
+    const right = new Date(b.recorded_at || b.created_at || "").getTime();
+    return right - left;
+  })[0];
 
   return (
     <AppShell title={patient.full_name_display}>
@@ -108,8 +112,16 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
           {canCreateVisit && (
             <Button asChild>
               <Link className="!text-white" href={`/visits/new?patient=${patient.id}`}>
-                <HeartPulse size={16} />
+                <ClipboardList size={16} />
                 New visit note
+              </Link>
+            </Button>
+          )}
+          {canCreateVisit && (
+            <Button asChild variant="secondary">
+              <Link href={`/vitals/new?patient=${patient.id}`}>
+                <HeartPulse size={16} />
+                Add vitals
               </Link>
             </Button>
           )}
@@ -181,7 +193,8 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                 ["Respiration", vitals.resp_rate ? `${vitals.resp_rate} / min` : "--"],
                 ["Glucose", vitals.glucose_mmol_l ? `${vitals.glucose_mmol_l} mmol/L` : "--"],
                 ["Food type", value(vitals.glucose_food_type)],
-                ["Context", value(vitals.glucose_context?.replaceAll("_", " "))]
+                ["Context", value(vitals.glucose_context?.replaceAll("_", " "))],
+                ["Recorded", formatDate(vitals.recorded_at)]
               ]}
             />
           ) : (
