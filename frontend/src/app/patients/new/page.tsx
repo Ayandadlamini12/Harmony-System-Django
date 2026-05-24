@@ -6,6 +6,7 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StepForm } from "@/components/step-form";
 import { ConditionChecklist } from "@/components/condition-checklist";
+import { NextOfKinFields } from "@/components/next-of-kin-fields";
 import { PhoneNumberInput } from "@/components/phone-number-input";
 import { createPatient } from "./actions";
 
@@ -75,6 +76,12 @@ export default async function RegisterPatientPage({ searchParams }: { searchPara
           <label className={fieldClass}><Label>Other important information</Label><Textarea name="other_important_information" /></label>
         </div>
       )
+    },
+    {
+      id: "next-of-kin",
+      title: "Next of kin",
+      description: "Emergency contact and relationship details.",
+      content: <NextOfKinFields />
     },
     {
       id: "conditions",

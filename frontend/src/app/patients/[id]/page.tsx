@@ -9,6 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
 import { getPatient } from "@/lib/api";
+import { relationshipLabel } from "@/lib/relationships";
 import { getSessionUser } from "@/lib/session";
 import { CalendarCheck, Check, ClipboardList, Eye, HeartPulse, LockKeyhole, Pencil, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
 
@@ -139,6 +140,17 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
               ["Locality", value(patient.town_or_locality || patient.region)],
               ["Secondary phone", value(patient.secondary_phone)],
               ["Status", patient.status]
+            ]}
+          />
+        </ClinicalPanel>
+
+        <ClinicalPanel title="Next of kin" icon={<UserRound size={17} />}>
+          <InfoGrid
+            rows={[
+              ["Full name(s)", value(patient.next_of_kin_full_name)],
+              ["Relationship", value(relationshipLabel(patient.next_of_kin_relationship, patient.next_of_kin_relationship_other))],
+              ["Phone", value(patient.next_of_kin_phone)],
+              ["Email", value(patient.next_of_kin_email)]
             ]}
           />
         </ClinicalPanel>

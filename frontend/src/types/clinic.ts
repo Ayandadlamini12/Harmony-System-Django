@@ -21,6 +21,11 @@ export type Patient = {
   region?: string;
   town_or_locality?: string;
   village?: string;
+  next_of_kin_full_name?: string;
+  next_of_kin_phone?: string;
+  next_of_kin_email?: string;
+  next_of_kin_relationship?: string;
+  next_of_kin_relationship_other?: string;
   status: string;
   last_visit_date?: string | null;
   profile?: PatientProfile;

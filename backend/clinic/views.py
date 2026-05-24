@@ -18,7 +18,15 @@ from .serializers import (
 
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.select_related("profile").prefetch_related("conditions", "visits__vitals")
-    search_fields = ("full_name_display", "patient_code", "national_id", "email", "primary_phone")
+    search_fields = (
+        "full_name_display",
+        "patient_code",
+        "national_id",
+        "email",
+        "primary_phone",
+        "next_of_kin_full_name",
+        "next_of_kin_phone",
+    )
     ordering_fields = ("created_at", "full_name_display", "patient_code")
 
     def get_serializer_class(self):
@@ -157,6 +165,11 @@ def patient_import_webhook(request):
             first_name=request.data["first_name"],
             last_name=request.data["last_name"],
             primary_phone=request.data.get("phone", ""),
+            next_of_kin_full_name=request.data.get("next_of_kin_full_name", ""),
+            next_of_kin_phone=request.data.get("next_of_kin_phone", ""),
+            next_of_kin_email=request.data.get("next_of_kin_email", ""),
+            next_of_kin_relationship=request.data.get("next_of_kin_relationship", ""),
+            next_of_kin_relationship_other=request.data.get("next_of_kin_relationship_other", ""),
             date_of_birth=request.data.get("date_of_birth") or None,
             gender=request.data.get("gender", "prefer_not_to_say"),
             town_or_locality=request.data.get("address", ""),

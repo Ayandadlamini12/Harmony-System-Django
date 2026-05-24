@@ -12,6 +12,12 @@ New patient enrollment now records non-clinical intake details separately from t
   - searchable country dialing extension
   - local phone number
 - The submitted phone value is stored as one international string, for example `+26876000000`.
+- Next of kin details are part of non-confidential intake:
+  - full name(s)
+  - phone number with country dialing extension
+  - optional email
+  - relationship dropdown
+  - `Other` relationship option with a typed relationship field
 
 ## Patient Number Rule
 

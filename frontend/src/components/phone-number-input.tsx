@@ -33,7 +33,7 @@ export function PhoneNumberInput({
   required = false
 }: {
   label: string;
-  name: "primary_phone" | "secondary_phone";
+  name: "primary_phone" | "secondary_phone" | "next_of_kin_phone";
   defaultValue?: string;
   required?: boolean;
 }) {

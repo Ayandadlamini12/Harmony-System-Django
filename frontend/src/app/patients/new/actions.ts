@@ -10,7 +10,7 @@ function optionalText(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }
 
-function phoneValue(formData: FormData, name: "primary_phone" | "secondary_phone") {
+function phoneValue(formData: FormData, name: "primary_phone" | "secondary_phone" | "next_of_kin_phone") {
   const countryCode = optionalText(formData, `${name}_country_code`).replace(/[^\d+]/g, "");
   const number = optionalText(formData, `${name}_number`).replace(/\D/g, "");
   if (!number) return "";
@@ -41,6 +41,11 @@ export async function createPatient(formData: FormData) {
     gender: optionalText(formData, "gender") || "prefer_not_to_say",
     primary_phone: phoneValue(formData, "primary_phone"),
     secondary_phone: phoneValue(formData, "secondary_phone"),
+    next_of_kin_full_name: optionalText(formData, "next_of_kin_full_name"),
+    next_of_kin_phone: phoneValue(formData, "next_of_kin_phone"),
+    next_of_kin_email: optionalText(formData, "next_of_kin_email"),
+    next_of_kin_relationship: optionalText(formData, "next_of_kin_relationship"),
+    next_of_kin_relationship_other: optionalText(formData, "next_of_kin_relationship_other"),
     region: optionalText(formData, "region"),
     town_or_locality: optionalText(formData, "town_or_locality"),
     village: optionalText(formData, "village"),

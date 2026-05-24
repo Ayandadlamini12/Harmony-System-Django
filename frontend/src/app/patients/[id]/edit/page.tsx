@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConditionChecklist } from "@/components/condition-checklist";
+import { NextOfKinFields } from "@/components/next-of-kin-fields";
 import { PhoneNumberInput } from "@/components/phone-number-input";
 import { getPatient } from "@/lib/api";
 
@@ -76,6 +77,17 @@ export default async function EditPatientPage({
             <label className={fieldClass}><Label>Town or locality</Label><Input name="town_or_locality" defaultValue={patient.town_or_locality || ""} /></label>
             <label className={fieldClass}><Label>Village</Label><Input name="village" defaultValue={patient.village || ""} /></label>
           </div>
+        </section>
+
+        <section className="hh-panel p-5">
+          <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Next of kin</h2>
+          <NextOfKinFields
+            defaultFullName={patient.next_of_kin_full_name || ""}
+            defaultPhone={patient.next_of_kin_phone || ""}
+            defaultEmail={patient.next_of_kin_email || ""}
+            defaultRelationship={patient.next_of_kin_relationship || ""}
+            defaultRelationshipOther={patient.next_of_kin_relationship_other || ""}
+          />
         </section>
 
         {profile ? (

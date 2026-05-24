@@ -26,6 +26,10 @@ class PatientApiTests(APITestCase):
                 "last_name": "Dlamini",
                 "gender": "female",
                 "primary_phone": "+26876000000",
+                "next_of_kin_full_name": "Nokuthula Dlamini",
+                "next_of_kin_phone": "+26876111111",
+                "next_of_kin_email": "nokuthula@example.com",
+                "next_of_kin_relationship": "mother",
                 "profile": {
                     "hiv_status": "undisclosed",
                     "past_medical_history": "Hypertension",
@@ -52,6 +56,8 @@ class PatientApiTests(APITestCase):
         patient = Patient.objects.get()
         self.assertEqual(patient.patient_code, f"HHPAT-100{timezone.now().strftime('%y')}000000")
         self.assertEqual(patient.full_name_display, "Nomsa Dlamini")
+        self.assertEqual(patient.next_of_kin_full_name, "Nokuthula Dlamini")
+        self.assertEqual(patient.next_of_kin_relationship, "mother")
         self.assertEqual(patient.profile.past_medical_history, "Hypertension")
         self.assertEqual(patient.conditions.count(), 2)
         self.assertTrue(PatientCondition.objects.get(patient=patient, condition_code="tuberculosis").present)
