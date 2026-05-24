@@ -8,8 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { ConditionChecklist } from "@/components/condition-checklist";
+import { PhoneNumberInput } from "@/components/phone-number-input";
 import { getPatient } from "@/lib/api";
-import { getSessionUser } from "@/lib/session";
 
 import { updatePatient } from "./actions";
 
@@ -26,7 +26,6 @@ export default async function EditPatientPage({
   const { id } = await params;
   const query = await searchParams;
   const patient = await getPatient(id);
-  const session = await getSessionUser();
   if (!patient) notFound();
 
   const submit = updatePatient.bind(null, id);
@@ -45,7 +44,7 @@ export default async function EditPatientPage({
             <label className={fieldClass}><Label>First name</Label><Input name="first_name" defaultValue={patient.first_name} required /></label>
             <label className={fieldClass}><Label>Middle name</Label><Input name="middle_name" defaultValue={patient.middle_name || ""} /></label>
             <label className={fieldClass}><Label>Last name</Label><Input name="last_name" defaultValue={patient.last_name} required /></label>
-            <label className={fieldClass}><Label>National ID</Label><Input name="national_id" defaultValue={patient.national_id || ""} /></label>
+            <label className={fieldClass}><Label>National / Passport ID</Label><Input name="national_id" defaultValue={patient.national_id || ""} /></label>
             <label className={fieldClass}><Label>Date of birth</Label><Input name="date_of_birth" type="date" defaultValue={patient.date_of_birth || ""} /></label>
             <label className={fieldClass}>
               <Label>Gender</Label>
@@ -70,8 +69,9 @@ export default async function EditPatientPage({
         <section className="hh-panel p-5">
           <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Contact and location</h2>
           <div className={gridClass}>
-            <label className={fieldClass}><Label>Primary phone</Label><Input name="primary_phone" defaultValue={patient.primary_phone || ""} /></label>
-            <label className={fieldClass}><Label>Secondary phone</Label><Input name="secondary_phone" defaultValue={patient.secondary_phone || ""} /></label>
+            <PhoneNumberInput label="Primary phone" name="primary_phone" defaultValue={patient.primary_phone || ""} required />
+            <PhoneNumberInput label="Secondary phone" name="secondary_phone" defaultValue={patient.secondary_phone || ""} />
+            <label className={fieldClass}><Label>Email</Label><Input name="email" type="email" defaultValue={patient.email || ""} /></label>
             <label className={fieldClass}><Label>Region</Label><Input name="region" defaultValue={patient.region || ""} /></label>
             <label className={fieldClass}><Label>Town or locality</Label><Input name="town_or_locality" defaultValue={patient.town_or_locality || ""} /></label>
             <label className={fieldClass}><Label>Village</Label><Input name="village" defaultValue={patient.village || ""} /></label>

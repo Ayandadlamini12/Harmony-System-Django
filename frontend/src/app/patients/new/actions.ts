@@ -10,6 +10,13 @@ function optionalText(formData: FormData, key: string) {
   return String(formData.get(key) || "").trim();
 }
 
+function phoneValue(formData: FormData, name: "primary_phone" | "secondary_phone") {
+  const countryCode = optionalText(formData, `${name}_country_code`).replace(/[^\d+]/g, "");
+  const number = optionalText(formData, `${name}_number`).replace(/\D/g, "");
+  if (!number) return "";
+  return `${countryCode || "+268"}${number}`;
+}
+
 export async function createPatient(formData: FormData) {
   const accessToken = (await cookies()).get("harmony_access")?.value;
   if (!accessToken) {
@@ -29,10 +36,11 @@ export async function createPatient(formData: FormData) {
     middle_name: optionalText(formData, "middle_name"),
     last_name: optionalText(formData, "last_name"),
     national_id: optionalText(formData, "national_id") || null,
+    email: optionalText(formData, "email"),
     date_of_birth: optionalText(formData, "date_of_birth") || null,
     gender: optionalText(formData, "gender") || "prefer_not_to_say",
-    primary_phone: optionalText(formData, "primary_phone"),
-    secondary_phone: optionalText(formData, "secondary_phone"),
+    primary_phone: phoneValue(formData, "primary_phone"),
+    secondary_phone: phoneValue(formData, "secondary_phone"),
     region: optionalText(formData, "region"),
     town_or_locality: optionalText(formData, "town_or_locality"),
     village: optionalText(formData, "village"),

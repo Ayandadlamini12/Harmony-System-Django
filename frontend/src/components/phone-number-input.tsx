@@ -1,0 +1,73 @@
+import { getCountries, getCountryCallingCode } from "libphonenumber-js";
+
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+
+const countryNameFormatter = new Intl.DisplayNames(["en"], { type: "region" });
+
+const countryCodeOptions = getCountries()
+  .map((country) => {
+    const dialCode = `+${getCountryCallingCode(country)}`;
+    return {
+      country,
+      dialCode,
+      label: `${countryNameFormatter.of(country) || country} (${dialCode})`
+    };
+  })
+  .sort((a, b) => a.label.localeCompare(b.label));
+
+const dialCodes = Array.from(new Set(countryCodeOptions.map((option) => option.dialCode))).sort((a, b) => b.length - a.length);
+
+function parsePhone(value?: string) {
+  const text = value || "";
+  const compact = text.replace(/\s/g, "");
+  const dialCode = dialCodes.find((code) => compact.startsWith(code));
+  if (!dialCode) return { countryCode: "+268", number: text };
+  return { countryCode: dialCode, number: compact.slice(dialCode.length).replace(/\D/g, "") };
+}
+
+export function PhoneNumberInput({
+  label,
+  name,
+  defaultValue,
+  required = false
+}: {
+  label: string;
+  name: "primary_phone" | "secondary_phone";
+  defaultValue?: string;
+  required?: boolean;
+}) {
+  const parsed = parsePhone(defaultValue);
+  const listId = `${name}-country-codes`;
+
+  return (
+    <div className="grid gap-1.5">
+      <Label>{label}</Label>
+      <div className="grid grid-cols-[minmax(112px,150px)_1fr] gap-2">
+        <input
+          className="hh-input"
+          defaultValue={parsed.countryCode}
+          list={listId}
+          name={`${name}_country_code`}
+          pattern="^\+\d{1,4}$"
+          placeholder="+268"
+          required={required}
+        />
+        <Input
+          defaultValue={parsed.number}
+          inputMode="tel"
+          name={`${name}_number`}
+          placeholder="7600 0000"
+          required={required}
+        />
+      </div>
+      <datalist id={listId}>
+        {countryCodeOptions.map((option) => (
+          <option key={`${option.country}-${option.dialCode}`} value={option.dialCode}>
+            {option.label}
+          </option>
+        ))}
+      </datalist>
+    </div>
+  );
+}

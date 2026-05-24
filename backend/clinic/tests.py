@@ -50,12 +50,20 @@ class PatientApiTests(APITestCase):
 
         self.assertEqual(response.status_code, 201)
         patient = Patient.objects.get()
-        self.assertTrue(patient.patient_code.startswith("PAT-"))
+        self.assertEqual(patient.patient_code, f"HHPAT-100{timezone.now().strftime('%y')}000000")
         self.assertEqual(patient.full_name_display, "Nomsa Dlamini")
         self.assertEqual(patient.profile.past_medical_history, "Hypertension")
         self.assertEqual(patient.conditions.count(), 2)
         self.assertTrue(PatientCondition.objects.get(patient=patient, condition_code="tuberculosis").present)
         self.assertFalse(PatientCondition.objects.get(patient=patient, condition_code="epilepsy").present)
+
+    def test_patient_code_sequence_increments_and_uses_last_six_phone_digits(self):
+        first = Patient.objects.create(first_name="A", last_name="One", gender="female", primary_phone="+268 7601 2345")
+        second = Patient.objects.create(first_name="B", last_name="Two", gender="male", primary_phone="+27 72 555 7788")
+
+        year_suffix = timezone.now().strftime("%y")
+        self.assertEqual(first.patient_code, f"HHPAT-100{year_suffix}012345")
+        self.assertEqual(second.patient_code, f"HHPAT-101{year_suffix}557788")
 
     def test_creates_visit_with_vitals_for_patient(self):
         patient = Patient.objects.create(first_name="John", last_name="Nkosi", gender="male")

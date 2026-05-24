@@ -18,7 +18,7 @@ export default async function PatientListPage({ searchParams }: { searchParams: 
       action={canRegister ? <Link className="hh-button" href="/patients/new">Register patient</Link> : undefined}
     >
       <form className="mb-5 max-w-md">
-        <input className="hh-input" name="search" defaultValue={params.search || ""} placeholder="Search by name, code, ID, or phone" />
+        <input className="hh-input" name="search" defaultValue={params.search || ""} placeholder="Search by name, code, ID, email, or phone" />
       </form>
 
       <div className="hh-panel overflow-hidden">
@@ -40,7 +40,8 @@ export default async function PatientListPage({ searchParams }: { searchParams: 
                 <tr key={patient.id} className="border-t border-[var(--hh-border)]">
                   <td className="px-5 py-4">
                     <Link href={`/patients/${patient.id}`} className="font-bold text-[var(--hh-purple)] hover:underline">{patient.full_name_display}</Link>
-                    <div className="text-xs text-[#66736d]">{patient.national_id || "No national ID"}</div>
+                    <div className="text-xs text-[#66736d]">{patient.national_id || "No national/passport ID"}</div>
+                    {patient.email && <div className="text-xs text-[#66736d]">{patient.email}</div>}
                   </td>
                   <td className="px-5 py-4 font-mono text-xs text-[var(--hh-purple)]">{patient.patient_code}</td>
                   <td className="px-5 py-4 capitalize">{patient.gender.replaceAll("_", " ")}</td>

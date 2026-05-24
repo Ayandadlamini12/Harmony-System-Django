@@ -121,6 +121,7 @@ class PatientListSerializer(serializers.ModelSerializer):
             "id",
             "patient_code",
             "national_id",
+            "email",
             "primary_phone",
             "first_name",
             "middle_name",

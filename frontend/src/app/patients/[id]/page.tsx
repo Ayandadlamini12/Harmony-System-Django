@@ -133,7 +133,9 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             rows={[
               ["Patient code", patient.patient_code],
               ["Date of birth", formatDate(patient.date_of_birth)],
+              ["National / Passport ID", value(patient.national_id)],
               ["Primary phone", value(patient.primary_phone)],
+              ["Email", value(patient.email)],
               ["Locality", value(patient.town_or_locality || patient.region)],
               ["Secondary phone", value(patient.secondary_phone)],
               ["Status", patient.status]

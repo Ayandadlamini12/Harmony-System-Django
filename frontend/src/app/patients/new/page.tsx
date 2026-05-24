@@ -6,11 +6,10 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { StepForm } from "@/components/step-form";
 import { ConditionChecklist } from "@/components/condition-checklist";
+import { PhoneNumberInput } from "@/components/phone-number-input";
 import { createPatient } from "./actions";
-import { getSessionUser } from "@/lib/session";
 
 export default async function RegisterPatientPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const session = await getSessionUser();
   const params = await searchParams;
   const fieldClass = "grid gap-1.5";
   const twoColumn = "grid gap-4 md:grid-cols-2";
@@ -25,7 +24,7 @@ export default async function RegisterPatientPage({ searchParams }: { searchPara
           <label className={fieldClass}><Label>First name</Label><Input name="first_name" required /></label>
           <label className={fieldClass}><Label>Middle name</Label><Input name="middle_name" /></label>
           <label className={fieldClass}><Label>Last name</Label><Input name="last_name" required /></label>
-          <label className={fieldClass}><Label>National ID</Label><Input name="national_id" /></label>
+          <label className={fieldClass}><Label>National / Passport ID</Label><Input name="national_id" /></label>
           <label className={fieldClass}><Label>Date of birth</Label><Input name="date_of_birth" type="date" /></label>
           <label className={fieldClass}>
             <Label>Gender</Label>
@@ -42,11 +41,12 @@ export default async function RegisterPatientPage({ searchParams }: { searchPara
     {
       id: "contact",
       title: "Contact and location",
-      description: "Phones, region, locality, and village.",
+      description: "Country code, phones, email, region, locality, and village.",
       content: (
         <div className={threeColumn}>
-          <label className={fieldClass}><Label>Primary phone</Label><Input name="primary_phone" /></label>
-          <label className={fieldClass}><Label>Secondary phone</Label><Input name="secondary_phone" /></label>
+          <PhoneNumberInput label="Primary phone" name="primary_phone" required />
+          <PhoneNumberInput label="Secondary phone" name="secondary_phone" />
+          <label className={fieldClass}><Label>Email</Label><Input name="email" type="email" /></label>
           <label className={fieldClass}><Label>Region</Label><Input name="region" /></label>
           <label className={fieldClass}><Label>Town or locality</Label><Input name="town_or_locality" /></label>
           <label className={fieldClass}><Label>Village</Label><Input name="village" /></label>
@@ -101,6 +101,7 @@ export default async function RegisterPatientPage({ searchParams }: { searchPara
           <h3 className="text-base font-bold">Ready to save</h3>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-[#66736d]">
             Use Back to review each section. The system will generate the patient code automatically if one was not provided.
+            The code uses the next Harmony patient sequence, current year, and the last 6 digits of the primary phone number.
           </p>
         </div>
       )

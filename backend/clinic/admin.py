@@ -11,8 +11,8 @@ class PatientProfileInline(admin.StackedInline):
 @admin.register(Patient)
 class PatientAdmin(admin.ModelAdmin):
     inlines = [PatientProfileInline]
-    list_display = ("patient_code", "full_name_display", "primary_phone", "gender", "status", "created_at")
-    search_fields = ("patient_code", "national_id", "full_name_display", "primary_phone")
+    list_display = ("patient_code", "full_name_display", "primary_phone", "email", "gender", "status", "created_at")
+    search_fields = ("patient_code", "national_id", "email", "full_name_display", "primary_phone")
     list_filter = ("gender", "status", "created_at")
 
 

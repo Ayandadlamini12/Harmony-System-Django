@@ -9,6 +9,7 @@ export type Patient = {
   id: number;
   patient_code: string;
   national_id?: string | null;
+  email?: string;
   primary_phone?: string;
   secondary_phone?: string;
   first_name: string;

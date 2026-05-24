@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 from django.utils import timezone
+import re
 
 
 class TimeStampedModel(models.Model):
@@ -20,6 +21,7 @@ class Patient(TimeStampedModel):
 
     patient_code = models.CharField(max_length=50, unique=True, blank=True)
     national_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
+    email = models.EmailField(blank=True)
     primary_phone = models.CharField(max_length=50, blank=True)
     secondary_phone = models.CharField(max_length=50, blank=True)
     first_name = models.CharField(max_length=100)
@@ -52,16 +54,21 @@ class Patient(TimeStampedModel):
             part for part in [self.first_name, self.middle_name, self.last_name] if part
         )
         if not self.patient_code:
-            self.patient_code = self.next_patient_code()
+            self.patient_code = self.next_patient_code(self.primary_phone)
         super().save(*args, **kwargs)
 
     @classmethod
-    def next_patient_code(cls) -> str:
-        year = timezone.now().year
-        prefix = f"PAT-{year}-"
-        last = cls.objects.filter(patient_code__startswith=prefix).order_by("-patient_code").first()
-        next_number = int(last.patient_code[-6:]) + 1 if last else 1
-        return f"{prefix}{next_number:06d}"
+    def next_patient_code(cls, phone_number: str = "") -> str:
+        year_suffix = timezone.now().strftime("%y")
+        phone_digits = re.sub(r"\D", "", phone_number or "")
+        last_six_phone_digits = phone_digits[-6:].rjust(6, "0")
+        last = cls.objects.filter(patient_code__startswith="HHPAT-").order_by("-id").first()
+        next_sequence = 100
+        if last:
+            match = re.match(r"^HHPAT-(\d+)\d{8}$", last.patient_code)
+            if match:
+                next_sequence = int(match.group(1)) + 1
+        return f"HHPAT-{next_sequence}{year_suffix}{last_six_phone_digits}"
 
     def __str__(self) -> str:
         return f"{self.patient_code} - {self.full_name_display}"
