@@ -3,6 +3,9 @@
 import { Save } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
+import { toast } from "sonner";
+
+import { LoadingButton } from "@/components/harmony-loading";
 import type { Patient } from "@/types/clinic";
 
 export function VisitForm({ patients, patientId, error: initialError }: { patients: Patient[]; patientId?: string; error?: string }) {
@@ -56,9 +59,11 @@ export function VisitForm({ patients, patientId, error: initialError }: { patien
 
     const data = await res.json();
     if (data.success) {
+      toast.success("Visit saved");
       router.push("/visits");
     } else {
       setError("save_failed");
+      toast.error("The visit could not be saved");
       setLoading(false);
     }
   }
@@ -135,9 +140,10 @@ export function VisitForm({ patients, patientId, error: initialError }: { patien
       </section>
 
       <div>
-        <button className="hh-button" type="submit" disabled={loading}>
-          <Save size={17} /> {loading ? "Saving..." : "Save visit"}
-        </button>
+        <LoadingButton type="submit" loading={loading} loadingText="Saving visit...">
+          {!loading && <Save size={17} />}
+          Save visit
+        </LoadingButton>
       </div>
     </form>
   );

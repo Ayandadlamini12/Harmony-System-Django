@@ -12,6 +12,15 @@
   --hh-border: #D9E3DD;
 }
 
+@keyframes hh-indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
+}
+
 * {
   box-sizing: border-box;
 }
@@ -62,6 +71,12 @@ a {
   font-size: 0.875rem;
   font-weight: 700;
   background: var(--hh-purple);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+.hh-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
 }
 
 .hh-button:not(.hh-button-secondary) {

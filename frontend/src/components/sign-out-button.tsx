@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+import { LoadingButton } from "@/components/harmony-loading";
+
 export function SignOutButton() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
@@ -14,8 +16,8 @@ export function SignOutButton() {
   }
 
   return (
-    <button className="hh-button hh-button-secondary" type="button" onClick={handleLogout} disabled={loading}>
-      {loading ? "Signing out..." : "Sign out"}
-    </button>
+    <LoadingButton type="button" onClick={handleLogout} loading={loading} loadingText="Signing out..." variant="secondary">
+      Sign out
+    </LoadingButton>
   );
 }

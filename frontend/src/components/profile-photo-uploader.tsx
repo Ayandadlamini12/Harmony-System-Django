@@ -3,7 +3,9 @@
 import { Camera, RotateCcw, Trash2, Upload } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
+import { LoadingButton } from "@/components/harmony-loading";
 import { Button } from "@/components/ui/button";
 
 type UploadState = "idle" | "saving" | "saved" | "error";
@@ -79,10 +81,13 @@ export function ProfilePhotoUploader({ avatarUrl, name }: { avatarUrl?: string; 
       });
       if (!response.ok) throw new Error("The profile image could not be saved.");
       setStatus("saved");
+      toast.success("Profile picture saved");
       router.refresh();
     } catch (uploadError) {
       setStatus("error");
-      setError(uploadError instanceof Error ? uploadError.message : "The profile image could not be saved.");
+      const message = uploadError instanceof Error ? uploadError.message : "The profile image could not be saved.";
+      setError(message);
+      toast.error(message);
     }
   }
 
@@ -94,11 +99,13 @@ export function ProfilePhotoUploader({ avatarUrl, name }: { avatarUrl?: string; 
       setFile(null);
       setPreviewUrl(null);
       setStatus("idle");
+      toast.success("Profile picture removed");
       router.refresh();
       return;
     }
     setStatus("error");
     setError("The profile image could not be removed.");
+    toast.error("The profile image could not be removed.");
   }
 
   const displayUrl = previewUrl || avatarUrl || "/brand/harmony-icon-sm.webp";
@@ -121,10 +128,10 @@ export function ProfilePhotoUploader({ avatarUrl, name }: { avatarUrl?: string; 
               Choose picture
             </Button>
             {file && (
-              <Button onClick={uploadAvatar} type="button" disabled={status === "saving"}>
-                <Upload size={17} />
+              <LoadingButton onClick={uploadAvatar} type="button" loading={status === "saving"} loadingText="Saving crop...">
+                {status !== "saving" && <Upload size={17} />}
                 Save crop
-              </Button>
+              </LoadingButton>
             )}
             {avatarUrl && !file && (
               <Button onClick={removeAvatar} type="button" variant="secondary" disabled={status === "saving"}>

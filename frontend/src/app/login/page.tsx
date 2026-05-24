@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 
+import { LoadingButton } from "@/components/harmony-loading";
+
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
@@ -75,9 +77,9 @@ function LoginForm() {
             <span className="hh-label">Password</span>
             <input className="hh-input" name="password" type="password" autoComplete="current-password" required />
           </label>
-          <button className="hh-button" type="submit" disabled={loading}>
-            {loading ? "Signing in..." : "Sign in"}
-          </button>
+          <LoadingButton className="w-full" type="submit" loading={loading} loadingText="Signing in...">
+            Sign in
+          </LoadingButton>
         </form>
 
         <p className="mt-4 text-center text-sm text-[#66736d]">
@@ -91,7 +93,7 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={<div className="flex min-h-screen items-center justify-center bg-[var(--hh-soft)]"><p className="text-[#66736d]">Loading...</p></div>}>
+    <Suspense fallback={null}>
       <LoginForm />
     </Suspense>
   );

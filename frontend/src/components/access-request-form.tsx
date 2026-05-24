@@ -1,6 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { toast } from "sonner";
+
+import { LoadingButton } from "@/components/harmony-loading";
 import type { Patient } from "@/types/clinic";
 
 export function AccessRequestForm({ patients }: { patients: Patient[] }) {
@@ -22,9 +25,11 @@ export function AccessRequestForm({ patients }: { patients: Patient[] }) {
     const data = await res.json();
     if (data.success) {
       setMessage({ type: "success", text: "Access request submitted." });
+      toast.success("Access request submitted");
       e.currentTarget.reset();
     } else {
       setMessage({ type: "error", text: "Could not submit request." });
+      toast.error("Could not submit access request");
     }
     setLoading(false);
   }
@@ -55,9 +60,9 @@ export function AccessRequestForm({ patients }: { patients: Patient[] }) {
           <span className="hh-label">Reason</span>
           <textarea className="hh-input min-h-28" name="reason" placeholder="Explain why temporary clinical access is needed." required />
         </label>
-        <button className="hh-button" type="submit" disabled={loading}>
-          {loading ? "Submitting..." : "Submit request"}
-        </button>
+        <LoadingButton type="submit" loading={loading} loadingText="Submitting request...">
+          Submit request
+        </LoadingButton>
       </form>
     </>
   );

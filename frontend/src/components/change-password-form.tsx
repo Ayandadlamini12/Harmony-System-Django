@@ -1,6 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
+import { toast } from "sonner";
+
+import { LoadingButton } from "@/components/harmony-loading";
 
 export function ChangePasswordForm() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -21,12 +24,14 @@ export function ChangePasswordForm() {
     const data = await res.json();
     if (data.success) {
       setMessage({ type: "success", text: "Password updated successfully." });
+      toast.success("Password updated");
       e.currentTarget.reset();
     } else {
       const msg = data.error === "wrong" ? "Current password is incorrect."
         : data.error === "weak" ? "New password is too weak. Minimum 8 characters, not too common."
         : "Password change failed.";
       setMessage({ type: "error", text: msg });
+      toast.error(msg);
     }
     setLoading(false);
   }
@@ -59,9 +64,9 @@ export function ChangePasswordForm() {
           <span className="hh-label">New password</span>
           <input className="hh-input" name="new_password" type="password" autoComplete="new-password" required minLength={8} />
         </label>
-        <button className="hh-button" type="submit" disabled={loading}>
-          {loading ? "Updating..." : "Update password"}
-        </button>
+        <LoadingButton type="submit" loading={loading} loadingText="Updating password...">
+          Update password
+        </LoadingButton>
       </form>
     </div>
   );

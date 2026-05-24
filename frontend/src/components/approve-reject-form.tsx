@@ -1,7 +1,9 @@
 "use client";
 
 import { FormEvent, useState } from "react";
-import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+
+import { LoadingButton } from "@/components/harmony-loading";
 
 export function ApproveRejectForm({ requestId, onDone }: { requestId: number; onDone: (action: "approved" | "rejected") => void }) {
   const [approveLoading, setApproveLoading] = useState(false);
@@ -23,9 +25,11 @@ export function ApproveRejectForm({ requestId, onDone }: { requestId: number; on
 
     const data = await res.json();
     if (data.success) {
+      toast.success("Access request approved");
       onDone("approved");
     } else {
       setApproveError("Failed to approve.");
+      toast.error("Failed to approve access request");
     }
     setApproveLoading(false);
   }
@@ -44,9 +48,11 @@ export function ApproveRejectForm({ requestId, onDone }: { requestId: number; on
 
     const data = await res.json();
     if (data.success) {
+      toast.success("Access request rejected");
       onDone("rejected");
     } else {
       setRejectError("Failed to reject.");
+      toast.error("Failed to reject access request");
     }
     setRejectLoading(false);
   }
@@ -57,12 +63,12 @@ export function ApproveRejectForm({ requestId, onDone }: { requestId: number; on
         <input className="hh-input" name="hours" type="number" min="1" max="24" defaultValue="4" aria-label="Approval hours" />
         <input className="hh-input" name="review_note" placeholder="Approval note" />
         {approveError && <div className="text-xs text-red-600">{approveError}</div>}
-        <Button type="submit" disabled={approveLoading}>{approveLoading ? "Approving..." : "Approve"}</Button>
+        <LoadingButton type="submit" loading={approveLoading} loadingText="Approving...">Approve</LoadingButton>
       </form>
       <form onSubmit={handleReject} className="grid gap-2">
         <input className="hh-input" name="review_note" placeholder="Rejection note" />
         {rejectError && <div className="text-xs text-red-600">{rejectError}</div>}
-        <Button type="submit" variant="secondary" disabled={rejectLoading}>{rejectLoading ? "Rejecting..." : "Reject"}</Button>
+        <LoadingButton type="submit" variant="secondary" loading={rejectLoading} loadingText="Rejecting...">Reject</LoadingButton>
       </form>
     </div>
   );
