@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, Patient, PatientCondition, PatientProfile, Visit, Vital
+from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit, Vital
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -110,6 +110,39 @@ class VisitSerializer(serializers.ModelSerializer):
         if follow_up_data:
             FollowUpEvaluation.objects.create(visit=visit, **follow_up_data)
         return visit
+
+
+class PatientCheckInSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
+    patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
+    patient_phone = serializers.CharField(source="patient.primary_phone", read_only=True)
+
+    class Meta:
+        model = PatientCheckIn
+        fields = (
+            "id",
+            "patient",
+            "patient_name",
+            "patient_code",
+            "patient_phone",
+            "visit_type",
+            "status",
+            "method",
+            "identifier_type",
+            "source_label",
+            "note",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("status", "created_at", "updated_at")
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            validated_data["checked_in_by"] = request.user
+            if not validated_data.get("method"):
+                validated_data["method"] = PatientCheckIn.Method.RECEPTION
+        return super().create(validated_data)
 
 
 class PatientListSerializer(serializers.ModelSerializer):

@@ -99,7 +99,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
               <Clock className="text-[var(--hh-purple)]" size={22} />
               <h2 className="font-bold">Waiting list</h2>
             </div>
-            <p className="mt-3 text-sm text-[#66736d]">Arrived patients will appear here once check-in is configured.</p>
+            <p className="mt-3 text-sm text-[#66736d]">Arrived patients from reception, tablet, and future API check-ins appear here.</p>
           </div>
           <div className="hh-panel p-5">
             <div className="flex items-center gap-3">

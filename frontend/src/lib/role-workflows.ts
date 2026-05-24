@@ -59,8 +59,7 @@ export const workflowCards: WorkflowCard[] = [
     description: "Patients who have arrived and are waiting to be seen by a clinician.",
     href: "/waiting-list",
     icon: Inbox,
-    roles: ["admin", "clinician"],
-    status: "planned"
+    roles: ["admin", "clinician"]
   },
   {
     title: "Approvals",
@@ -119,11 +118,10 @@ export const workflowCards: WorkflowCard[] = [
   },
   {
     title: "Check-in desk",
-    description: "Mark arrivals, update demographic details, and move patients into the waiting list.",
+    description: "Mark arrivals from reception or open the mounted tablet self check-in screen.",
     href: "/check-ins",
     icon: ClipboardCheck,
-    roles: ["admin", "receptionist"],
-    status: "planned"
+    roles: ["admin", "receptionist"]
   }
 ];
 

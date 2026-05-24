@@ -211,6 +211,44 @@ class Visit(TimeStampedModel):
         return f"{self.patient.full_name_display} - {self.visit_date}"
 
 
+class PatientCheckIn(TimeStampedModel):
+    class Status(models.TextChoices):
+        WAITING = "waiting", "Waiting"
+        IN_VISIT = "in_visit", "In visit"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    class Method(models.TextChoices):
+        RECEPTION = "reception", "Reception"
+        TABLET = "tablet", "Tablet"
+        API = "api", "API"
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="check_ins")
+    visit_type = models.CharField(max_length=40, choices=Visit.VisitType.choices, default=Visit.VisitType.NEW_CONSULTATION)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.WAITING)
+    method = models.CharField(max_length=30, choices=Method.choices, default=Method.RECEPTION)
+    identifier_type = models.CharField(max_length=40, blank=True)
+    source_label = models.CharField(max_length=120, blank=True)
+    note = models.TextField(blank=True)
+    checked_in_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="patient_check_ins",
+    )
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["patient", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.patient.full_name_display} - {self.get_status_display()}"
+
+
 class Vital(TimeStampedModel):
     class GlucoseContext(models.TextChoices):
         FASTING = "fasting", "Fasting"

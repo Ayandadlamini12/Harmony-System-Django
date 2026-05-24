@@ -42,11 +42,19 @@ Older `PAT-YYYY-000001` patient numbers are not rewritten. The new format is use
 
 ## Existing Patient Check-In
 
-Already registered patients are checked in from `/check-ins`.
+Already registered patients are checked in from `/check-ins` by reception or from `/tablet-check-in` on a mounted front-desk tablet.
 
 - Reception can search by cell number, Harmony patient ID, or National / Passport ID.
 - The search uses the backend patient search endpoint through `/api/patients/search`, so it is not limited to the first visible page of patients.
 - Matched patients expose two visit choices:
   - `New visit`
   - `Follow up`
-- The selected visit type is passed into `/visits/new` and preselects the visit type field.
+- The check-in creates a `PatientCheckIn` record with:
+  - patient
+  - visit type
+  - status (`waiting`, `in_visit`, `completed`, `cancelled`)
+  - method (`reception`, `tablet`, `api`)
+  - source label and identifier type
+- The waiting list reads `waiting` check-ins from `/api/check-ins/`.
+- Clinicians can start the visit from the waiting list; the selected visit type is passed into `/visits/new`.
+- The public tablet lookup uses `/api/check-ins/lookup/` and accepts exact patient code, National / Passport ID, or phone digits. This keeps the check-in workflow ready for future sources such as appointment links, QR codes, WhatsApp, or external kiosk integrations.

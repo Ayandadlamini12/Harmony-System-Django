@@ -1,4 +1,4 @@
-import type { DashboardStats, ElevatedAccessRequest, Paginated, Patient, User, Visit } from "@/types/clinic";
+import type { DashboardStats, ElevatedAccessRequest, Paginated, Patient, PatientCheckIn, User, Visit } from "@/types/clinic";
 import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -43,6 +43,16 @@ export function getPatient(id: string | number) {
 
 export function getVisits() {
   return apiGet<Paginated<Visit>>("/visits/", {
+    count: 0,
+    next: null,
+    previous: null,
+    results: []
+  });
+}
+
+export function getCheckIns(status = "") {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiGet<Paginated<PatientCheckIn>>(`/check-ins/${query}`, {
     count: 0,
     next: null,
     previous: null,

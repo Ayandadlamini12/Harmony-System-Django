@@ -83,6 +83,22 @@ export type Visit = {
   };
 };
 
+export type PatientCheckIn = {
+  id: number;
+  patient: number;
+  patient_name?: string;
+  patient_code?: string;
+  patient_phone?: string;
+  visit_type: string;
+  status: "waiting" | "in_visit" | "completed" | "cancelled";
+  method: "reception" | "tablet" | "api";
+  identifier_type?: string;
+  source_label?: string;
+  note?: string;
+  created_at: string;
+  updated_at?: string;
+};
+
 export type ElevatedAccessRequest = {
   id: number;
   patient: number;

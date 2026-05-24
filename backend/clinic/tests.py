@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import ElevatedAccessRequest, Patient, PatientCondition, PatientProfile, Visit
+from .models import ElevatedAccessRequest, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit
 
 User = get_user_model()
 
@@ -106,6 +106,48 @@ class DashboardApiTests(APITestCase):
         response = self.client.get("/api/dashboard/stats/")
 
         self.assertEqual(response.status_code, 401)
+
+
+class PatientCheckInApiTests(APITestCase):
+    def setUp(self):
+        self.patient = Patient.objects.create(
+            first_name="Zahara",
+            last_name="Dlamini",
+            gender="female",
+            national_id="P123456",
+            primary_phone="+26876001048",
+        )
+
+    def test_public_tablet_lookup_uses_patient_code_phone_or_identity(self):
+        response = self.client.post("/api/check-ins/lookup/", {"identifier": "76001048"}, format="json")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["patient"], self.patient.id)
+        self.assertEqual(response.data["patient_code"], self.patient.patient_code)
+
+        identity_response = self.client.post("/api/check-ins/lookup/", {"identifier": "P123456"}, format="json")
+        self.assertEqual(identity_response.status_code, 200)
+        self.assertEqual(identity_response.data["patient"], self.patient.id)
+
+    def test_public_tablet_check_in_creates_waiting_record(self):
+        response = self.client.post(
+            "/api/check-ins/",
+            {
+                "identifier": self.patient.patient_code,
+                "visit_type": "follow_up",
+                "method": "tablet",
+                "identifier_type": "patient_code",
+                "source_label": "Front desk tablet",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        check_in = PatientCheckIn.objects.get()
+        self.assertEqual(check_in.patient, self.patient)
+        self.assertEqual(check_in.visit_type, "follow_up")
+        self.assertEqual(check_in.method, "tablet")
+        self.assertEqual(check_in.status, PatientCheckIn.Status.WAITING)
 
 
 class ClinicalAccessTests(APITestCase):

@@ -1,19 +1,39 @@
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
+import re
+
+from django.db.models import Q
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 
 from .access import has_patient_clinical_access, is_clinical_user
-from .models import AuditLog, ElevatedAccessRequest, Patient, PatientProfile, Visit
+from .models import AuditLog, ElevatedAccessRequest, Patient, PatientCheckIn, PatientProfile, Visit
 from .serializers import (
     AuditLogSerializer,
     ElevatedAccessRequestSerializer,
+    PatientCheckInSerializer,
     PatientDetailSerializer,
     PatientListSerializer,
     VisitSerializer,
 )
+
+
+def normalize_digits(value):
+    return re.sub(r"\D", "", value or "")
+
+
+def find_patient_by_identifier(identifier):
+    text = (identifier or "").strip()
+    digits = normalize_digits(text)
+    if not text:
+        return None
+
+    query = Q(patient_code__iexact=text) | Q(national_id__iexact=text)
+    if digits:
+        query |= Q(primary_phone__icontains=digits[-8:]) | Q(secondary_phone__icontains=digits[-8:])
+    return Patient.objects.filter(query).order_by("-created_at").first()
 
 
 class PatientViewSet(viewsets.ModelViewSet):
@@ -76,6 +96,46 @@ class VisitViewSet(viewsets.ModelViewSet):
         if not is_clinical_user(request.user):
             return Response({"detail": "Only clinical users can create visits."}, status=status.HTTP_403_FORBIDDEN)
         return super().create(request, *args, **kwargs)
+
+
+class PatientCheckInViewSet(viewsets.ModelViewSet):
+    queryset = PatientCheckIn.objects.select_related("patient", "checked_in_by").order_by("-created_at")
+    serializer_class = PatientCheckInSerializer
+    search_fields = ("patient__full_name_display", "patient__patient_code", "patient__national_id", "patient__primary_phone")
+    filterset_fields = ("status", "method", "visit_type")
+    ordering_fields = ("created_at", "status")
+
+    def get_permissions(self):
+        if self.action in {"lookup", "create"}:
+            return [permissions.AllowAny()]
+        return [permissions.IsAuthenticated()]
+
+    @action(detail=False, methods=["post"], permission_classes=[permissions.AllowAny])
+    def lookup(self, request):
+        patient = find_patient_by_identifier(request.data.get("identifier", ""))
+        if not patient:
+            return Response({"detail": "No matching registered patient found."}, status=status.HTTP_404_NOT_FOUND)
+        return Response(
+            {
+                "patient": patient.id,
+                "patient_name": patient.full_name_display,
+                "patient_code": patient.patient_code,
+                "primary_phone": patient.primary_phone,
+            }
+        )
+
+    def create(self, request, *args, **kwargs):
+        data = request.data.copy()
+        identifier = data.get("identifier", "")
+        if not data.get("patient") and identifier:
+            patient = find_patient_by_identifier(identifier)
+            if not patient:
+                return Response({"detail": "No matching registered patient found."}, status=status.HTTP_404_NOT_FOUND)
+            data["patient"] = patient.id
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):

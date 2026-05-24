@@ -9,7 +9,15 @@ export default async function CheckInsPage() {
   const patients = await getPatients();
 
   return (
-    <AppShell title="Check-in desk" action={<Button asChild variant="secondary"><Link href="/appointments">Appointments</Link></Button>}>
+    <AppShell
+      title="Check-in desk"
+      action={
+        <>
+          <Button asChild variant="secondary"><Link href="/tablet-check-in">Tablet view</Link></Button>
+          <Button asChild variant="secondary"><Link href="/appointments">Appointments</Link></Button>
+        </>
+      }
+    >
       <PatientCheckIn patients={patients.results} />
     </AppShell>
   );
