@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 
-const protectedPaths = ["/", "/patients", "/visits", "/drafts", "/check-ins", "/waiting-list", "/appointments", "/account", "/users", "/approvals", "/access-requests"];
+const protectedPaths = ["/", "/patients", "/visits", "/drafts", "/check-ins", "/waiting-list", "/appointments", "/account", "/users", "/roles", "/teams", "/approvals", "/access-requests"];
 
 function isProtected(pathname: string) {
   return protectedPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));

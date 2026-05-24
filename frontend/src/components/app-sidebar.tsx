@@ -2,6 +2,7 @@
 
 import {
   Bell,
+  ChevronDown,
   Menu,
   Search,
   UserCog,
@@ -118,6 +119,7 @@ function TopBar({
 function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: string; role: UserRole }) {
   const pathname = usePathname();
   const nav = allowedForRole(navItems, role);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   return (
     <aside className="fixed bottom-0 left-0 top-16 z-20 hidden border-r border-[var(--hh-border)] bg-white lg:block">
@@ -142,7 +144,68 @@ function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: s
           <nav className="flex-1 space-y-1 p-3">
             {nav.map((item) => {
               const Icon = item.icon;
-              const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+              const children = item.children ? allowedForRole(item.children, role) : [];
+              const hasChildren = children.length > 0;
+              const childActive = children.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`));
+              const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href) || childActive;
+              const expanded = openGroups[item.href] ?? active;
+
+              if (hasChildren) {
+                return (
+                  <div key={item.href}>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          className={cn(
+                            "w-full justify-start gap-3 px-3 text-sm font-bold text-[#24302b] hover:text-[var(--hh-purple)]",
+                            active && "bg-[#f7f0fb] text-[var(--hh-purple)]",
+                            collapsed && "justify-center px-0"
+                          )}
+                          onClick={() => setOpenGroups((current) => ({ ...current, [item.href]: !expanded }))}
+                          type="button"
+                          variant="ghost"
+                        >
+                          <Icon size={18} />
+                          {!collapsed && (
+                            <>
+                              <span className="flex-1 text-left">{item.label}</span>
+                              <ChevronDown className={cn("transition-transform", expanded && "rotate-180")} size={16} />
+                            </>
+                          )}
+                        </Button>
+                      </TooltipTrigger>
+                      {collapsed && <TooltipContent side="right">{item.label}</TooltipContent>}
+                    </Tooltip>
+
+                    {!collapsed && expanded && (
+                      <div className="mt-1 grid gap-1 pl-8">
+                        {children.map((child) => {
+                          const ChildIcon = child.icon;
+                          const childCurrent = pathname === child.href || pathname.startsWith(`${child.href}/`);
+                          return (
+                            <Button
+                              key={child.href}
+                              asChild
+                              className={cn(
+                                "w-full justify-start gap-2 px-3 text-xs font-bold text-[#52615a] hover:text-[var(--hh-purple)]",
+                                childCurrent && "bg-[#f7f0fb] text-[var(--hh-purple)]"
+                              )}
+                              variant="ghost"
+                            >
+                              <Link href={child.href}>
+                                <ChildIcon size={15} />
+                                <span>{child.label}</span>
+                                {child.status === "planned" && <span className="ml-auto text-[10px] uppercase text-[#66736d]">Future</span>}
+                              </Link>
+                            </Button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <Tooltip key={item.href}>
                   <TooltipTrigger asChild>

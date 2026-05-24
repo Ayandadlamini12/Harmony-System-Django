@@ -12,6 +12,7 @@ import {
   ShieldCheck,
   Stethoscope,
   Users,
+  UserRoundCog,
   type LucideIcon
 } from "lucide-react";
 
@@ -23,6 +24,7 @@ export type NavItem = {
   icon: LucideIcon;
   roles: UserRole[];
   status?: "ready" | "planned";
+  children?: NavItem[];
 };
 
 export type WorkflowCard = {
@@ -43,6 +45,17 @@ export const navItems: NavItem[] = [
   { href: "/messages", label: "Messages", icon: MessageSquare, roles: ["admin", "clinician", "receptionist"] },
   { href: "/inventory", label: "Inventory", icon: Package, roles: ["admin", "clinician"] },
   { href: "/reports", label: "Reports", icon: FileText, roles: ["admin", "clinician"] },
+  {
+    href: "/users",
+    label: "User Management",
+    icon: UserRoundCog,
+    roles: ["admin"],
+    children: [
+      { href: "/users", label: "Users", icon: Users, roles: ["admin"] },
+      { href: "/roles", label: "Roles", icon: ShieldCheck, roles: ["admin"], status: "planned" },
+      { href: "/teams", label: "Teams", icon: Users, roles: ["admin"], status: "planned" }
+    ]
+  },
   { href: "/account", label: "Settings", icon: Settings, roles: ["admin", "clinician", "receptionist"] }
 ];
 

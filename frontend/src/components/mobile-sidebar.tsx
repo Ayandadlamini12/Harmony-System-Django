@@ -1,6 +1,6 @@
 "use client";
 
-import { Menu, X } from "lucide-react";
+import { ChevronDown, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
@@ -32,7 +32,47 @@ function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRo
       <nav className="grid gap-1 px-3">
         {nav.map((item) => {
           const Icon = item.icon;
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const children = item.children ? allowedForRole(item.children, role) : [];
+          const hasChildren = children.length > 0;
+          const childActive = children.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`));
+          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href) || childActive;
+          if (hasChildren) {
+            return (
+              <details key={item.href} className="rounded-lg" open={active}>
+                <summary
+                  className={cn(
+                    "flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-white/82 transition-colors hover:bg-white/10 [&::-webkit-details-marker]:hidden",
+                    active && "bg-white/14 text-white"
+                  )}
+                >
+                  <Icon size={18} />
+                  <span className="flex-1">{item.label}</span>
+                  <ChevronDown size={16} />
+                </summary>
+                <div className="mt-1 grid gap-1 pl-7">
+                  {children.map((child) => {
+                    const ChildIcon = child.icon;
+                    const childCurrent = pathname === child.href || pathname.startsWith(`${child.href}/`);
+                    return (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        onClick={onNavigate}
+                        className={cn(
+                          "flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white/75 transition-colors hover:bg-white/10",
+                          childCurrent && "bg-white/14 text-white"
+                        )}
+                      >
+                        <ChildIcon size={15} />
+                        {child.label}
+                        {child.status === "planned" && <span className="ml-auto text-[10px] uppercase text-white/55">Future</span>}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </details>
+            );
+          }
           return (
             <Link
               key={item.href}
