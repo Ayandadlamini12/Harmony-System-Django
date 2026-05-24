@@ -1,33 +1,16 @@
-import { AlertCircle, CheckCircle2, ShieldCheck } from "lucide-react";
+import { KeyRound, Laptop, ShieldCheck, UserCog } from "lucide-react";
+import Link from "next/link";
+import type React from "react";
 
 import { AppShell } from "@/components/app-shell";
-import { ChangePasswordForm } from "@/components/change-password-form";
-import { ClinicianProfileForm } from "@/components/clinician-profile-form";
-import { ProfilePhotoUploader } from "@/components/profile-photo-uploader";
-import { Progress } from "@/components/ui/progress";
-import { getMyClinicianProfile } from "@/lib/api";
+import { Button } from "@/components/ui/button";
 import { getSessionUser } from "@/lib/session";
 
-export default async function AccountPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {
-  const params = await searchParams;
+export default async function AccountPage() {
   const session = await getSessionUser();
-  const canMaintainClinicianProfile = session.role === "admin" || session.role === "clinician";
-  const clinicianProfile = canMaintainClinicianProfile ? await getMyClinicianProfile() : null;
-  const completion = clinicianProfile?.profile_completion || 0;
-  const missingSections = clinicianProfile?.missing_sections || [];
 
   return (
-    <AppShell title="Profile and account">
-      {params.saved === "profile" && (
-        <div className="mb-5 flex items-center gap-2 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm font-semibold text-green-800">
-          <CheckCircle2 size={18} /> Clinician profile saved.
-        </div>
-      )}
-      {params.error === "profile_save_failed" && (
-        <div className="mb-5 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          <AlertCircle size={18} /> Clinician profile could not be saved. Check the form and try again.
-        </div>
-      )}
+    <AppShell title="Account">
       <section className="grid gap-6 lg:grid-cols-[360px_1fr]">
         <div className="hh-panel p-5">
           <img
@@ -37,25 +20,9 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
           />
           <h2 className="mt-4 text-xl font-bold">{session.name}</h2>
           <p className="mt-1 text-sm text-[#66736d]">{session.username}</p>
-          <span className="mt-4 inline-flex rounded-full bg-[var(--hh-green-light)] px-3 py-1 text-xs font-bold capitalize text-[var(--hh-green-dark)]">{session.role}</span>
-          <ProfilePhotoUploader avatarUrl={session.avatarUrl} name={session.name} />
-
-          {canMaintainClinicianProfile && (
-            <div className="mt-5 rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4">
-              <div className="flex items-center justify-between gap-3">
-                <h3 className="text-sm font-bold">Clinician profile</h3>
-                <span className="text-sm font-bold text-[var(--hh-purple)]">{completion}%</span>
-              </div>
-              <Progress className="mt-3" value={completion} label="Clinician profile completion" />
-              {completion < 100 ? (
-                <p className="mt-3 text-sm leading-6 text-[#66736d]">
-                  Complete {missingSections.map((section) => section.label.toLowerCase()).join(", ") || "the remaining sections"} so the practice has a complete professional record.
-                </p>
-              ) : (
-                <p className="mt-3 text-sm leading-6 text-[#66736d]">Your clinician profile is complete. Review it periodically so it stays current.</p>
-              )}
-            </div>
-          )}
+          <span className="mt-4 inline-flex rounded-full bg-[var(--hh-green-light)] px-3 py-1 text-xs font-bold capitalize text-[var(--hh-green-dark)]">
+            {session.role}
+          </span>
         </div>
 
         <div className="grid gap-4">
@@ -68,34 +35,54 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
               Account permissions control which dashboards and confidential records are visible. Reception users see non-confidential patient records. Clinicians and admins can access medical records and approval workflows.
             </p>
           </div>
-          <ChangePasswordForm />
+
+          <div className="grid gap-4 md:grid-cols-3">
+            <AccountCard
+              description="Update your photo and clinician resume profile."
+              href="/account/profile"
+              icon={<UserCog size={22} />}
+              title="Profile settings"
+            />
+            <AccountCard
+              description="Change your account password."
+              href="/account/password"
+              icon={<KeyRound size={22} />}
+              title="Password management"
+            />
+            <div className="hh-panel p-5 opacity-75">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#f1f4f2] text-[#66736d]">
+                <Laptop size={22} />
+              </div>
+              <h3 className="mt-4 font-bold">Device management</h3>
+              <p className="mt-2 text-sm leading-6 text-[#66736d]">Future account security feature for trusted devices and active sessions.</p>
+              <span className="mt-4 inline-flex rounded-full bg-[#f1f4f2] px-3 py-1 text-xs font-bold uppercase text-[#66736d]">Future item</span>
+            </div>
+          </div>
         </div>
       </section>
-
-      {canMaintainClinicianProfile && (
-        <section className="mt-6 grid gap-4">
-          {completion < 100 && (
-            <div className="rounded-lg border border-[#ead7b8] bg-[#fff7e6] p-4">
-              <div className="flex items-start gap-3">
-                <AlertCircle className="mt-0.5 text-[#9a5b00]" size={20} />
-                <div>
-                  <h2 className="font-bold text-[#4b2b00]">Profile reminder</h2>
-                  <p className="mt-1 text-sm leading-6 text-[#6b4a1d]">
-                    Your clinician profile is {completion}% complete. This works like a professional profile checklist and will keep reminding you until the core sections are filled.
-                  </p>
-                </div>
-              </div>
-            </div>
-          )}
-          <div className="hh-panel p-5">
-            <h2 className="text-lg font-bold">Clinician resume profile</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-[#66736d]">
-              Maintain a structured professional profile for clinician records, internal governance, and future public-facing doctor profiles.
-            </p>
-          </div>
-          <ClinicianProfileForm profile={clinicianProfile} />
-        </section>
-      )}
     </AppShell>
+  );
+}
+
+function AccountCard({
+  description,
+  href,
+  icon,
+  title,
+}: {
+  description: string;
+  href: string;
+  icon: React.ReactNode;
+  title: string;
+}) {
+  return (
+    <div className="hh-panel p-5">
+      <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#f7f0fb] text-[var(--hh-purple)]">{icon}</div>
+      <h3 className="mt-4 font-bold">{title}</h3>
+      <p className="mt-2 text-sm leading-6 text-[#66736d]">{description}</p>
+      <Button asChild className="mt-4" variant="secondary">
+        <Link href={href}>Open</Link>
+      </Button>
+    </div>
   );
 }

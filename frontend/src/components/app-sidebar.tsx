@@ -13,6 +13,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { UserAccountMenu } from "@/components/user-account-menu";
 import { allowedForRole, navItems } from "@/lib/role-workflows";
 import type { UserRole } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -97,14 +98,7 @@ function TopBar({
             <span className="sr-only">Notifications</span>
           </Button>
           {signedIn ? (
-            <Link
-              aria-label={`${name || title} profile and account`}
-              className="inline-flex h-11 w-11 items-center justify-center rounded-lg bg-white text-[var(--hh-purple)] ring-1 ring-white/25 hover:bg-[#f7f0fb]"
-              href="/account"
-              title={name || title}
-            >
-              <img alt="" className="h-9 w-9 rounded-md object-cover" src={avatarUrl || "/brand/harmony-icon-sm.webp"} />
-            </Link>
+            <UserAccountMenu avatarUrl={avatarUrl} name={name} title={title} />
           ) : (
             <Link
               aria-label="Sign in"
@@ -183,9 +177,9 @@ function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: s
             )}
             variant="ghost"
           >
-            <Link href="/account" title={collapsed ? "Profile & account" : undefined}>
+            <Link href="/account" title={collapsed ? "Account" : undefined}>
               <UserCog size={18} />
-              {!collapsed && <span>Profile & account</span>}
+              {!collapsed && <span>Account</span>}
             </Link>
           </Button>
           {!collapsed && <div className="mt-2 truncate px-3 text-xs text-[#66736d]">{name}</div>}

@@ -58,8 +58,9 @@ export async function updateClinicianProfile(formData: FormData) {
   });
 
   revalidatePath("/account");
+  revalidatePath("/account/profile");
   if (!response.ok) {
-    redirect("/account?error=profile_save_failed");
+    redirect("/account/profile?error=profile_save_failed");
   }
-  redirect("/account?saved=profile");
+  redirect("/account/profile?saved=profile");
 }
