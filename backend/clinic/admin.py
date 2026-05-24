@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit, Vital
+from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit, Vital
 
 
 class PatientProfileInline(admin.StackedInline):
@@ -38,6 +38,14 @@ class PatientCheckInAdmin(admin.ModelAdmin):
     list_filter = ("status", "method", "visit_type", "created_at")
 
 
+@admin.register(FormDraft)
+class FormDraftAdmin(admin.ModelAdmin):
+    list_display = ("draft_key", "owner_user", "form_type", "current_stage", "status", "last_saved_at")
+    search_fields = ("draft_key", "owner_user__username", "owner_user__email", "related_patient__full_name_display")
+    list_filter = ("form_type", "status", "created_at", "last_saved_at")
+    readonly_fields = ("draft_key", "created_at", "updated_at", "last_saved_at", "submitted_at")
+
+
 @admin.register(ElevatedAccessRequest)
 class ElevatedAccessRequestAdmin(admin.ModelAdmin):
     list_display = ("patient", "requested_by", "status", "reviewed_by", "expires_at", "created_at")
@@ -54,6 +62,11 @@ class PatientConditionAdmin(admin.ModelAdmin):
 
 admin.site.register(Vital)
 admin.site.register(FollowUpEvaluation)
-admin.site.register(AuditLog)
+@admin.register(AuditLog)
+class AuditLogAdmin(admin.ModelAdmin):
+    list_display = ("entity_type", "entity_id", "action", "user", "created_at", "ip_address")
+    search_fields = ("entity_type", "action", "user__username", "details")
+    list_filter = ("entity_type", "action", "created_at")
+    readonly_fields = ("created_at",)
 
 # Register your models here.

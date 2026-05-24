@@ -9,10 +9,12 @@ from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 
 from .access import has_patient_clinical_access, is_clinical_user
-from .models import AuditLog, ElevatedAccessRequest, Patient, PatientCheckIn, PatientProfile, Visit
+from .audit import snapshot_instance, write_audit_log
+from .models import AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientProfile, Visit
 from .serializers import (
     AuditLogSerializer,
     ElevatedAccessRequestSerializer,
+    FormDraftSerializer,
     PatientCheckInSerializer,
     PatientDetailSerializer,
     PatientListSerializer,
@@ -65,6 +67,41 @@ class PatientViewSet(viewsets.ModelViewSet):
             return PatientListSerializer
         return PatientDetailSerializer
 
+    def perform_create(self, serializer):
+        patient = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=patient,
+            after_data=snapshot_instance(patient),
+            details="Patient record created.",
+        )
+
+    def perform_update(self, serializer):
+        before_data = snapshot_instance(self.get_object())
+        patient = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="update",
+            instance=patient,
+            before_data=before_data,
+            after_data=snapshot_instance(patient),
+            details="Patient record updated.",
+        )
+
+    def perform_destroy(self, instance):
+        before_data = snapshot_instance(instance)
+        entity_id = instance.pk
+        instance.delete()
+        write_audit_log(
+            request=self.request,
+            action="delete",
+            entity_type="patient",
+            entity_id=entity_id,
+            before_data=before_data,
+            details="Patient record deleted.",
+        )
+
     @action(detail=True, methods=["get", "post"])
     def visits(self, request, pk=None):
         patient = self.get_object()
@@ -107,6 +144,41 @@ class VisitViewSet(viewsets.ModelViewSet):
         if not is_clinical_user(request.user):
             return Response({"detail": "Only clinical users can create visits."}, status=status.HTTP_403_FORBIDDEN)
         return super().create(request, *args, **kwargs)
+
+    def perform_create(self, serializer):
+        visit = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=visit,
+            after_data=snapshot_instance(visit),
+            details="Visit record created.",
+        )
+
+    def perform_update(self, serializer):
+        before_data = snapshot_instance(self.get_object())
+        visit = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="update",
+            instance=visit,
+            before_data=before_data,
+            after_data=snapshot_instance(visit),
+            details="Visit record updated.",
+        )
+
+    def perform_destroy(self, instance):
+        before_data = snapshot_instance(instance)
+        entity_id = instance.pk
+        instance.delete()
+        write_audit_log(
+            request=self.request,
+            action="delete",
+            entity_type="visit",
+            entity_id=entity_id,
+            before_data=before_data,
+            details="Visit record deleted.",
+        )
 
 
 class PatientCheckInViewSet(viewsets.ModelViewSet):
@@ -151,6 +223,100 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
         self.perform_create(serializer)
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
+    def perform_create(self, serializer):
+        check_in = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=check_in,
+            after_data=snapshot_instance(check_in),
+            details="Patient check-in created.",
+        )
+
+    def perform_update(self, serializer):
+        before_data = snapshot_instance(self.get_object())
+        check_in = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="update",
+            instance=check_in,
+            before_data=before_data,
+            after_data=snapshot_instance(check_in),
+            details="Patient check-in updated.",
+        )
+
+
+class FormDraftViewSet(viewsets.ModelViewSet):
+    serializer_class = FormDraftSerializer
+    lookup_field = "draft_key"
+    filterset_fields = ("form_type", "status", "related_patient", "related_visit")
+    search_fields = ("form_type", "current_stage", "related_patient__full_name_display")
+    ordering_fields = ("last_saved_at", "updated_at", "created_at")
+
+    def get_queryset(self):
+        queryset = FormDraft.objects.select_related("owner_user", "related_patient", "related_visit")
+        if self.request.user.is_staff or getattr(self.request.user, "role", "") == "admin":
+            return queryset
+        return queryset.filter(owner_user=self.request.user)
+
+    def perform_create(self, serializer):
+        draft = serializer.save(owner_user=self.request.user)
+        write_audit_log(
+            request=self.request,
+            action="create_draft",
+            instance=draft,
+            entity_type="form_draft",
+            after_data=snapshot_instance(draft),
+            details="Form draft created.",
+        )
+
+    def perform_update(self, serializer):
+        before_data = snapshot_instance(self.get_object())
+        draft = serializer.save(owner_user=self.request.user if not serializer.instance.owner_user_id else serializer.instance.owner_user)
+        write_audit_log(
+            request=self.request,
+            action="update_draft",
+            instance=draft,
+            entity_type="form_draft",
+            before_data=before_data,
+            after_data=snapshot_instance(draft),
+            details="Form draft saved.",
+        )
+
+    @action(detail=True, methods=["post"])
+    def submit(self, request, draft_key=None):
+        draft = self.get_object()
+        before_data = snapshot_instance(draft)
+        draft.status = FormDraft.Status.SUBMITTED
+        draft.save(update_fields=["status", "submitted_at", "updated_at"])
+        write_audit_log(
+            request=request,
+            action="submit_draft",
+            instance=draft,
+            entity_type="form_draft",
+            before_data=before_data,
+            after_data=snapshot_instance(draft),
+            details="Form draft marked submitted.",
+        )
+        return Response(self.get_serializer(draft).data)
+
+    @action(detail=True, methods=["post"])
+    def abandon(self, request, draft_key=None):
+        draft = self.get_object()
+        before_data = snapshot_instance(draft)
+        draft.status = FormDraft.Status.ABANDONED
+        draft.save(update_fields=["status", "updated_at"])
+        write_audit_log(
+            request=request,
+            action="abandon_draft",
+            instance=draft,
+            entity_type="form_draft",
+            before_data=before_data,
+            after_data=snapshot_instance(draft),
+            details="Form draft abandoned.",
+        )
+        return Response(self.get_serializer(draft).data)
+
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.select_related("user")
@@ -169,7 +335,15 @@ class ElevatedAccessRequestViewSet(viewsets.ModelViewSet):
         return queryset.filter(requested_by=self.request.user)
 
     def perform_create(self, serializer):
-        serializer.save(requested_by=self.request.user)
+        access_request = serializer.save(requested_by=self.request.user)
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=access_request,
+            entity_type="elevated_access_request",
+            after_data=snapshot_instance(access_request),
+            details="Elevated access request created.",
+        )
 
     def update(self, request, *args, **kwargs):
         return Response({"detail": "Use approve or reject actions to review access requests."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
@@ -182,6 +356,7 @@ class ElevatedAccessRequestViewSet(viewsets.ModelViewSet):
         if not is_clinical_user(request.user):
             return Response({"detail": "Only clinicians can approve elevated access."}, status=status.HTTP_403_FORBIDDEN)
         access_request = self.get_object()
+        before_data = snapshot_instance(access_request)
         hours = int(request.data.get("hours") or 4)
         access_request.status = ElevatedAccessRequest.Status.APPROVED
         access_request.reviewed_by = request.user
@@ -189,6 +364,15 @@ class ElevatedAccessRequestViewSet(viewsets.ModelViewSet):
         access_request.reviewed_at = timezone.now()
         access_request.expires_at = access_request.reviewed_at + timezone.timedelta(hours=hours)
         access_request.save(update_fields=["status", "reviewed_by", "review_note", "reviewed_at", "expires_at", "updated_at"])
+        write_audit_log(
+            request=request,
+            action="approve",
+            instance=access_request,
+            entity_type="elevated_access_request",
+            before_data=before_data,
+            after_data=snapshot_instance(access_request),
+            details="Elevated access request approved.",
+        )
         return Response(self.get_serializer(access_request).data)
 
     @action(detail=True, methods=["post"])
@@ -196,12 +380,22 @@ class ElevatedAccessRequestViewSet(viewsets.ModelViewSet):
         if not is_clinical_user(request.user):
             return Response({"detail": "Only clinicians can reject elevated access."}, status=status.HTTP_403_FORBIDDEN)
         access_request = self.get_object()
+        before_data = snapshot_instance(access_request)
         access_request.status = ElevatedAccessRequest.Status.REJECTED
         access_request.reviewed_by = request.user
         access_request.review_note = request.data.get("review_note", "")
         access_request.reviewed_at = timezone.now()
         access_request.expires_at = None
         access_request.save(update_fields=["status", "reviewed_by", "review_note", "reviewed_at", "expires_at", "updated_at"])
+        write_audit_log(
+            request=request,
+            action="reject",
+            instance=access_request,
+            entity_type="elevated_access_request",
+            before_data=before_data,
+            after_data=snapshot_instance(access_request),
+            details="Elevated access request rejected.",
+        )
         return Response(self.get_serializer(access_request).data)
 
 
@@ -213,6 +407,7 @@ def dashboard_stats(request):
             "total_patients": Patient.objects.count(),
             "today_visits": Visit.objects.filter(created_at__date=today).count(),
             "pending_drafts": ElevatedAccessRequest.objects.filter(status=ElevatedAccessRequest.Status.PENDING).count(),
+            "my_drafts": FormDraft.objects.filter(owner_user=request.user, status=FormDraft.Status.DRAFT).count(),
             "follow_ups_due": 0,
         }
     )
@@ -258,8 +453,10 @@ def patient_import_webhook(request):
             entity_id=patient.id,
             action="import",
             change_summary={"source": "n8n", "patient_code": patient.patient_code},
+            after_data=snapshot_instance(patient),
             details="Imported via n8n webhook",
             ip_address=request.META.get("REMOTE_ADDR"),
+            user_agent=request.META.get("HTTP_USER_AGENT", ""),
         )
     return Response(
         {

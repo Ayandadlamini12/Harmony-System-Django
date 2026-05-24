@@ -1,4 +1,4 @@
-import type { DashboardStats, ElevatedAccessRequest, Paginated, Patient, PatientCheckIn, User, Visit } from "@/types/clinic";
+import type { DashboardStats, ElevatedAccessRequest, FormDraft, Paginated, Patient, PatientCheckIn, User, Visit } from "@/types/clinic";
 import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -23,6 +23,7 @@ export function getDashboardStats() {
     total_patients: 0,
     today_visits: 0,
     pending_drafts: 0,
+    my_drafts: 0,
     follow_ups_due: 0
   });
 }
@@ -67,6 +68,20 @@ export function getAccessRequests() {
     previous: null,
     results: []
   });
+}
+
+export function getFormDrafts(status = "draft") {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiGet<Paginated<FormDraft>>(`/form-drafts/${query}`, {
+    count: 0,
+    next: null,
+    previous: null,
+    results: []
+  });
+}
+
+export function getFormDraft(draftKey: string) {
+  return apiGet<FormDraft | null>(`/form-drafts/${draftKey}/`, null);
 }
 
 export function getUsers(search = "") {

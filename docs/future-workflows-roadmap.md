@@ -25,3 +25,24 @@ Expected flow:
 Important rule:
 
 - AI extraction must never directly create or modify clinical records without human review.
+
+## n8n Operating Model
+
+Use n8n as the workflow automation layer, not the clinical system of record.
+
+Recommended uses:
+
+- Scanned form intake and extraction.
+- Human-in-the-loop approval steps before AI-assisted actions.
+- WhatsApp, Telegram, email, and reminder workflows.
+- Appointment and follow-up notifications.
+- Failed workflow or failed sync alerts.
+- External integration workflows that should not bloat the Django backend.
+
+Rules:
+
+- Harmony remains the source of truth for patients, visits, drafts, and audit logs.
+- n8n should call Harmony APIs instead of writing directly to the Harmony database.
+- AI-generated or OCR-generated patient data should be saved as drafts for review.
+- Sensitive or clinical record changes must require human review and Harmony audit logging.
+- Use narrow API credentials for n8n and avoid giving broad workflow-editing access to many users.

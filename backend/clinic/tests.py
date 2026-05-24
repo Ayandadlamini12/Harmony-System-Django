@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import ElevatedAccessRequest, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit
+from .models import AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit
 
 User = get_user_model()
 
@@ -108,6 +108,65 @@ class DashboardApiTests(APITestCase):
         self.assertEqual(response.status_code, 401)
 
 
+class FormDraftApiTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="reception_drafts",
+            password="password123",
+            role="receptionist",
+            first_name="Reception",
+            last_name="Drafts",
+        )
+        self.client.force_authenticate(self.user)
+
+    def test_user_can_create_update_and_submit_own_draft(self):
+        create_response = self.client.post(
+            "/api/form-drafts/",
+            {
+                "form_type": "patient_registration",
+                "current_stage": "identity",
+                "payload": {"first_name": "Nomsa"},
+            },
+            format="json",
+        )
+
+        self.assertEqual(create_response.status_code, 201)
+        draft = FormDraft.objects.get()
+        self.assertEqual(draft.owner_user, self.user)
+        self.assertEqual(draft.status, FormDraft.Status.DRAFT)
+
+        update_response = self.client.patch(
+            f"/api/form-drafts/{draft.draft_key}/",
+            {
+                "current_stage": "contact",
+                "payload": {"first_name": "Nomsa", "primary_phone": "+26876000000"},
+            },
+            format="json",
+        )
+        self.assertEqual(update_response.status_code, 200)
+        draft.refresh_from_db()
+        self.assertEqual(draft.current_stage, "contact")
+        self.assertEqual(draft.payload["primary_phone"], "+26876000000")
+
+        submit_response = self.client.post(f"/api/form-drafts/{draft.draft_key}/submit/", {}, format="json")
+        self.assertEqual(submit_response.status_code, 200)
+        draft.refresh_from_db()
+        self.assertEqual(draft.status, FormDraft.Status.SUBMITTED)
+        self.assertIsNotNone(draft.submitted_at)
+        self.assertTrue(AuditLog.objects.filter(entity_type="form_draft", action="submit_draft").exists())
+
+    def test_user_only_sees_own_drafts(self):
+        other = User.objects.create_user(username="other", password="password123", role="receptionist")
+        FormDraft.objects.create(owner_user=other, form_type=FormDraft.FormType.PATIENT_REGISTRATION, current_stage="identity")
+        FormDraft.objects.create(owner_user=self.user, form_type=FormDraft.FormType.VISIT_NEW_CONSULTATION, current_stage="vitals")
+
+        response = self.client.get("/api/form-drafts/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["current_stage"], "vitals")
+
+
 class PatientCheckInApiTests(APITestCase):
     def setUp(self):
         self.patient = Patient.objects.create(
@@ -210,6 +269,22 @@ class ClinicalAccessTests(APITestCase):
         self.assertEqual(response.data["clinical_access"], "approval_required")
         self.assertNotIn("profile", response.data)
         self.assertNotIn("visits", response.data)
+
+    def test_patient_update_creates_audit_log_with_changed_fields(self):
+        self.client.force_authenticate(self.clinician)
+
+        response = self.client.patch(
+            f"/api/patients/{self.patient.id}/",
+            {"first_name": "Lindiwe", "last_name": "Updated", "gender": "female"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        audit = AuditLog.objects.filter(entity_type="patient", action="update").latest("created_at")
+        self.assertEqual(audit.user, self.clinician)
+        self.assertIn("last_name", audit.changed_fields)
+        self.assertEqual(audit.changed_fields["last_name"]["before"], "Maseko")
+        self.assertEqual(audit.changed_fields["last_name"]["after"], "Updated")
 
     def test_clinician_can_approve_receptionist_access_request(self):
         self.client.force_authenticate(self.receptionist)

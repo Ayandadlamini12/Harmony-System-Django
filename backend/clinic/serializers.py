@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit, Vital
+from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit, Vital
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -145,6 +145,53 @@ class PatientCheckInSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class FormDraftSerializer(serializers.ModelSerializer):
+    owner_name = serializers.CharField(source="owner_user.get_full_name", read_only=True)
+    form_type_label = serializers.CharField(source="get_form_type_display", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    related_patient_name = serializers.CharField(source="related_patient.full_name_display", read_only=True)
+
+    class Meta:
+        model = FormDraft
+        fields = (
+            "id",
+            "draft_key",
+            "owner_user",
+            "owner_name",
+            "form_type",
+            "form_type_label",
+            "related_patient",
+            "related_patient_name",
+            "related_visit",
+            "current_stage",
+            "payload",
+            "status",
+            "status_label",
+            "created_at",
+            "updated_at",
+            "last_saved_at",
+            "submitted_at",
+        )
+        read_only_fields = (
+            "id",
+            "draft_key",
+            "owner_user",
+            "owner_name",
+            "form_type_label",
+            "status_label",
+            "related_patient_name",
+            "created_at",
+            "updated_at",
+            "last_saved_at",
+            "submitted_at",
+        )
+
+    def validate_status(self, value):
+        if value not in {FormDraft.Status.DRAFT, FormDraft.Status.ABANDONED}:
+            raise serializers.ValidationError("Use submit action to mark a draft as submitted.")
+        return value
+
+
 class PatientListSerializer(serializers.ModelSerializer):
     last_visit_date = serializers.SerializerMethodField()
 
@@ -271,8 +318,12 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "entity_id",
             "action",
             "change_summary",
+            "before_data",
+            "after_data",
+            "changed_fields",
             "details",
             "ip_address",
+            "user_agent",
             "created_at",
         )
 

@@ -2,6 +2,7 @@ export type DashboardStats = {
   total_patients: number;
   today_visits: number;
   pending_drafts: number;
+  my_drafts: number;
   follow_ups_due: number;
 };
 
@@ -97,6 +98,26 @@ export type PatientCheckIn = {
   note?: string;
   created_at: string;
   updated_at?: string;
+};
+
+export type FormDraft = {
+  id: number;
+  draft_key: string;
+  owner_user: number;
+  owner_name?: string;
+  form_type: "patient_registration" | "visit_new_consultation" | "visit_follow_up" | "vitals_entry" | "medical_history_update";
+  form_type_label?: string;
+  related_patient?: number | null;
+  related_patient_name?: string | null;
+  related_visit?: number | null;
+  current_stage?: string;
+  payload: Record<string, unknown>;
+  status: "draft" | "submitted" | "abandoned";
+  status_label?: string;
+  created_at: string;
+  updated_at: string;
+  last_saved_at: string;
+  submitted_at?: string | null;
 };
 
 export type ElevatedAccessRequest = {

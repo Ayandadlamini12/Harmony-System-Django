@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db import models
 from django.utils import timezone
 import re
+import uuid
 
 
 class TimeStampedModel(models.Model):
@@ -249,6 +250,65 @@ class PatientCheckIn(TimeStampedModel):
         return f"{self.patient.full_name_display} - {self.get_status_display()}"
 
 
+class FormDraft(TimeStampedModel):
+    class FormType(models.TextChoices):
+        PATIENT_REGISTRATION = "patient_registration", "Patient registration"
+        VISIT_NEW_CONSULTATION = "visit_new_consultation", "New consultation"
+        VISIT_FOLLOW_UP = "visit_follow_up", "Follow up"
+        VITALS_ENTRY = "vitals_entry", "Vitals entry"
+        MEDICAL_HISTORY_UPDATE = "medical_history_update", "Medical history update"
+
+    class Status(models.TextChoices):
+        DRAFT = "draft", "Draft"
+        SUBMITTED = "submitted", "Submitted"
+        ABANDONED = "abandoned", "Abandoned"
+
+    draft_key = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    owner_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="form_drafts",
+    )
+    form_type = models.CharField(max_length=80, choices=FormType.choices)
+    related_patient = models.ForeignKey(
+        Patient,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="form_drafts",
+    )
+    related_visit = models.ForeignKey(
+        Visit,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="form_drafts",
+    )
+    current_stage = models.CharField(max_length=120, blank=True)
+    payload = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.DRAFT)
+    last_saved_at = models.DateTimeField(default=timezone.now)
+    submitted_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-last_saved_at", "-updated_at")
+        indexes = [
+            models.Index(fields=["owner_user", "status", "last_saved_at"]),
+            models.Index(fields=["form_type", "status"]),
+            models.Index(fields=["draft_key"]),
+        ]
+
+    def save(self, *args, **kwargs):
+        if self.status == self.Status.SUBMITTED and not self.submitted_at:
+            self.submitted_at = timezone.now()
+        if self.status == self.Status.DRAFT:
+            self.last_saved_at = timezone.now()
+        super().save(*args, **kwargs)
+
+    def __str__(self) -> str:
+        return f"{self.get_form_type_display()} draft for {self.owner_user}"
+
+
 class Vital(TimeStampedModel):
     class GlucoseContext(models.TextChoices):
         FASTING = "fasting", "Fasting"
@@ -300,8 +360,12 @@ class AuditLog(models.Model):
     entity_id = models.PositiveBigIntegerField()
     action = models.CharField(max_length=80)
     change_summary = models.JSONField(null=True, blank=True)
+    before_data = models.JSONField(null=True, blank=True)
+    after_data = models.JSONField(null=True, blank=True)
+    changed_fields = models.JSONField(null=True, blank=True)
     details = models.TextField(blank=True)
     ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
