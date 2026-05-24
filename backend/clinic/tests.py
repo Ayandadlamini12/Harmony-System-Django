@@ -119,15 +119,40 @@ class PatientCheckInApiTests(APITestCase):
         )
 
     def test_public_tablet_lookup_uses_patient_code_phone_or_identity(self):
-        response = self.client.post("/api/check-ins/lookup/", {"identifier": "76001048"}, format="json")
+        response = self.client.post(
+            "/api/check-ins/lookup/",
+            {"identifier": "76001048", "identifier_type": "cell_number"},
+            format="json",
+        )
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["patient"], self.patient.id)
         self.assertEqual(response.data["patient_code"], self.patient.patient_code)
 
-        identity_response = self.client.post("/api/check-ins/lookup/", {"identifier": "P123456"}, format="json")
+        identity_response = self.client.post(
+            "/api/check-ins/lookup/",
+            {"identifier": "P123456", "identifier_type": "national_passport_id"},
+            format="json",
+        )
         self.assertEqual(identity_response.status_code, 200)
         self.assertEqual(identity_response.data["patient"], self.patient.id)
+
+    def test_national_passport_identifier_is_alphanumeric_not_phone_digit_match(self):
+        other_patient = Patient.objects.create(
+            first_name="Phone",
+            last_name="Match",
+            gender="male",
+            primary_phone="+26876551234",
+        )
+
+        response = self.client.post(
+            "/api/check-ins/lookup/",
+            {"identifier": "551234", "identifier_type": "national_passport_id"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(Patient.objects.filter(id=other_patient.id).exists())
 
     def test_public_tablet_check_in_creates_waiting_record(self):
         response = self.client.post(

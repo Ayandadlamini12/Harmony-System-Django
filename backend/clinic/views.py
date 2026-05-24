@@ -24,15 +24,26 @@ def normalize_digits(value):
     return re.sub(r"\D", "", value or "")
 
 
-def find_patient_by_identifier(identifier):
+def find_patient_by_identifier(identifier, identifier_type=""):
     text = (identifier or "").strip()
     digits = normalize_digits(text)
     if not text:
         return None
 
-    query = Q(patient_code__iexact=text) | Q(national_id__iexact=text)
-    if digits:
-        query |= Q(primary_phone__icontains=digits[-8:]) | Q(secondary_phone__icontains=digits[-8:])
+    identifier_type = (identifier_type or "").strip()
+    if identifier_type == "cell_number":
+        if not digits:
+            return None
+        query = Q(primary_phone__icontains=digits[-8:]) | Q(secondary_phone__icontains=digits[-8:])
+    elif identifier_type == "patient_code":
+        query = Q(patient_code__iexact=text)
+    elif identifier_type == "national_passport_id":
+        query = Q(national_id__iexact=text)
+    else:
+        query = Q(patient_code__iexact=text) | Q(national_id__iexact=text)
+        if digits:
+            query |= Q(primary_phone__icontains=digits[-8:]) | Q(secondary_phone__icontains=digits[-8:])
+
     return Patient.objects.filter(query).order_by("-created_at").first()
 
 
@@ -112,7 +123,10 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=["post"], permission_classes=[permissions.AllowAny])
     def lookup(self, request):
-        patient = find_patient_by_identifier(request.data.get("identifier", ""))
+        patient = find_patient_by_identifier(
+            request.data.get("identifier", ""),
+            request.data.get("identifier_type", ""),
+        )
         if not patient:
             return Response({"detail": "No matching registered patient found."}, status=status.HTTP_404_NOT_FOUND)
         return Response(
@@ -128,7 +142,7 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
         data = request.data.copy()
         identifier = data.get("identifier", "")
         if not data.get("patient") and identifier:
-            patient = find_patient_by_identifier(identifier)
+            patient = find_patient_by_identifier(identifier, data.get("identifier_type", ""))
             if not patient:
                 return Response({"detail": "No matching registered patient found."}, status=status.HTTP_404_NOT_FOUND)
             data["patient"] = patient.id

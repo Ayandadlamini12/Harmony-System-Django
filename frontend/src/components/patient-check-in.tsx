@@ -44,6 +44,30 @@ type LookupResult = {
   primary_phone?: string;
 };
 
+const identifierOptions = [
+  {
+    value: "cell_number",
+    label: "Cell Number",
+    description: "Use your phone number",
+    placeholder: "Enter cell number",
+    inputMode: "tel" as const
+  },
+  {
+    value: "patient_code",
+    label: "Patient ID",
+    description: "Use your HHPAT number",
+    placeholder: "Enter HHPAT patient ID",
+    inputMode: "text" as const
+  },
+  {
+    value: "national_passport_id",
+    label: "National / Passport ID",
+    description: "Letters and numbers accepted",
+    placeholder: "Enter National or Passport ID",
+    inputMode: "text" as const
+  }
+];
+
 export function PatientCheckIn({
   patients,
   mode = "staff"
@@ -52,6 +76,7 @@ export function PatientCheckIn({
   mode?: "staff" | "tablet";
 }) {
   const [query, setQuery] = useState("");
+  const [identifierType, setIdentifierType] = useState(identifierOptions[0].value);
   const [lookup, setLookup] = useState<LookupResult | null>(null);
   const [remotePatients, setRemotePatients] = useState(patients);
   const [searching, setSearching] = useState(false);
@@ -60,6 +85,7 @@ export function PatientCheckIn({
   const matches = useMemo(() => remotePatients.filter((patient) => matchesPatient(patient, query)).slice(0, 8), [remotePatients, query]);
   const hasQuery = query.trim().length > 0;
   const isTablet = mode === "tablet";
+  const selectedIdentifier = identifierOptions.find((option) => option.value === identifierType) || identifierOptions[0];
 
   useEffect(() => {
     const text = query.trim();
@@ -77,7 +103,7 @@ export function PatientCheckIn({
           const response = await fetch("/api/check-ins/lookup", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ identifier: text }),
+            body: JSON.stringify({ identifier: text, identifier_type: identifierType }),
             signal: controller.signal
           });
           setLookup(response.ok ? ((await response.json()) as LookupResult) : null);
@@ -106,7 +132,7 @@ export function PatientCheckIn({
       controller.abort();
       window.clearTimeout(timeout);
     };
-  }, [isTablet, patients, query]);
+  }, [identifierType, isTablet, patients, query]);
 
   async function checkIn({
     patient,
@@ -129,7 +155,7 @@ export function PatientCheckIn({
           identifier,
           visit_type: visitType,
           method,
-          identifier_type: "self_service_identifier",
+          identifier_type: patient && !isTablet ? "reception_selected_patient" : identifierType,
           source_label: isTablet ? "Front desk tablet" : "Reception dashboard"
         })
       });
@@ -168,7 +194,9 @@ export function PatientCheckIn({
               {isTablet ? "Patient self check-in" : "Existing patient check-in"}
             </h2>
             <p className={isTablet ? "mt-2 max-w-3xl text-base leading-7 text-[#66736d]" : "mt-1 max-w-2xl text-sm leading-6 text-[#66736d]"}>
-              Enter a cell number, Harmony patient ID, or National / Passport ID, then choose whether this is a new visit or follow-up.
+              {isTablet
+                ? "Choose what you want to use, enter the details, then select whether this is a new visit or follow-up."
+                : "Enter a cell number, Harmony patient ID, or National / Passport ID, then choose whether this is a new visit or follow-up."}
             </p>
           </div>
           {!isTablet && (
@@ -177,15 +205,44 @@ export function PatientCheckIn({
             </Button>
           )}
         </div>
+        {isTablet && (
+          <div className="mt-6 grid gap-3 md:grid-cols-3">
+            {identifierOptions.map((option) => {
+              const active = option.value === identifierType;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    setIdentifierType(option.value);
+                    setQuery("");
+                    setLookup(null);
+                  }}
+                  className={`min-h-24 rounded-lg border px-4 py-3 text-left transition ${
+                    active
+                      ? "border-[var(--hh-purple)] bg-white text-[var(--hh-purple)] shadow-sm ring-2 ring-[#e8d5f3]"
+                      : "border-[var(--hh-border)] bg-[#f7faf8] text-[var(--hh-text)] hover:border-[#d1abe7] hover:bg-white"
+                  }`}
+                  aria-pressed={active}
+                >
+                  <span className="block text-base font-bold">{option.label}</span>
+                  <span className="mt-1 block text-sm text-[#66736d]">{option.description}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         <label className="mt-5 grid gap-1.5">
-          <span className="hh-label">Search patient</span>
+          <span className="hh-label">{isTablet ? selectedIdentifier.label : "Search patient"}</span>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#66736d]" size={18} />
             <Input
               className="pl-10"
+              inputMode={isTablet ? selectedIdentifier.inputMode : "search"}
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
-              placeholder="Cell number, HHPAT number, or National / Passport ID"
+              placeholder={isTablet ? selectedIdentifier.placeholder : "Cell number, HHPAT number, or National / Passport ID"}
             />
           </div>
         </label>

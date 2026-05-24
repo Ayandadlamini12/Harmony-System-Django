@@ -25,7 +25,7 @@ export default async function RegisterPatientPage({ searchParams }: { searchPara
           <label className={fieldClass}><Label>First name</Label><Input name="first_name" required /></label>
           <label className={fieldClass}><Label>Middle name</Label><Input name="middle_name" /></label>
           <label className={fieldClass}><Label>Last name</Label><Input name="last_name" required /></label>
-          <label className={fieldClass}><Label>National / Passport ID</Label><Input name="national_id" /></label>
+          <label className={fieldClass}><Label>National / Passport ID</Label><Input name="national_id" autoCapitalize="characters" /></label>
           <label className={fieldClass}><Label>Date of birth</Label><Input name="date_of_birth" type="date" /></label>
           <label className={fieldClass}>
             <Label>Gender</Label>

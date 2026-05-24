@@ -58,3 +58,8 @@ Already registered patients are checked in from `/check-ins` by reception or fro
 - The waiting list reads `waiting` check-ins from `/api/check-ins/`.
 - Clinicians can start the visit from the waiting list; the selected visit type is passed into `/visits/new`.
 - The public tablet lookup uses `/api/check-ins/lookup/` and accepts exact patient code, National / Passport ID, or phone digits. This keeps the check-in workflow ready for future sources such as appointment links, QR codes, WhatsApp, or external kiosk integrations.
+- The tablet self check-in screen first asks the patient to choose the identifier type:
+  - Cell Number
+  - Patient ID
+  - National / Passport ID
+- National / Passport ID values are treated as alphanumeric exact IDs, not as phone-number digits.

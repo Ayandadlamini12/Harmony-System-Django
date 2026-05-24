@@ -45,7 +45,7 @@ export default async function EditPatientPage({
             <label className={fieldClass}><Label>First name</Label><Input name="first_name" defaultValue={patient.first_name} required /></label>
             <label className={fieldClass}><Label>Middle name</Label><Input name="middle_name" defaultValue={patient.middle_name || ""} /></label>
             <label className={fieldClass}><Label>Last name</Label><Input name="last_name" defaultValue={patient.last_name} required /></label>
-            <label className={fieldClass}><Label>National / Passport ID</Label><Input name="national_id" defaultValue={patient.national_id || ""} /></label>
+            <label className={fieldClass}><Label>National / Passport ID</Label><Input name="national_id" autoCapitalize="characters" defaultValue={patient.national_id || ""} /></label>
             <label className={fieldClass}><Label>Date of birth</Label><Input name="date_of_birth" type="date" defaultValue={patient.date_of_birth || ""} /></label>
             <label className={fieldClass}>
               <Label>Gender</Label>
