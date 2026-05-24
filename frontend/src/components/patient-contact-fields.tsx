@@ -1,12 +1,16 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 
 import { PhoneNumberInput, parsePhone } from "@/components/phone-number-input";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
-import { getLocationRegions } from "@/lib/location-data";
+
+type RegionOption = {
+  name: string;
+  isoCode: string;
+};
 
 type PatientContactFieldsProps = {
   defaultEmail?: string;
@@ -25,13 +29,42 @@ export function PatientContactFields({
   defaultTownOrLocality = "",
   defaultVillage = ""
 }: PatientContactFieldsProps) {
-  const initialCountryCode = parsePhone(defaultPrimaryPhone).countryCode;
-  const [countryCode, setCountryCode] = useState(initialCountryCode);
+  const parsedPrimaryPhone = parsePhone(defaultPrimaryPhone);
+  const [country, setCountry] = useState(parsedPrimaryPhone.country);
   const [region, setRegion] = useState(defaultRegion);
   const [townOrLocality, setTownOrLocality] = useState(defaultTownOrLocality);
-  const regions = useMemo(() => getLocationRegions(countryCode), [countryCode]);
-  const selectedRegion = regions.find((item) => item.region === region);
+  const [regions, setRegions] = useState<RegionOption[]>([]);
+  const [towns, setTowns] = useState<string[]>([]);
+  const selectedRegion = regions.find((item) => item.name === region);
+  const selectedRegionIsoCode = selectedRegion?.isoCode || "";
   const hasDropdownLocations = regions.length > 0;
+
+  useEffect(() => {
+    const controller = new AbortController();
+
+    async function loadLocations() {
+      const params = new URLSearchParams({ country });
+      if (selectedRegionIsoCode) {
+        params.set("state", selectedRegionIsoCode);
+      }
+      const response = await fetch(`/api/locations?${params.toString()}`, {
+        signal: controller.signal
+      });
+      if (!response.ok) return;
+      const data = (await response.json()) as { regions?: RegionOption[]; towns?: string[] };
+      setRegions(data.regions || []);
+      setTowns(data.towns || []);
+    }
+
+    loadLocations().catch(() => {
+      if (!controller.signal.aborted) {
+        setRegions([]);
+        setTowns([]);
+      }
+    });
+
+    return () => controller.abort();
+  }, [country, selectedRegionIsoCode]);
 
   return (
     <div className="grid gap-4 md:grid-cols-3">
@@ -39,13 +72,11 @@ export function PatientContactFields({
         label="Primary phone"
         name="primary_phone"
         defaultValue={defaultPrimaryPhone}
-          onCountryCodeChange={(value) => {
-            setCountryCode(value);
-            if (!getLocationRegions(value).some((item) => item.region === region)) {
-              setRegion("");
-              setTownOrLocality("");
-            }
-          }}
+        onCountryChange={({ country: nextCountry }) => {
+          setCountry(nextCountry);
+          setRegion("");
+          setTownOrLocality("");
+        }}
         required
       />
       <PhoneNumberInput label="Secondary phone" name="secondary_phone" defaultValue={defaultSecondaryPhone} />
@@ -57,7 +88,7 @@ export function PatientContactFields({
       {hasDropdownLocations ? (
         <>
           <label className="grid gap-1.5">
-            <Label>Region</Label>
+            <Label>Region / State</Label>
             <Select
               name="region"
               value={region}
@@ -66,10 +97,10 @@ export function PatientContactFields({
                 setTownOrLocality("");
               }}
             >
-              <option value="">Select region</option>
+              <option value="">Select region / state</option>
               {regions.map((item) => (
-                <option key={item.region} value={item.region}>
-                  {item.region}
+                <option key={item.isoCode} value={item.name}>
+                  {item.name}
                 </option>
               ))}
             </Select>
@@ -80,10 +111,10 @@ export function PatientContactFields({
               name="town_or_locality"
               value={townOrLocality}
               onChange={(event) => setTownOrLocality(event.currentTarget.value)}
-              disabled={!selectedRegion}
+              disabled={towns.length === 0}
             >
-              <option value="">Select town or locality</option>
-              {selectedRegion?.localities.map((locality) => (
+              <option value="">{selectedRegion ? "Select town or locality" : "Select town or locality from country"}</option>
+              {towns.map((locality) => (
                 <option key={locality} value={locality}>
                   {locality}
                 </option>

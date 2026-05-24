@@ -12,8 +12,8 @@ New patient enrollment now records non-clinical intake details separately from t
   - searchable country dialing extension
   - local phone number
 - The submitted phone value is stored as one international string, for example `+26876000000`.
-- For Eswatini primary phone codes (`+268`), registration and edit forms show controlled `Region` and `Town or locality` dropdowns.
-- For other country codes, region/province and town/locality remain typed fields until those country datasets are added.
+- Registration and edit forms use `country-state-city` so the primary phone country code loads matching region/state and town/locality options.
+- Eswatini (`+268`) now loads Eswatini regions and towns from the shared country dataset; changing the primary phone code immediately refreshes the location dropdowns for the selected country where data exists.
 - Next of kin details are part of non-confidential intake:
   - full name(s)
   - phone number with country dialing extension
