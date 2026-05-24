@@ -157,10 +157,16 @@ export type ClinicianProfile = {
   user: number;
   user_name?: string;
   username?: string;
+  full_names: string;
   professional_title: string;
   display_name: string;
   professional_email: string;
   professional_phone: string;
+  whatsapp_number: string;
+  telegram_number: string;
+  linkedin_url: string;
+  facebook_url: string;
+  portfolio_url: string;
   bio: string;
   clinical_interests: string;
   education: ClinicianProfileEntry[];

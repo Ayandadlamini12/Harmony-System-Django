@@ -26,10 +26,16 @@ class ClinicianProfile(models.Model):
     SECTION_KEYS = ("personal_details", "education", "career_details", "awards_certifications", "affiliations")
 
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name="clinician_profile")
+    full_names = models.CharField(max_length=220, blank=True)
     professional_title = models.CharField(max_length=120, blank=True)
     display_name = models.CharField(max_length=180, blank=True)
     professional_email = models.EmailField(blank=True)
     professional_phone = models.CharField(max_length=50, blank=True)
+    whatsapp_number = models.CharField(max_length=50, blank=True)
+    telegram_number = models.CharField(max_length=50, blank=True)
+    linkedin_url = models.URLField(blank=True)
+    facebook_url = models.URLField(blank=True)
+    portfolio_url = models.URLField(blank=True)
     bio = models.TextField(blank=True)
     clinical_interests = models.TextField(blank=True)
     education = models.JSONField(default=list, blank=True)
@@ -50,7 +56,7 @@ class ClinicianProfile(models.Model):
 
     def calculate_completed_sections(self) -> list[str]:
         completed = []
-        if self.professional_title and self.display_name and self.bio:
+        if self.full_names and self.professional_title and self.display_name and self.bio:
             completed.append("personal_details")
         if self._has_any_entry(self.education, ("institution", "qualification")):
             completed.append("education")

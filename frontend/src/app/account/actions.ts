@@ -33,10 +33,16 @@ async function authHeaders() {
 
 export async function updateClinicianProfile(formData: FormData) {
   const body = {
+    full_names: String(formData.get("full_names") || ""),
     professional_title: String(formData.get("professional_title") || ""),
     display_name: String(formData.get("display_name") || ""),
     professional_email: String(formData.get("professional_email") || ""),
     professional_phone: String(formData.get("professional_phone") || ""),
+    whatsapp_number: String(formData.get("whatsapp_number") || ""),
+    telegram_number: String(formData.get("telegram_number") || ""),
+    linkedin_url: String(formData.get("linkedin_url") || ""),
+    facebook_url: String(formData.get("facebook_url") || ""),
+    portfolio_url: String(formData.get("portfolio_url") || ""),
     bio: String(formData.get("bio") || ""),
     clinical_interests: String(formData.get("clinical_interests") || ""),
     education: rowsFromForm(formData, "education", ["qualification", "institution", "start_year", "end_year", "notes"]),

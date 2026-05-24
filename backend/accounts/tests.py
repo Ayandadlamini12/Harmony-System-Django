@@ -14,10 +14,16 @@ class ClinicianProfileApiTests(APITestCase):
         response = self.client.patch(
             "/api/users/me/clinician-profile/",
             {
+                "full_names": "Dr Profile Test",
                 "professional_title": "Doctor of Homeopathy",
                 "display_name": "Dr Profile Test",
                 "professional_email": "profile@harmony.test",
                 "professional_phone": "+268 7600 0000",
+                "whatsapp_number": "+268 7600 0000",
+                "telegram_number": "+268 7600 0000",
+                "linkedin_url": "https://linkedin.com/in/profile-test",
+                "facebook_url": "https://facebook.com/profile.test",
+                "portfolio_url": "https://profile-test.example.com",
                 "bio": "Clinician focused on whole-person homeopathic care.",
                 "clinical_interests": "Chronic care, family wellness",
                 "education": [{"qualification": "DHom", "institution": "Homeopathy College", "year": "2019"}],

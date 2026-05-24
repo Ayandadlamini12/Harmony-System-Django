@@ -50,6 +50,7 @@ class UserViewSet(viewsets.ModelViewSet):
         profile, _ = ClinicianProfile.objects.get_or_create(
             user=request.user,
             defaults={
+                "full_names": request.user.get_full_name() or request.user.username,
                 "display_name": request.user.get_full_name() or request.user.username,
                 "professional_email": request.user.email,
             },
