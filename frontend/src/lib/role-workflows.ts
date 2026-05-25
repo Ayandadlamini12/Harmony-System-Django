@@ -2,6 +2,7 @@ import {
   Archive,
   CalendarCheck,
   ClipboardCheck,
+  ListChecks,
   Inbox,
   LayoutDashboard,
   LockKeyhole,
@@ -50,6 +51,7 @@ export const navItems: NavItem[] = [
       { href: "/patients", label: "Patient List", icon: Users, roles: ["admin", "clinician", "receptionist"] },
       { href: "/visits/new", label: "Add Visit", icon: Stethoscope, roles: ["admin", "clinician"] },
       { href: "/check-ins", label: "Check-In", icon: ClipboardCheck, roles: ["admin", "receptionist"] },
+      { href: "/patient-flow", label: "Track Patient Flow", icon: ListChecks, roles: ["admin", "clinician", "receptionist"] },
       { href: "/vitals/new", label: "Add Vitals", icon: HeartPulse, roles: ["admin", "clinician"] },
       { href: "/messages", label: "Send Message", icon: MessageSquare, roles: ["admin", "clinician", "receptionist"], status: "planned" }
     ]
@@ -144,6 +146,13 @@ export const workflowCards: WorkflowCard[] = [
     icon: Archive,
     roles: ["admin", "clinician"],
     status: "planned"
+  },
+  {
+    title: "Patient flow tracking",
+    description: "Search by phone, patient ID, or identity number to see where a patient is in today's establishment flow.",
+    href: "/patient-flow",
+    icon: ListChecks,
+    roles: ["admin", "clinician", "receptionist"]
   },
   {
     title: "Check-in desk",

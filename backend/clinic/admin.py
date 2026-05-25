@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit, Vital
+from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 
 
 class PatientProfileInline(admin.StackedInline):
@@ -36,6 +36,20 @@ class PatientCheckInAdmin(admin.ModelAdmin):
     list_display = ("patient", "visit_type", "status", "method", "checked_in_by", "created_at")
     search_fields = ("patient__full_name_display", "patient__patient_code", "patient__national_id", "patient__primary_phone")
     list_filter = ("status", "method", "visit_type", "created_at")
+
+
+@admin.register(PatientJourney)
+class PatientJourneyAdmin(admin.ModelAdmin):
+    list_display = ("patient", "service_date", "current_stage", "flow_type", "queue_number", "is_active")
+    search_fields = ("patient__full_name_display", "patient__patient_code", "patient__national_id", "patient__primary_phone")
+    list_filter = ("current_stage", "flow_type", "service_date", "is_active")
+
+
+@admin.register(PatientJourneyEvent)
+class PatientJourneyEventAdmin(admin.ModelAdmin):
+    list_display = ("journey", "stage", "recorded_by", "created_at")
+    search_fields = ("journey__patient__full_name_display", "journey__patient__patient_code", "note")
+    list_filter = ("stage", "created_at")
 
 
 @admin.register(FormDraft)

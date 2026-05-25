@@ -33,6 +33,7 @@ export type Patient = {
   conditions?: PatientCondition[];
   visits?: Visit[];
   clinical_access?: "active" | "approval_required";
+  current_journey?: PatientJourneySummary | null;
 };
 
 export type PatientProfile = {
@@ -109,6 +110,41 @@ export type PatientCheckIn = {
   note?: string;
   created_at: string;
   updated_at?: string;
+};
+
+export type PatientJourneySummary = {
+  id: number;
+  service_date: string;
+  current_stage: string;
+  current_stage_label: string;
+  flow_type: string;
+  flow_type_label: string;
+  queue_number?: number | null;
+  appointment_matched: boolean;
+};
+
+export type PatientJourneyEvent = {
+  id: number;
+  stage: string;
+  stage_label: string;
+  note?: string;
+  recorded_by?: number | null;
+  recorded_by_name?: string | null;
+  created_at: string;
+};
+
+export type PatientJourney = PatientJourneySummary & {
+  patient: number;
+  patient_name?: string;
+  patient_code?: string;
+  patient_phone?: string;
+  check_in?: number | null;
+  visit?: number | null;
+  is_active: boolean;
+  notes?: string;
+  events: PatientJourneyEvent[];
+  created_at: string;
+  updated_at: string;
 };
 
 export type FormDraft = {

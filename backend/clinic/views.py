@@ -3,19 +3,20 @@ from django.db import transaction
 from django.utils import timezone
 import re
 
-from django.db.models import Q
+from django.db.models import Max, Q
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
-from .models import AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientProfile, Visit, Vital
+from .models import AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 from .serializers import (
     AuditLogSerializer,
     ElevatedAccessRequestSerializer,
     FormDraftSerializer,
     PatientCheckInSerializer,
+    PatientJourneySerializer,
     PatientDetailSerializer,
     PatientListSerializer,
     VisitSerializer,
@@ -50,6 +51,108 @@ def find_patient_by_identifier(identifier, identifier_type=""):
     return Patient.objects.filter(query).order_by("-created_at").first()
 
 
+def next_queue_number(service_date):
+    current = (
+        PatientJourney.objects.filter(
+            service_date=service_date,
+            flow_type=PatientJourney.FlowType.WALK_IN_QUEUE,
+        )
+        .aggregate(max_queue=Max("queue_number"))
+        .get("max_queue")
+    )
+    return (current or 0) + 1
+
+
+def create_journey_event(journey, stage, request=None, note=""):
+    user = request.user if request and request.user.is_authenticated else None
+    return PatientJourneyEvent.objects.create(journey=journey, stage=stage, note=note, recorded_by=user)
+
+
+def start_journey_for_registration(patient, request=None):
+    service_date = timezone.localdate()
+    user = request.user if request and request.user.is_authenticated else None
+    journey, created = PatientJourney.objects.get_or_create(
+        patient=patient,
+        service_date=service_date,
+        is_active=True,
+        defaults={
+            "current_stage": PatientJourney.Stage.REGISTERED,
+            "flow_type": PatientJourney.FlowType.MANUAL,
+            "created_by": user,
+            "updated_by": user,
+            "notes": "Created from patient registration.",
+        },
+    )
+    if created:
+        create_journey_event(journey, PatientJourney.Stage.REGISTERED, request, "Patient registration started today's establishment flow.")
+    return journey
+
+
+def start_journey_for_check_in(check_in, request=None):
+    service_date = timezone.localdate()
+    # Appointment matching will use the appointments table once that module exists.
+    appointment_matched = False
+    flow_type = PatientJourney.FlowType.APPOINTMENT_CHECKIN if appointment_matched else PatientJourney.FlowType.WALK_IN_QUEUE
+    current_stage = PatientJourney.Stage.CHECKED_IN if appointment_matched else PatientJourney.Stage.QUEUED
+    queue_number = None if appointment_matched else next_queue_number(service_date)
+    user = request.user if request and request.user.is_authenticated else None
+
+    journey = (
+        PatientJourney.objects.filter(patient=check_in.patient, service_date=service_date, is_active=True)
+        .order_by("-created_at")
+        .first()
+    )
+    created = False
+    if not journey:
+        journey = PatientJourney.objects.create(
+            check_in=check_in,
+            patient=check_in.patient,
+            service_date=service_date,
+            current_stage=current_stage,
+            flow_type=flow_type,
+            queue_number=queue_number,
+            appointment_matched=appointment_matched,
+            created_by=user,
+            updated_by=user,
+            notes="Created from patient check-in.",
+        )
+        created = True
+    else:
+        journey.check_in = check_in
+        journey.current_stage = current_stage
+        journey.flow_type = flow_type
+        journey.appointment_matched = appointment_matched
+        if not journey.queue_number and queue_number:
+            journey.queue_number = queue_number
+        journey.updated_by = user
+        journey.notes = "Updated from patient check-in."
+        journey.save()
+    if created or journey.events.filter(stage=current_stage).count() == 0:
+        create_journey_event(journey, current_stage, request, "Patient added to establishment flow from check-in.")
+    return journey
+
+
+def transition_active_patient_journey(patient, stage, request=None, note="", visit=None):
+    journey = (
+        PatientJourney.objects.filter(patient=patient, is_active=True)
+        .order_by("-service_date", "-created_at")
+        .first()
+    )
+    if not journey:
+        return None
+    journey.current_stage = stage
+    if visit:
+        journey.visit = visit
+    journey.updated_by = request.user if request and request.user.is_authenticated else None
+    if note:
+        journey.notes = note
+    if stage in {PatientJourney.Stage.COMPLETED, PatientJourney.Stage.CANCELLED}:
+        journey.is_active = False
+    journey.save()
+    create_journey_event(journey, stage, request, note)
+    return journey
+
+
 class PatientViewSet(viewsets.ModelViewSet):
     queryset = Patient.objects.select_related("profile").prefetch_related("conditions", "visits__vitals")
     search_fields = (
@@ -70,12 +173,21 @@ class PatientViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         patient = serializer.save()
+        journey = start_journey_for_registration(patient, self.request)
         write_audit_log(
             request=self.request,
             action="create",
             instance=patient,
             after_data=snapshot_instance(patient),
             details="Patient record created.",
+        )
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=journey,
+            entity_type="patient_journey",
+            after_data=snapshot_instance(journey),
+            details="Patient journey tracking started from registration.",
         )
 
     def perform_update(self, serializer):
@@ -148,6 +260,13 @@ class VisitViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         visit = serializer.save()
+        journey = transition_active_patient_journey(
+            visit.patient,
+            PatientJourney.Stage.VISIT_RECORDED,
+            self.request,
+            "Visit record created and linked to patient flow.",
+            visit=visit,
+        )
         write_audit_log(
             request=self.request,
             action="create",
@@ -155,6 +274,15 @@ class VisitViewSet(viewsets.ModelViewSet):
             after_data=snapshot_instance(visit),
             details="Visit record created.",
         )
+        if journey:
+            write_audit_log(
+                request=self.request,
+                action="transition",
+                instance=journey,
+                entity_type="patient_journey",
+                after_data=snapshot_instance(journey),
+                details="Patient journey transitioned after visit creation.",
+            )
 
     def perform_update(self, serializer):
         before_data = snapshot_instance(self.get_object())
@@ -207,6 +335,12 @@ class VitalViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         vital = serializer.save()
+        journey = transition_active_patient_journey(
+            vital.visit.patient,
+            PatientJourney.Stage.VITALS_RECORDED,
+            self.request,
+            "Vitals recorded for active patient flow.",
+        )
         write_audit_log(
             request=self.request,
             action="create",
@@ -215,6 +349,15 @@ class VitalViewSet(viewsets.ModelViewSet):
             after_data=snapshot_instance(vital),
             details="Vitals record created.",
         )
+        if journey:
+            write_audit_log(
+                request=self.request,
+                action="transition",
+                instance=journey,
+                entity_type="patient_journey",
+                after_data=snapshot_instance(journey),
+                details="Patient journey transitioned after vitals creation.",
+            )
 
     def perform_update(self, serializer):
         before_data = snapshot_instance(self.get_object())
@@ -287,12 +430,21 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         check_in = serializer.save()
+        journey = start_journey_for_check_in(check_in, self.request)
         write_audit_log(
             request=self.request,
             action="create",
             instance=check_in,
             after_data=snapshot_instance(check_in),
             details="Patient check-in created.",
+        )
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=journey,
+            entity_type="patient_journey",
+            after_data=snapshot_instance(journey),
+            details="Patient journey tracking started.",
         )
 
     def perform_update(self, serializer):
@@ -306,6 +458,77 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
             after_data=snapshot_instance(check_in),
             details="Patient check-in updated.",
         )
+
+
+class PatientJourneyViewSet(viewsets.ModelViewSet):
+    queryset = PatientJourney.objects.select_related("patient", "check_in", "visit").prefetch_related("events").order_by("-service_date", "queue_number", "created_at")
+    serializer_class = PatientJourneySerializer
+    search_fields = ("patient__full_name_display", "patient__patient_code", "patient__national_id", "patient__primary_phone")
+    filterset_fields = ("current_stage", "flow_type", "service_date", "is_active")
+    ordering_fields = ("service_date", "queue_number", "created_at", "updated_at")
+
+    @action(detail=False, methods=["post"])
+    def lookup(self, request):
+        patient = find_patient_by_identifier(
+            request.data.get("identifier", ""),
+            request.data.get("identifier_type", ""),
+        )
+        if not patient:
+            return Response({"detail": "No matching registered patient found."}, status=status.HTTP_404_NOT_FOUND)
+        journey = (
+            PatientJourney.objects.select_related("patient", "check_in", "visit")
+            .prefetch_related("events")
+            .filter(patient=patient, is_active=True)
+            .order_by("-service_date", "-created_at")
+            .first()
+        )
+        history = (
+            PatientJourney.objects.select_related("patient", "check_in", "visit")
+            .prefetch_related("events")
+            .filter(patient=patient)
+            .order_by("-service_date", "-created_at")[:5]
+        )
+        return Response(
+            {
+                "patient": {
+                    "id": patient.id,
+                    "patient_code": patient.patient_code,
+                    "full_name_display": patient.full_name_display,
+                    "primary_phone": patient.primary_phone,
+                    "national_id": patient.national_id,
+                },
+                "current_journey": self.get_serializer(journey).data if journey else None,
+                "recent_journeys": self.get_serializer(history, many=True).data,
+            }
+        )
+
+    @action(detail=True, methods=["post"])
+    def transition(self, request, pk=None):
+        journey = self.get_object()
+        next_stage = request.data.get("stage")
+        valid_stages = {choice[0] for choice in PatientJourney.Stage.choices}
+        if next_stage not in valid_stages:
+            return Response({"stage": "Invalid patient journey stage."}, status=status.HTTP_400_BAD_REQUEST)
+        before_data = snapshot_instance(journey)
+        journey.current_stage = next_stage
+        journey.updated_by = request.user
+        note = request.data.get("note", "")
+        if note:
+            journey.notes = note
+        if next_stage in {PatientJourney.Stage.COMPLETED, PatientJourney.Stage.CANCELLED}:
+            journey.is_active = False
+        journey.save()
+        create_journey_event(journey, next_stage, request, note)
+        write_audit_log(
+            request=request,
+            action="transition",
+            instance=journey,
+            entity_type="patient_journey",
+            before_data=before_data,
+            after_data=snapshot_instance(journey),
+            details=f"Patient journey transitioned to {journey.get_current_stage_display()}.",
+        )
+        return Response(self.get_serializer(journey).data)
 
 
 class FormDraftViewSet(viewsets.ModelViewSet):

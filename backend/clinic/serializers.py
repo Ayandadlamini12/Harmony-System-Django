@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit, Vital
+from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -164,6 +164,62 @@ class PatientCheckInSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class PatientJourneyEventSerializer(serializers.ModelSerializer):
+    recorded_by_name = serializers.CharField(source="recorded_by.get_full_name", read_only=True)
+    stage_label = serializers.CharField(source="get_stage_display", read_only=True)
+
+    class Meta:
+        model = PatientJourneyEvent
+        fields = ("id", "stage", "stage_label", "note", "recorded_by", "recorded_by_name", "created_at")
+        read_only_fields = ("id", "stage_label", "recorded_by", "recorded_by_name", "created_at")
+
+
+class PatientJourneySerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
+    patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
+    patient_phone = serializers.CharField(source="patient.primary_phone", read_only=True)
+    current_stage_label = serializers.CharField(source="get_current_stage_display", read_only=True)
+    flow_type_label = serializers.CharField(source="get_flow_type_display", read_only=True)
+    events = PatientJourneyEventSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = PatientJourney
+        fields = (
+            "id",
+            "patient",
+            "patient_name",
+            "patient_code",
+            "patient_phone",
+            "check_in",
+            "visit",
+            "service_date",
+            "current_stage",
+            "current_stage_label",
+            "flow_type",
+            "flow_type_label",
+            "queue_number",
+            "appointment_matched",
+            "is_active",
+            "notes",
+            "events",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "patient_name",
+            "patient_code",
+            "patient_phone",
+            "current_stage_label",
+            "flow_type_label",
+            "queue_number",
+            "appointment_matched",
+            "events",
+            "created_at",
+            "updated_at",
+        )
+
+
 class FormDraftSerializer(serializers.ModelSerializer):
     owner_name = serializers.CharField(source="owner_user.get_full_name", read_only=True)
     form_type_label = serializers.CharField(source="get_form_type_display", read_only=True)
@@ -213,6 +269,7 @@ class FormDraftSerializer(serializers.ModelSerializer):
 
 class PatientListSerializer(serializers.ModelSerializer):
     last_visit_date = serializers.SerializerMethodField()
+    current_journey = serializers.SerializerMethodField()
 
     class Meta:
         model = Patient
@@ -238,12 +295,28 @@ class PatientListSerializer(serializers.ModelSerializer):
             "next_of_kin_relationship_other",
             "status",
             "last_visit_date",
+            "current_journey",
             "created_at",
         )
 
     def get_last_visit_date(self, obj):
         visit = obj.visits.order_by("-visit_date", "-created_at").first()
         return visit.visit_date if visit else None
+
+    def get_current_journey(self, obj):
+        journey = obj.journeys.filter(is_active=True).order_by("-service_date", "-created_at").first()
+        if not journey:
+            return None
+        return {
+            "id": journey.id,
+            "service_date": journey.service_date,
+            "current_stage": journey.current_stage,
+            "current_stage_label": journey.get_current_stage_display(),
+            "flow_type": journey.flow_type,
+            "flow_type_label": journey.get_flow_type_display(),
+            "queue_number": journey.queue_number,
+            "appointment_matched": journey.appointment_matched,
+        }
 
 
 class PatientDetailSerializer(PatientListSerializer):

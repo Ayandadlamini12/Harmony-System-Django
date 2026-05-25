@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientProfile, Visit, Vital
+from .models import AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientJourney, PatientProfile, Visit, Vital
 
 User = get_user_model()
 
@@ -250,6 +250,51 @@ class PatientCheckInApiTests(APITestCase):
         self.assertEqual(check_in.visit_type, "follow_up")
         self.assertEqual(check_in.method, "tablet")
         self.assertEqual(check_in.status, PatientCheckIn.Status.WAITING)
+        journey = PatientJourney.objects.get(check_in=check_in)
+        self.assertEqual(journey.patient, self.patient)
+        self.assertEqual(journey.current_stage, PatientJourney.Stage.QUEUED)
+        self.assertEqual(journey.flow_type, PatientJourney.FlowType.WALK_IN_QUEUE)
+        self.assertEqual(journey.queue_number, 1)
+        self.assertEqual(journey.events.count(), 1)
+
+    def test_authenticated_user_can_lookup_patient_current_journey(self):
+        user = User.objects.create_user(username="flow_user", password="password123", role="receptionist")
+        self.client.force_authenticate(user)
+        check_in = PatientCheckIn.objects.create(patient=self.patient, visit_type="follow_up")
+        journey = PatientJourney.objects.create(
+            patient=self.patient,
+            check_in=check_in,
+            current_stage=PatientJourney.Stage.QUEUED,
+            flow_type=PatientJourney.FlowType.WALK_IN_QUEUE,
+            queue_number=4,
+        )
+
+        response = self.client.post(
+            "/api/patient-journeys/lookup/",
+            {"identifier": self.patient.patient_code, "identifier_type": "patient_code"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["patient"]["id"], self.patient.id)
+        self.assertEqual(response.data["current_journey"]["id"], journey.id)
+        self.assertEqual(response.data["current_journey"]["queue_number"], 4)
+
+    def test_check_in_queue_number_increments_for_same_service_day(self):
+        second_patient = Patient.objects.create(first_name="Second", last_name="Patient", gender="male", primary_phone="+26876009999")
+        self.client.post(
+            "/api/check-ins/",
+            {"identifier": self.patient.patient_code, "visit_type": "follow_up", "method": "tablet", "identifier_type": "patient_code"},
+            format="json",
+        )
+        self.client.post(
+            "/api/check-ins/",
+            {"identifier": second_patient.patient_code, "visit_type": "follow_up", "method": "tablet", "identifier_type": "patient_code"},
+            format="json",
+        )
+
+        self.assertEqual(PatientJourney.objects.get(patient=self.patient).queue_number, 1)
+        self.assertEqual(PatientJourney.objects.get(patient=second_patient).queue_number, 2)
 
 
 class ClinicalAccessTests(APITestCase):

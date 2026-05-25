@@ -31,6 +31,7 @@ export default async function PatientListPage({ searchParams }: { searchParams: 
                 <th className="px-5 py-3">Gender</th>
                 <th className="px-5 py-3">Contact</th>
                 <th className="px-5 py-3">Last visit</th>
+                <th className="px-5 py-3">Today&apos;s flow</th>
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3 text-right">Manage</th>
               </tr>
@@ -48,6 +49,18 @@ export default async function PatientListPage({ searchParams }: { searchParams: 
                   <td className="px-5 py-4 text-[#66736d]">{patient.primary_phone || "No phone"}</td>
                   <td className="px-5 py-4 text-[#66736d]">{patient.last_visit_date || "--"}</td>
                   <td className="px-5 py-4">
+                    {patient.current_journey ? (
+                      <div className="grid gap-1">
+                        <span className="font-bold text-[var(--hh-purple)]">{patient.current_journey.current_stage_label}</span>
+                        <span className="text-xs text-[#66736d]">
+                          {patient.current_journey.queue_number ? `Queue #${patient.current_journey.queue_number}` : patient.current_journey.flow_type_label}
+                        </span>
+                      </div>
+                    ) : (
+                      <span className="text-[#66736d]">--</span>
+                    )}
+                  </td>
+                  <td className="px-5 py-4">
                     <span className="rounded-full bg-[var(--hh-green-light)] px-2 py-1 text-xs font-bold text-[var(--hh-green-dark)]">{patient.status}</span>
                   </td>
                   <td className="px-5 py-4">
@@ -61,7 +74,7 @@ export default async function PatientListPage({ searchParams }: { searchParams: 
               ))}
               {patients.results.length === 0 && (
                 <tr>
-                  <td className="px-5 py-10 text-center text-[#66736d]" colSpan={7}>No patients found.</td>
+                  <td className="px-5 py-10 text-center text-[#66736d]" colSpan={8}>No patients found.</td>
                 </tr>
               )}
             </tbody>

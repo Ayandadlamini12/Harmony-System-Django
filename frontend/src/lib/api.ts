@@ -1,4 +1,4 @@
-import type { ClinicianProfile, DashboardStats, ElevatedAccessRequest, FormDraft, Paginated, Patient, PatientCheckIn, User, Visit, Vital } from "@/types/clinic";
+import type { ClinicianProfile, DashboardStats, ElevatedAccessRequest, FormDraft, Paginated, Patient, PatientCheckIn, PatientJourney, User, Visit, Vital } from "@/types/clinic";
 import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -63,6 +63,16 @@ export function getVitals() {
 export function getCheckIns(status = "") {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
   return apiGet<Paginated<PatientCheckIn>>(`/check-ins/${query}`, {
+    count: 0,
+    next: null,
+    previous: null,
+    results: []
+  });
+}
+
+export function getPatientJourneys(filter = "") {
+  const query = filter ? `?${filter}` : "";
+  return apiGet<Paginated<PatientJourney>>(`/patient-journeys/${query}`, {
     count: 0,
     next: null,
     previous: null,

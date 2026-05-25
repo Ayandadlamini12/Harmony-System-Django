@@ -11,7 +11,7 @@ import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
 import { getPatient } from "@/lib/api";
 import { relationshipLabel } from "@/lib/relationships";
 import { getSessionUser } from "@/lib/session";
-import { CalendarCheck, Check, ClipboardList, Eye, HeartPulse, LockKeyhole, Pencil, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
+import { CalendarCheck, Check, ClipboardList, Eye, HeartPulse, ListChecks, LockKeyhole, Pencil, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
 
 const tabs = ["Overview", "Complaints", "Assessments", "Diagnosis", "Remedies", "Vitals", "Follow-ups", "Documents", "Notes"];
 
@@ -141,6 +141,8 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
       </section>
 
       <section className="grid gap-5 py-5">
+        <PatientJourneyPanel patient={patient} />
+
         <ClinicalPanel title="Patient details" icon={<UserRound size={17} />}>
           <InfoGrid
             rows={[
@@ -242,6 +244,42 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         </ClinicalPanel>
       </section>
     </AppShell>
+  );
+}
+
+function PatientJourneyPanel({ patient }: { patient: NonNullable<Awaited<ReturnType<typeof getPatient>>> }) {
+  const journey = patient.current_journey;
+  return (
+    <ClinicalPanel title="Patient process today" icon={<ListChecks size={17} />}>
+      {journey ? (
+        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
+          <div className="grid gap-3 sm:grid-cols-3">
+            <ProcessMetric label="Stage" value={journey.current_stage_label} />
+            <ProcessMetric label="Flow" value={journey.flow_type_label} />
+            <ProcessMetric label="Queue" value={journey.queue_number ? `#${journey.queue_number}` : journey.appointment_matched ? "Appointment" : "--"} />
+          </div>
+          <Button asChild variant="secondary">
+            <Link href={`/patient-flow?identifier=${encodeURIComponent(patient.patient_code)}`}>Track full flow</Link>
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
+          <p className="text-sm leading-6 text-[#66736d]">No active establishment process has been started for this patient today.</p>
+          <Button asChild variant="secondary">
+            <Link href="/check-ins">Check in patient</Link>
+          </Button>
+        </div>
+      )}
+    </ClinicalPanel>
+  );
+}
+
+function ProcessMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-3">
+      <div className="text-xs font-bold uppercase text-[#66736d]">{label}</div>
+      <div className="mt-1 font-bold text-[#1f2933]">{value}</div>
+    </div>
   );
 }
 

@@ -250,6 +250,83 @@ class PatientCheckIn(TimeStampedModel):
         return f"{self.patient.full_name_display} - {self.get_status_display()}"
 
 
+class PatientJourney(TimeStampedModel):
+    class Stage(models.TextChoices):
+        REGISTERED = "registered", "Registered"
+        QUEUED = "queued", "Queued"
+        CHECKED_IN = "checked_in", "Checked in"
+        VITALS_RECORDED = "vitals_recorded", "Vitals recorded"
+        WAITING_CLINICIAN = "waiting_clinician", "Waiting clinician"
+        IN_CONSULTATION = "in_consultation", "In consultation"
+        VISIT_RECORDED = "visit_recorded", "Visit recorded"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+
+    class FlowType(models.TextChoices):
+        WALK_IN_QUEUE = "walk_in_queue", "Walk-in queue"
+        APPOINTMENT_CHECKIN = "appointment_checkin", "Appointment check-in"
+        MANUAL = "manual", "Manual"
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="journeys")
+    check_in = models.OneToOneField(PatientCheckIn, null=True, blank=True, on_delete=models.SET_NULL, related_name="journey")
+    visit = models.ForeignKey(Visit, null=True, blank=True, on_delete=models.SET_NULL, related_name="journeys")
+    service_date = models.DateField(default=timezone.localdate)
+    current_stage = models.CharField(max_length=40, choices=Stage.choices, default=Stage.REGISTERED)
+    flow_type = models.CharField(max_length=40, choices=FlowType.choices, default=FlowType.MANUAL)
+    queue_number = models.PositiveIntegerField(null=True, blank=True)
+    appointment_matched = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_patient_journeys",
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="updated_patient_journeys",
+    )
+
+    class Meta:
+        ordering = ("service_date", "queue_number", "created_at")
+        indexes = [
+            models.Index(fields=["patient", "service_date", "is_active"]),
+            models.Index(fields=["current_stage", "service_date"]),
+            models.Index(fields=["flow_type", "service_date", "queue_number"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.patient.full_name_display} - {self.get_current_stage_display()}"
+
+
+class PatientJourneyEvent(models.Model):
+    journey = models.ForeignKey(PatientJourney, on_delete=models.CASCADE, related_name="events")
+    stage = models.CharField(max_length=40, choices=PatientJourney.Stage.choices)
+    note = models.TextField(blank=True)
+    recorded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="patient_journey_events",
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ("created_at",)
+        indexes = [
+            models.Index(fields=["journey", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.journey_id} - {self.stage}"
+
+
 class FormDraft(TimeStampedModel):
     class FormType(models.TextChoices):
         PATIENT_REGISTRATION = "patient_registration", "Patient registration"
