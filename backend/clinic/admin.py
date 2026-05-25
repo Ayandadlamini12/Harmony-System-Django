@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 
 
 class PatientProfileInline(admin.StackedInline):
@@ -38,9 +38,16 @@ class PatientCheckInAdmin(admin.ModelAdmin):
     list_filter = ("status", "method", "visit_type", "created_at")
 
 
+@admin.register(Appointment)
+class AppointmentAdmin(admin.ModelAdmin):
+    list_display = ("patient", "appointment_type", "appointment_date", "appointment_time", "source", "assigned_clinician", "status")
+    search_fields = ("patient__full_name_display", "patient__patient_code", "patient__national_id", "patient__primary_phone", "notes")
+    list_filter = ("appointment_type", "appointment_date", "source", "status", "assigned_clinician")
+
+
 @admin.register(PatientJourney)
 class PatientJourneyAdmin(admin.ModelAdmin):
-    list_display = ("patient", "service_date", "current_stage", "flow_type", "queue_number", "is_active")
+    list_display = ("patient", "service_date", "current_stage", "flow_type", "queue_number", "appointment", "is_active")
     search_fields = ("patient__full_name_display", "patient__patient_code", "patient__national_id", "patient__primary_phone")
     list_filter = ("current_stage", "flow_type", "service_date", "is_active")
 

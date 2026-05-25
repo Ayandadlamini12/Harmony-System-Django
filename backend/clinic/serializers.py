@@ -2,7 +2,7 @@ from django.db import transaction
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -164,6 +164,54 @@ class PatientCheckInSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class AppointmentSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
+    patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
+    patient_phone = serializers.CharField(source="patient.primary_phone", read_only=True)
+    appointment_type_label = serializers.CharField(source="get_appointment_type_display", read_only=True)
+    source_label = serializers.CharField(source="get_source_display", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    assigned_clinician_name = serializers.CharField(source="assigned_clinician.get_full_name", read_only=True)
+
+    class Meta:
+        model = Appointment
+        fields = (
+            "id",
+            "patient",
+            "patient_name",
+            "patient_code",
+            "patient_phone",
+            "appointment_type",
+            "appointment_type_label",
+            "appointment_date",
+            "appointment_time",
+            "source",
+            "source_label",
+            "assigned_clinician",
+            "assigned_clinician_name",
+            "notes",
+            "status",
+            "status_label",
+            "checked_in_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "patient_name",
+            "patient_code",
+            "patient_phone",
+            "appointment_type_label",
+            "source_label",
+            "assigned_clinician_name",
+            "status",
+            "status_label",
+            "checked_in_at",
+            "created_at",
+            "updated_at",
+        )
+
+
 class PatientJourneyEventSerializer(serializers.ModelSerializer):
     recorded_by_name = serializers.CharField(source="recorded_by.get_full_name", read_only=True)
     stage_label = serializers.CharField(source="get_stage_display", read_only=True)
@@ -191,6 +239,7 @@ class PatientJourneySerializer(serializers.ModelSerializer):
             "patient_code",
             "patient_phone",
             "check_in",
+            "appointment",
             "visit",
             "service_date",
             "current_stage",

@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientJourney, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientJourney, PatientProfile, Visit, Vital
 
 User = get_user_model()
 
@@ -295,6 +295,61 @@ class PatientCheckInApiTests(APITestCase):
 
         self.assertEqual(PatientJourney.objects.get(patient=self.patient).queue_number, 1)
         self.assertEqual(PatientJourney.objects.get(patient=second_patient).queue_number, 2)
+
+    def test_check_in_matches_same_day_appointment(self):
+        clinician = User.objects.create_user(username="doctor_appt", password="password123", role="clinician")
+        appointment = Appointment.objects.create(
+            patient=self.patient,
+            appointment_type="follow_up",
+            appointment_date=timezone.localdate(),
+            assigned_clinician=clinician,
+            notes="Review remedy response",
+        )
+
+        response = self.client.post(
+            "/api/check-ins/",
+            {"identifier": self.patient.patient_code, "visit_type": "follow_up", "method": "tablet", "identifier_type": "patient_code"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        appointment.refresh_from_db()
+        self.assertEqual(appointment.status, Appointment.Status.CHECKED_IN)
+        self.assertIsNotNone(appointment.checked_in_at)
+        journey = PatientJourney.objects.get(patient=self.patient)
+        self.assertEqual(journey.flow_type, PatientJourney.FlowType.APPOINTMENT_CHECKIN)
+        self.assertEqual(journey.current_stage, PatientJourney.Stage.CHECKED_IN)
+        self.assertEqual(journey.appointment, appointment)
+        self.assertIsNone(journey.queue_number)
+
+
+class AppointmentApiTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="admin_appt", password="password123", role="admin")
+        self.clinician = User.objects.create_user(username="doctor_default", password="password123", role="clinician")
+        self.patient = Patient.objects.create(first_name="Appointment", last_name="Patient", gender="female", primary_phone="+26876001234")
+        self.client.force_authenticate(self.admin)
+
+    def test_employee_can_book_appointment_with_default_clinician(self):
+        response = self.client.post(
+            "/api/appointments/",
+            {
+                "patient": self.patient.id,
+                "appointment_type": "follow_up",
+                "appointment_date": "2026-05-28",
+                "appointment_time": "10:30",
+                "source": "internal",
+                "notes": "Booked from reception.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        appointment = Appointment.objects.get()
+        self.assertEqual(appointment.assigned_clinician, self.clinician)
+        self.assertEqual(appointment.created_by, self.admin)
+        self.assertEqual(appointment.status, Appointment.Status.SCHEDULED)
+        self.assertTrue(AuditLog.objects.filter(entity_type="appointment", action="create").exists())
 
 
 class ClinicalAccessTests(APITestCase):

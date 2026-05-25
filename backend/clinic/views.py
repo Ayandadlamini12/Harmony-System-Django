@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.contrib.auth import get_user_model
 from django.db import transaction
 from django.utils import timezone
 import re
@@ -10,9 +11,10 @@ from rest_framework.response import Response
 
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
-from .models import AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 from .serializers import (
     AuditLogSerializer,
+    AppointmentSerializer,
     ElevatedAccessRequestSerializer,
     FormDraftSerializer,
     PatientCheckInSerializer,
@@ -22,6 +24,8 @@ from .serializers import (
     VisitSerializer,
     VitalSerializer,
 )
+
+User = get_user_model()
 
 
 def normalize_digits(value):
@@ -90,12 +94,24 @@ def start_journey_for_registration(patient, request=None):
 
 def start_journey_for_check_in(check_in, request=None):
     service_date = timezone.localdate()
-    # Appointment matching will use the appointments table once that module exists.
-    appointment_matched = False
+    appointment = (
+        Appointment.objects.filter(
+            patient=check_in.patient,
+            appointment_date=service_date,
+            status=Appointment.Status.SCHEDULED,
+        )
+        .order_by("appointment_time", "created_at")
+        .first()
+    )
+    appointment_matched = appointment is not None
     flow_type = PatientJourney.FlowType.APPOINTMENT_CHECKIN if appointment_matched else PatientJourney.FlowType.WALK_IN_QUEUE
     current_stage = PatientJourney.Stage.CHECKED_IN if appointment_matched else PatientJourney.Stage.QUEUED
     queue_number = None if appointment_matched else next_queue_number(service_date)
     user = request.user if request and request.user.is_authenticated else None
+    if appointment:
+        appointment.status = Appointment.Status.CHECKED_IN
+        appointment.checked_in_at = timezone.now()
+        appointment.save(update_fields=["status", "checked_in_at", "updated_at"])
 
     journey = (
         PatientJourney.objects.filter(patient=check_in.patient, service_date=service_date, is_active=True)
@@ -112,6 +128,7 @@ def start_journey_for_check_in(check_in, request=None):
             flow_type=flow_type,
             queue_number=queue_number,
             appointment_matched=appointment_matched,
+            appointment=appointment,
             created_by=user,
             updated_by=user,
             notes="Created from patient check-in.",
@@ -119,6 +136,7 @@ def start_journey_for_check_in(check_in, request=None):
         created = True
     else:
         journey.check_in = check_in
+        journey.appointment = appointment
         journey.current_stage = current_stage
         journey.flow_type = flow_type
         journey.appointment_matched = appointment_matched
@@ -130,6 +148,13 @@ def start_journey_for_check_in(check_in, request=None):
     if created or journey.events.filter(stage=current_stage).count() == 0:
         create_journey_event(journey, current_stage, request, "Patient added to establishment flow from check-in.")
     return journey
+
+
+def default_clinician():
+    clinician = User.objects.filter(is_active=True, role="clinician").order_by("id").first()
+    if clinician:
+        return clinician
+    return User.objects.filter(is_active=True, role="admin").order_by("id").first()
 
 
 def transition_active_patient_journey(patient, stage, request=None, note="", visit=None):
@@ -460,8 +485,57 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
         )
 
 
+class AppointmentViewSet(viewsets.ModelViewSet):
+    queryset = Appointment.objects.select_related("patient", "assigned_clinician", "created_by").order_by("appointment_date", "appointment_time", "created_at")
+    serializer_class = AppointmentSerializer
+    search_fields = ("patient__full_name_display", "patient__patient_code", "patient__national_id", "patient__primary_phone", "notes")
+    filterset_fields = ("appointment_date", "appointment_type", "source", "status", "assigned_clinician")
+    ordering_fields = ("appointment_date", "appointment_time", "created_at", "updated_at")
+
+    def perform_create(self, serializer):
+        clinician = serializer.validated_data.get("assigned_clinician") or default_clinician()
+        appointment = serializer.save(
+            assigned_clinician=clinician,
+            created_by=self.request.user if self.request.user.is_authenticated else None,
+        )
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=appointment,
+            entity_type="appointment",
+            after_data=snapshot_instance(appointment),
+            details="Appointment booked.",
+        )
+
+    def perform_update(self, serializer):
+        before_data = snapshot_instance(self.get_object())
+        appointment = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="update",
+            instance=appointment,
+            entity_type="appointment",
+            before_data=before_data,
+            after_data=snapshot_instance(appointment),
+            details="Appointment updated.",
+        )
+
+    def perform_destroy(self, instance):
+        before_data = snapshot_instance(instance)
+        entity_id = instance.pk
+        instance.delete()
+        write_audit_log(
+            request=self.request,
+            action="delete",
+            entity_type="appointment",
+            entity_id=entity_id,
+            before_data=before_data,
+            details="Appointment deleted.",
+        )
+
+
 class PatientJourneyViewSet(viewsets.ModelViewSet):
-    queryset = PatientJourney.objects.select_related("patient", "check_in", "visit").prefetch_related("events").order_by("-service_date", "queue_number", "created_at")
+    queryset = PatientJourney.objects.select_related("patient", "check_in", "appointment", "visit").prefetch_related("events").order_by("-service_date", "queue_number", "created_at")
     serializer_class = PatientJourneySerializer
     search_fields = ("patient__full_name_display", "patient__patient_code", "patient__national_id", "patient__primary_phone")
     filterset_fields = ("current_stage", "flow_type", "service_date", "is_active")
@@ -476,14 +550,14 @@ class PatientJourneyViewSet(viewsets.ModelViewSet):
         if not patient:
             return Response({"detail": "No matching registered patient found."}, status=status.HTTP_404_NOT_FOUND)
         journey = (
-            PatientJourney.objects.select_related("patient", "check_in", "visit")
+            PatientJourney.objects.select_related("patient", "check_in", "appointment", "visit")
             .prefetch_related("events")
             .filter(patient=patient, is_active=True)
             .order_by("-service_date", "-created_at")
             .first()
         )
         history = (
-            PatientJourney.objects.select_related("patient", "check_in", "visit")
+            PatientJourney.objects.select_related("patient", "check_in", "appointment", "visit")
             .prefetch_related("events")
             .filter(patient=patient)
             .order_by("-service_date", "-created_at")[:5]

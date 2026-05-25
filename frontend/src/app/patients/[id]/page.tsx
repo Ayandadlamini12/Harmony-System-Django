@@ -129,9 +129,11 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             <Printer size={16} />
             Print summary
           </Button>
-          <Button variant="secondary" type="button">
-            <CalendarCheck size={16} />
-            Book follow-up
+          <Button asChild variant="secondary">
+            <Link href={`/appointments?patient=${patient.id}`}>
+              <CalendarCheck size={16} />
+              Book follow-up
+            </Link>
           </Button>
           <Button variant="secondary" type="button">
             <LockKeyhole size={16} />

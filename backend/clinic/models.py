@@ -250,6 +250,55 @@ class PatientCheckIn(TimeStampedModel):
         return f"{self.patient.full_name_display} - {self.get_status_display()}"
 
 
+class Appointment(TimeStampedModel):
+    class Source(models.TextChoices):
+        INTERNAL = "internal", "Internal"
+        TELEGRAM = "telegram", "Telegram"
+        WHATSAPP = "whatsapp", "WhatsApp"
+        API = "api", "API"
+
+    class Status(models.TextChoices):
+        SCHEDULED = "scheduled", "Scheduled"
+        CHECKED_IN = "checked_in", "Checked in"
+        COMPLETED = "completed", "Completed"
+        CANCELLED = "cancelled", "Cancelled"
+        NO_SHOW = "no_show", "No show"
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="appointments")
+    appointment_type = models.CharField(max_length=40, choices=Visit.VisitType.choices, default=Visit.VisitType.FOLLOW_UP)
+    appointment_date = models.DateField()
+    appointment_time = models.TimeField(null=True, blank=True)
+    source = models.CharField(max_length=30, choices=Source.choices, default=Source.INTERNAL)
+    assigned_clinician = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="assigned_appointments",
+    )
+    notes = models.TextField(blank=True)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.SCHEDULED)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_appointments",
+    )
+    checked_in_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("appointment_date", "appointment_time", "created_at")
+        indexes = [
+            models.Index(fields=["appointment_date", "status"]),
+            models.Index(fields=["patient", "appointment_date"]),
+            models.Index(fields=["assigned_clinician", "appointment_date"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.patient.full_name_display} - {self.get_appointment_type_display()} on {self.appointment_date}"
+
+
 class PatientJourney(TimeStampedModel):
     class Stage(models.TextChoices):
         REGISTERED = "registered", "Registered"
@@ -269,6 +318,7 @@ class PatientJourney(TimeStampedModel):
 
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="journeys")
     check_in = models.OneToOneField(PatientCheckIn, null=True, blank=True, on_delete=models.SET_NULL, related_name="journey")
+    appointment = models.ForeignKey(Appointment, null=True, blank=True, on_delete=models.SET_NULL, related_name="journeys")
     visit = models.ForeignKey(Visit, null=True, blank=True, on_delete=models.SET_NULL, related_name="journeys")
     service_date = models.DateField(default=timezone.localdate)
     current_stage = models.CharField(max_length=40, choices=Stage.choices, default=Stage.REGISTERED)

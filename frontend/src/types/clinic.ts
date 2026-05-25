@@ -112,6 +112,28 @@ export type PatientCheckIn = {
   updated_at?: string;
 };
 
+export type Appointment = {
+  id: number;
+  patient: number;
+  patient_name?: string;
+  patient_code?: string;
+  patient_phone?: string;
+  appointment_type: "new_consultation" | "follow_up" | "review";
+  appointment_type_label?: string;
+  appointment_date: string;
+  appointment_time?: string | null;
+  source: "internal" | "telegram" | "whatsapp" | "api";
+  source_label?: string;
+  assigned_clinician?: number | null;
+  assigned_clinician_name?: string | null;
+  notes?: string;
+  status: "scheduled" | "checked_in" | "completed" | "cancelled" | "no_show";
+  status_label?: string;
+  checked_in_at?: string | null;
+  created_at: string;
+  updated_at?: string;
+};
+
 export type PatientJourneySummary = {
   id: number;
   service_date: string;
@@ -139,6 +161,7 @@ export type PatientJourney = PatientJourneySummary & {
   patient_code?: string;
   patient_phone?: string;
   check_in?: number | null;
+  appointment?: number | null;
   visit?: number | null;
   is_active: boolean;
   notes?: string;
