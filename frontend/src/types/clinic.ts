@@ -74,6 +74,17 @@ export type Visit = {
   dietary_recommendation?: string;
   lifestyle_recommendation?: string;
   vitals?: Vital[];
+  follow_up_evaluation?: FollowUpEvaluation;
+};
+
+export type FollowUpEvaluation = {
+  id?: number;
+  previous_consult_symptoms?: string;
+  dietary_changes?: string;
+  lifestyle_changes?: string;
+  exercise_notes?: string;
+  energy_notes?: string;
+  evaluation_notes?: string;
 };
 
 export type Vital = {
