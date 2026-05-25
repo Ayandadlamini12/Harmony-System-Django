@@ -1,7 +1,8 @@
-import { CheckCircle2, Clock, MessageCircle, UserPlus, XCircle } from "lucide-react";
+import { Clock, MessageCircle, UserPlus } from "lucide-react";
 import Link from "next/link";
 
 import { AppShell } from "@/components/app-shell";
+import { EmployeeEnrollmentActions } from "@/components/employee-enrollment-actions";
 import { Button } from "@/components/ui/button";
 import { getEmployeeEnrollmentRequests } from "@/lib/api";
 
@@ -75,16 +76,7 @@ export default async function EmployeeEnrollmentPage() {
                       {request.source}
                     </span>
                   </div>
-                  <div className="flex gap-2 lg:justify-end">
-                    <Button variant="secondary" size="sm" disabled>
-                      <CheckCircle2 size={16} />
-                      Approve
-                    </Button>
-                    <Button variant="secondary" size="sm" disabled>
-                      <XCircle size={16} />
-                      Reject
-                    </Button>
-                  </div>
+                  <EmployeeEnrollmentActions requestId={request.id} status={request.status} />
                 </article>
               ))}
             </div>
