@@ -324,6 +324,7 @@ class PatientListSerializer(serializers.ModelSerializer):
         model = Patient
         fields = (
             "id",
+            "public_id",
             "patient_code",
             "national_id",
             "email",

@@ -21,6 +21,7 @@ class Patient(TimeStampedModel):
         PREFER_NOT_TO_SAY = "prefer_not_to_say", "Prefer not to say"
 
     patient_code = models.CharField(max_length=50, unique=True, blank=True)
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     national_id = models.CharField(max_length=100, unique=True, null=True, blank=True)
     email = models.EmailField(blank=True)
     primary_phone = models.CharField(max_length=50, blank=True)
@@ -51,6 +52,7 @@ class Patient(TimeStampedModel):
     class Meta:
         ordering = ("-created_at",)
         indexes = [
+            models.Index(fields=["public_id"]),
             models.Index(fields=["primary_phone"]),
             models.Index(fields=["full_name_display"]),
         ]

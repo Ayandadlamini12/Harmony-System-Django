@@ -16,6 +16,7 @@ import type { PatientJourney } from "@/types/clinic";
 type LookupResponse = {
   patient: {
     id: number;
+    public_id?: string;
     patient_code: string;
     full_name_display: string;
     primary_phone?: string;
@@ -165,7 +166,7 @@ export function PatientFlowLookup({ initialIdentifier = "" }: { initialIdentifie
                   </div>
                 </div>
                 <Button asChild variant="secondary">
-                  <Link href={`/patients/${result.patient.id}`}>Open patient</Link>
+                  <Link href={`/patients/${result.patient.public_id || result.patient.id}`}>Open patient</Link>
                 </Button>
               </div>
             </CardHeader>

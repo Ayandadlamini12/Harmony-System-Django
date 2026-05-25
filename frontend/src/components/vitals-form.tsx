@@ -13,11 +13,15 @@ export function VitalsForm({
   visits,
   patientId,
   visitId,
+  lockedPatient = false,
+  onSaved,
 }: {
   patients: Patient[];
   visits: Visit[];
   patientId?: string;
   visitId?: string;
+  lockedPatient?: boolean;
+  onSaved?: () => void;
 }) {
   const router = useRouter();
   const [selectedPatient, setSelectedPatient] = useState(patientId || "");
@@ -67,7 +71,10 @@ export function VitalsForm({
 
     if (data.success) {
       toast.success("Vitals saved");
-      router.push("/vitals/new");
+      onSaved?.();
+      if (!onSaved) {
+        router.push("/vitals/new");
+      }
       router.refresh();
     } else {
       setError("save_failed");
@@ -90,17 +97,21 @@ export function VitalsForm({
           <h2 className="font-bold">Vitals context</h2>
         </div>
         <div className="grid gap-4 md:grid-cols-3">
-          <label>
-            <span className="hh-label">Patient</span>
-            <select className="hh-input" name="patient" value={selectedPatient} onChange={(event) => setSelectedPatient(event.target.value)}>
-              <option value="">All patients</option>
-              {patients.map((patient) => (
-                <option key={patient.id} value={patient.id}>
-                  {patient.full_name_display} - {patient.patient_code}
-                </option>
-              ))}
-            </select>
-          </label>
+          {lockedPatient ? (
+            <input name="patient" type="hidden" value={selectedPatient} />
+          ) : (
+            <label>
+              <span className="hh-label">Patient</span>
+              <select className="hh-input" name="patient" value={selectedPatient} onChange={(event) => setSelectedPatient(event.target.value)}>
+                <option value="">All patients</option>
+                {patients.map((patient) => (
+                  <option key={patient.id} value={patient.id}>
+                    {patient.full_name_display} - {patient.patient_code}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label>
             <span className="hh-label">Visit</span>
             <select className="hh-input" name="visit" defaultValue={visitId || ""} required>

@@ -1,8 +1,10 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
 import re
+import uuid
 
 from django.db.models import Max, Q
 from rest_framework import permissions, status, viewsets
@@ -190,6 +192,20 @@ class PatientViewSet(viewsets.ModelViewSet):
         "next_of_kin_phone",
     )
     ordering_fields = ("created_at", "full_name_display", "patient_code")
+
+    def get_object(self):
+        lookup_value = self.kwargs.get(self.lookup_field or "pk")
+        if lookup_value:
+            try:
+                patient_uuid = uuid.UUID(str(lookup_value))
+            except ValueError:
+                patient_uuid = None
+            if patient_uuid:
+                queryset = self.filter_queryset(self.get_queryset())
+                obj = get_object_or_404(queryset, public_id=patient_uuid)
+                self.check_object_permissions(self.request, obj)
+                return obj
+        return super().get_object()
 
     def get_serializer_class(self):
         if self.action == "list":
@@ -566,6 +582,7 @@ class PatientJourneyViewSet(viewsets.ModelViewSet):
             {
                 "patient": {
                     "id": patient.id,
+                    "public_id": patient.public_id,
                     "patient_code": patient.patient_code,
                     "full_name_display": patient.full_name_display,
                     "primary_phone": patient.primary_phone,

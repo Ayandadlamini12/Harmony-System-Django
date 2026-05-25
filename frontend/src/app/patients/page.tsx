@@ -40,7 +40,7 @@ export default async function PatientListPage({ searchParams }: { searchParams: 
               {patients.results.map((patient) => (
                 <tr key={patient.id} className="border-t border-[var(--hh-border)]">
                   <td className="px-5 py-4">
-                    <Link href={`/patients/${patient.id}`} className="font-bold text-[var(--hh-purple)] hover:underline">{patient.full_name_display}</Link>
+                    <Link href={`/patients/${patient.public_id}`} className="font-bold text-[var(--hh-purple)] hover:underline">{patient.full_name_display}</Link>
                     <div className="text-xs text-[#66736d]">{patient.national_id || "No national/passport ID"}</div>
                     {patient.email && <div className="text-xs text-[#66736d]">{patient.email}</div>}
                   </td>
@@ -65,8 +65,8 @@ export default async function PatientListPage({ searchParams }: { searchParams: 
                   </td>
                   <td className="px-5 py-4">
                     <div className="flex justify-end gap-2">
-                      <Button asChild variant="secondary" size="sm"><Link href={`/patients/${patient.id}`}>Open</Link></Button>
-                      <Button asChild variant="secondary" size="sm"><Link href={`/patients/${patient.id}/edit`}>Edit</Link></Button>
+                      <Button asChild variant="secondary" size="sm"><Link href={`/patients/${patient.public_id}`}>Open</Link></Button>
+                      <Button asChild variant="secondary" size="sm"><Link href={`/patients/${patient.public_id}/edit`}>Edit</Link></Button>
                       {session.role !== "receptionist" && <Button asChild size="sm"><Link href={`/visits/new?patient=${patient.id}`}>Visit</Link></Button>}
                     </div>
                   </td>

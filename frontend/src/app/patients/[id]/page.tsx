@@ -4,6 +4,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { ClinicalPanel } from "@/components/clinical-panel";
 import { PatientAppointmentDialog } from "@/components/patient-appointment-dialog";
+import { PatientVitalsDialog } from "@/components/patient-vitals-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -118,14 +119,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
               </Link>
             </Button>
           )}
-          {canCreateVisit && (
-            <Button asChild variant="secondary">
-              <Link href={`/vitals/new?patient=${patient.id}`}>
-                <HeartPulse size={16} />
-                Add vitals
-              </Link>
-            </Button>
-          )}
+          {canCreateVisit && <PatientVitalsDialog patient={patient} />}
           <Button variant="secondary" type="button">
             <Printer size={16} />
             Print summary

@@ -35,7 +35,7 @@ export default async function EditPatientPage({
   return (
     <AppShell
       title={`Edit ${patient.full_name_display}`}
-      action={<Button asChild variant="secondary"><Link href={`/patients/${patient.id}`}>Back to patient</Link></Button>}
+      action={<Button asChild variant="secondary"><Link href={`/patients/${patient.public_id}`}>Back to patient</Link></Button>}
     >
       {query.error && <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">{query.error}</div>}
       <form action={submit} className="grid gap-6">
@@ -125,7 +125,7 @@ export default async function EditPatientPage({
         )}
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Button asChild variant="secondary"><Link href={`/patients/${patient.id}`}>Cancel</Link></Button>
+          <Button asChild variant="secondary"><Link href={`/patients/${patient.public_id}`}>Cancel</Link></Button>
           <Button type="submit">Save changes</Button>
         </div>
       </form>

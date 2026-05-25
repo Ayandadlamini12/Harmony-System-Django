@@ -72,7 +72,7 @@ export default async function AppointmentsPage({ searchParams }: { searchParams:
                   </span>
                   <Badge variant={appointment.source === "internal" ? "harmony" : "warning"}>{appointment.source_label || appointment.source}</Badge>
                   <Button asChild size="sm" variant="secondary">
-                    <Link href={`/patients/${appointment.patient}`}>Open patient</Link>
+                    <Link href={`/patients/${patients.results.find((patient) => patient.id === appointment.patient)?.public_id || appointment.patient}`}>Open patient</Link>
                   </Button>
                 </div>
               </div>

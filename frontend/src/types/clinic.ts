@@ -8,6 +8,7 @@ export type DashboardStats = {
 
 export type Patient = {
   id: number;
+  public_id: string;
   patient_code: string;
   national_id?: string | null;
   email?: string;

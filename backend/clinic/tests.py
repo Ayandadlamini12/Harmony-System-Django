@@ -56,6 +56,8 @@ class PatientApiTests(APITestCase):
         patient = Patient.objects.get()
         self.assertEqual(patient.patient_code, f"HHPAT-100{timezone.now().strftime('%y')}000000")
         self.assertEqual(patient.full_name_display, "Nomsa Dlamini")
+        self.assertIsNotNone(patient.public_id)
+        self.assertEqual(response.data["public_id"], str(patient.public_id))
         self.assertEqual(patient.next_of_kin_full_name, "Nokuthula Dlamini")
         self.assertEqual(patient.next_of_kin_relationship, "mother")
         self.assertEqual(patient.profile.past_medical_history, "Hypertension")
@@ -117,6 +119,15 @@ class PatientApiTests(APITestCase):
         self.assertEqual(second_response.status_code, 201)
         self.assertEqual(Vital.objects.filter(visit=visit).count(), 2)
         self.assertTrue(AuditLog.objects.filter(entity_type="vital", action="create").exists())
+
+    def test_patient_can_be_retrieved_by_public_id(self):
+        patient = Patient.objects.create(first_name="Public", last_name="Lookup", gender="female")
+
+        response = self.client.get(f"/api/patients/{patient.public_id}/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["id"], patient.id)
+        self.assertEqual(response.data["public_id"], str(patient.public_id))
 
 
 class DashboardApiTests(APITestCase):
