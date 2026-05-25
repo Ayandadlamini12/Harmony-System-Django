@@ -227,7 +227,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         </ClinicalPanel>
 
         <ClinicalPanel title="Visit timeline" icon={<ClipboardList size={17} />}>
-          <div className="divide-y divide-[#eef2ef]">
+          <div className="divide-y divide-[var(--hh-border)]">
             {patient.visits?.map((visit) => (
               <div key={visit.id} className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[110px_1fr]">
                 <div className="text-xs font-bold uppercase text-[#66736d]">{formatDate(visit.visit_date)}</div>
@@ -318,7 +318,7 @@ function HivStatusCard({ status }: { status: string }) {
               return (
                 <span
                   className={`rounded-full border px-3 py-1 text-sm font-bold capitalize ${
-                    active ? "border-[#bde5c4] bg-[var(--hh-green-light)] text-[var(--hh-green-dark)]" : "border-slate-200 bg-slate-50 text-slate-600"
+                    active ? "border-[#9bd6a6] bg-[var(--hh-green-light)] text-[var(--hh-green-dark)]" : "border-[var(--hh-border)] bg-slate-50 text-slate-600"
                   }`}
                   key={option}
                 >
