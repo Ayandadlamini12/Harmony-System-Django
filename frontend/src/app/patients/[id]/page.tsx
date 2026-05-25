@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { ClinicalPanel } from "@/components/clinical-panel";
+import { PatientAppointmentDialog } from "@/components/patient-appointment-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -11,7 +12,7 @@ import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
 import { getPatient } from "@/lib/api";
 import { relationshipLabel } from "@/lib/relationships";
 import { getSessionUser } from "@/lib/session";
-import { CalendarCheck, Check, ClipboardList, Eye, HeartPulse, ListChecks, LockKeyhole, Pencil, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
+import { Check, ClipboardList, Eye, HeartPulse, ListChecks, LockKeyhole, Pencil, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
 
 const tabs = ["Overview", "Complaints", "Assessments", "Diagnosis", "Remedies", "Vitals", "Follow-ups", "Documents", "Notes"];
 
@@ -129,12 +130,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
             <Printer size={16} />
             Print summary
           </Button>
-          <Button asChild variant="secondary">
-            <Link href={`/appointments?patient=${patient.id}`}>
-              <CalendarCheck size={16} />
-              Book follow-up
-            </Link>
-          </Button>
+          <PatientAppointmentDialog patient={patient} />
           <Button variant="secondary" type="button">
             <LockKeyhole size={16} />
             Access log

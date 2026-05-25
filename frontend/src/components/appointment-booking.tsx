@@ -16,7 +16,17 @@ function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
-export function AppointmentBooking({ patients, initialPatientId }: { patients: Patient[]; initialPatientId?: string }) {
+export function AppointmentBooking({
+  patients,
+  initialPatientId,
+  lockedPatient = false,
+  onBooked
+}: {
+  patients: Patient[];
+  initialPatientId?: string;
+  lockedPatient?: boolean;
+  onBooked?: () => void;
+}) {
   const router = useRouter();
   const [submitting, setSubmitting] = useState(false);
   const [patientId, setPatientId] = useState(initialPatientId || "");
@@ -50,6 +60,7 @@ export function AppointmentBooking({ patients, initialPatientId }: { patients: P
         return;
       }
       toast.success("Appointment booked");
+      onBooked?.();
       router.refresh();
     } finally {
       setSubmitting(false);
@@ -67,17 +78,21 @@ export function AppointmentBooking({ patients, initialPatientId }: { patients: P
       </CardHeader>
       <CardContent className="p-5 pt-0">
         <form className="grid gap-4" onSubmit={handleSubmit}>
-          <label className="grid gap-1.5">
-            <span className="hh-label">Patient</span>
-            <Select name="patient" value={patientId} onChange={(event) => setPatientId(event.currentTarget.value)} required>
-              <option value="">Select patient</option>
-              {patients.map((patient) => (
-                <option key={patient.id} value={patient.id}>
-                  {patient.full_name_display} - {patient.patient_code}
-                </option>
-              ))}
-            </Select>
-          </label>
+          {lockedPatient ? (
+            <input name="patient" type="hidden" value={patientId} />
+          ) : (
+            <label className="grid gap-1.5">
+              <span className="hh-label">Patient</span>
+              <Select name="patient" value={patientId} onChange={(event) => setPatientId(event.currentTarget.value)} required>
+                <option value="">Select patient</option>
+                {patients.map((patient) => (
+                  <option key={patient.id} value={patient.id}>
+                    {patient.full_name_display} - {patient.patient_code}
+                  </option>
+                ))}
+              </Select>
+            </label>
+          )}
 
           {selectedPatient && (
             <div className="rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-3 text-sm">
