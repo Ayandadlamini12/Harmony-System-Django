@@ -2,7 +2,7 @@ from django.contrib.auth import get_user_model, password_validation
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
-from .models import ClinicianProfile
+from .models import ClinicianProfile, EmployeeEnrollmentRequest
 
 User = get_user_model()
 
@@ -160,3 +160,44 @@ class ChangePasswordSerializer(serializers.Serializer):
         except ValidationError as e:
             raise serializers.ValidationError(list(e.messages))
         return value
+
+
+class EmployeeEnrollmentRequestSerializer(serializers.ModelSerializer):
+    reviewed_by_name = serializers.CharField(source="reviewed_by.get_full_name", read_only=True)
+
+    class Meta:
+        model = EmployeeEnrollmentRequest
+        fields = (
+            "id",
+            "full_names",
+            "email",
+            "phone_number",
+            "whatsapp_number",
+            "telegram_chat_id",
+            "telegram_username",
+            "requested_role",
+            "requested_team",
+            "source",
+            "status",
+            "notes",
+            "raw_payload",
+            "reviewed_by",
+            "reviewed_by_name",
+            "reviewed_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "status",
+            "reviewed_by",
+            "reviewed_by_name",
+            "reviewed_at",
+            "created_at",
+            "updated_at",
+        )
+
+    def validate(self, attrs):
+        if not attrs.get("phone_number") and not attrs.get("email") and not attrs.get("telegram_chat_id"):
+            raise serializers.ValidationError("At least one contact method is required.")
+        return attrs

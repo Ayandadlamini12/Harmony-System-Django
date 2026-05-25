@@ -1,14 +1,24 @@
 import mimetypes
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
+from django.utils import timezone
 from django.http import FileResponse, Http404
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 
-from .models import ClinicianProfile
-from .serializers import ChangePasswordSerializer, ClinicianProfileSerializer, RegisterSerializer, UserSerializer
+from clinic.audit import write_audit_log
+
+from .models import ClinicianProfile, EmployeeEnrollmentRequest
+from .serializers import (
+    ChangePasswordSerializer,
+    ClinicianProfileSerializer,
+    EmployeeEnrollmentRequestSerializer,
+    RegisterSerializer,
+    UserSerializer,
+)
 
 User = get_user_model()
 
@@ -16,6 +26,13 @@ User = get_user_model()
 class IsAdminUserRole(permissions.BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated and request.user.role == "admin")
+
+
+class HasHarmonyWebhookSecret(permissions.BasePermission):
+    def has_permission(self, request, view):
+        expected_secret = getattr(settings, "HARMONY_WEBHOOK_SECRET", "")
+        provided_secret = request.headers.get("X-Harmony-Webhook-Secret", "")
+        return bool(expected_secret and provided_secret and provided_secret == expected_secret)
 
 
 class UserViewSet(viewsets.ModelViewSet):
@@ -145,3 +162,68 @@ class ChangePasswordView(generics.GenericAPIView):
         user.set_password(serializer.validated_data["new_password"])
         user.save()
         return Response({"detail": "Password updated successfully."})
+
+
+class EmployeeEnrollmentRequestViewSet(viewsets.ModelViewSet):
+    queryset = EmployeeEnrollmentRequest.objects.order_by("-created_at")
+    serializer_class = EmployeeEnrollmentRequestSerializer
+    search_fields = ("full_names", "email", "phone_number", "telegram_username", "requested_role", "requested_team")
+    filterset_fields = ("status", "source", "requested_role", "requested_team")
+
+    def get_permissions(self):
+        if self.action == "create":
+            return [HasHarmonyWebhookSecret()]
+        return [IsAdminUserRole()]
+
+    def perform_create(self, serializer):
+        request_obj = serializer.save(
+            source=serializer.validated_data.get("source") or EmployeeEnrollmentRequest.Source.API,
+            raw_payload=self.request.data,
+        )
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=request_obj,
+            entity_type="employee_enrollment_request",
+            after_data=EmployeeEnrollmentRequestSerializer(request_obj).data,
+            details="Employee enrollment request created from external workflow.",
+        )
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAdminUserRole])
+    def approve(self, request, pk=None):
+        enrollment_request = self.get_object()
+        before = EmployeeEnrollmentRequestSerializer(enrollment_request).data
+        enrollment_request.status = EmployeeEnrollmentRequest.Status.APPROVED
+        enrollment_request.reviewed_by = request.user
+        enrollment_request.reviewed_at = timezone.now()
+        enrollment_request.save(update_fields=["status", "reviewed_by", "reviewed_at", "updated_at"])
+        after = EmployeeEnrollmentRequestSerializer(enrollment_request).data
+        write_audit_log(
+            request=request,
+            action="approve",
+            instance=enrollment_request,
+            entity_type="employee_enrollment_request",
+            before_data=before,
+            after_data=after,
+        )
+        return Response(after)
+
+    @action(detail=True, methods=["post"], permission_classes=[IsAdminUserRole])
+    def reject(self, request, pk=None):
+        enrollment_request = self.get_object()
+        before = EmployeeEnrollmentRequestSerializer(enrollment_request).data
+        enrollment_request.status = EmployeeEnrollmentRequest.Status.REJECTED
+        enrollment_request.reviewed_by = request.user
+        enrollment_request.reviewed_at = timezone.now()
+        enrollment_request.notes = request.data.get("notes", enrollment_request.notes)
+        enrollment_request.save(update_fields=["status", "reviewed_by", "reviewed_at", "notes", "updated_at"])
+        after = EmployeeEnrollmentRequestSerializer(enrollment_request).data
+        write_audit_log(
+            request=request,
+            action="reject",
+            instance=enrollment_request,
+            entity_type="employee_enrollment_request",
+            before_data=before,
+            after_data=after,
+        )
+        return Response(after)

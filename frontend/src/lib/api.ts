@@ -1,4 +1,4 @@
-import type { Appointment, ClinicianProfile, DashboardStats, ElevatedAccessRequest, FormDraft, Paginated, Patient, PatientCheckIn, PatientJourney, User, Visit, Vital } from "@/types/clinic";
+import type { Appointment, ClinicianProfile, DashboardStats, ElevatedAccessRequest, EmployeeEnrollmentRequest, FormDraft, Paginated, Patient, PatientCheckIn, PatientJourney, User, Visit, Vital } from "@/types/clinic";
 import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -125,6 +125,16 @@ export function getUsers(search = "") {
 
 export function getMyClinicianProfile() {
   return apiGet<ClinicianProfile | null>("/users/me/clinician-profile/", null);
+}
+
+export function getEmployeeEnrollmentRequests(status = "") {
+  const query = status ? `?status=${encodeURIComponent(status)}` : "";
+  return apiGet<Paginated<EmployeeEnrollmentRequest>>(`/employee-enrollment-requests/${query}`, {
+    count: 0,
+    next: null,
+    previous: null,
+    results: []
+  });
 }
 
 export { API_BASE_URL };

@@ -85,3 +85,51 @@ class ClinicianProfile(models.Model):
     def save(self, *args, **kwargs):
         self.update_completion()
         super().save(*args, **kwargs)
+
+
+class EmployeeEnrollmentRequest(models.Model):
+    class Source(models.TextChoices):
+        TELEGRAM = "telegram", "Telegram"
+        WHATSAPP = "whatsapp", "WhatsApp"
+        INTERNAL = "internal", "Internal"
+        API = "api", "API"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        APPROVED = "approved", "Approved"
+        REJECTED = "rejected", "Rejected"
+        CANCELLED = "cancelled", "Cancelled"
+
+    full_names = models.CharField(max_length=220)
+    email = models.EmailField(blank=True)
+    phone_number = models.CharField(max_length=50, blank=True)
+    whatsapp_number = models.CharField(max_length=50, blank=True)
+    telegram_chat_id = models.CharField(max_length=80, blank=True)
+    telegram_username = models.CharField(max_length=120, blank=True)
+    requested_role = models.CharField(max_length=80, blank=True)
+    requested_team = models.CharField(max_length=120, blank=True)
+    source = models.CharField(max_length=30, choices=Source.choices, default=Source.API)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING)
+    notes = models.TextField(blank=True)
+    raw_payload = models.JSONField(default=dict, blank=True)
+    reviewed_by = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="reviewed_employee_enrollment_requests",
+    )
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["source", "created_at"]),
+            models.Index(fields=["telegram_chat_id", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.full_names} - {self.get_status_display()}"

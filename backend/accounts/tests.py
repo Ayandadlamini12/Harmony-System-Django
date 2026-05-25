@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
-from .models import ClinicianProfile
+from .models import ClinicianProfile, EmployeeEnrollmentRequest
 
 User = get_user_model()
 
@@ -45,3 +45,56 @@ class ClinicianProfileApiTests(APITestCase):
         response = self.client.get("/api/users/me/clinician-profile/")
 
         self.assertEqual(response.status_code, 403)
+
+
+class EmployeeEnrollmentRequestApiTests(APITestCase):
+    def test_n8n_can_create_pending_employee_enrollment_request_with_webhook_secret(self):
+        with self.settings(HARMONY_WEBHOOK_SECRET="test-secret"):
+            response = self.client.post(
+                "/api/employee-enrollment-requests/",
+                {
+                    "full_names": "Jane Dlamini",
+                    "email": "jane@harmonyhealthsz.com",
+                    "phone_number": "+26876000000",
+                    "whatsapp_number": "+26876000000",
+                    "telegram_chat_id": "123456",
+                    "telegram_username": "jane_d",
+                    "requested_role": "Receptionist",
+                    "requested_team": "Reception",
+                    "source": "telegram",
+                },
+                format="json",
+                HTTP_X_HARMONY_WEBHOOK_SECRET="test-secret",
+            )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(response.data["status"], EmployeeEnrollmentRequest.Status.PENDING)
+        self.assertTrue(EmployeeEnrollmentRequest.objects.filter(full_names="Jane Dlamini").exists())
+
+    def test_employee_enrollment_request_rejects_missing_webhook_secret(self):
+        with self.settings(HARMONY_WEBHOOK_SECRET="test-secret"):
+            response = self.client.post(
+                "/api/employee-enrollment-requests/",
+                {
+                    "full_names": "Jane Dlamini",
+                    "telegram_chat_id": "123456",
+                    "source": "telegram",
+                },
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_admin_can_list_employee_enrollment_requests(self):
+        admin = User.objects.create_user(username="admin_user", password="password123", role="admin")
+        EmployeeEnrollmentRequest.objects.create(
+            full_names="Jane Dlamini",
+            phone_number="+26876000000",
+            source=EmployeeEnrollmentRequest.Source.TELEGRAM,
+        )
+        self.client.force_authenticate(admin)
+
+        response = self.client.get("/api/employee-enrollment-requests/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)

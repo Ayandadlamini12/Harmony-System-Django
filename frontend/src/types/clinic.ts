@@ -263,6 +263,26 @@ export type ClinicianProfile = {
   updated_at: string;
 };
 
+export type EmployeeEnrollmentRequest = {
+  id: number;
+  full_names: string;
+  email?: string;
+  phone_number?: string;
+  whatsapp_number?: string;
+  telegram_chat_id?: string;
+  telegram_username?: string;
+  requested_role?: string;
+  requested_team?: string;
+  source: "telegram" | "whatsapp" | "internal" | "api";
+  status: "pending" | "approved" | "rejected" | "cancelled";
+  notes?: string;
+  reviewed_by?: number | null;
+  reviewed_by_name?: string | null;
+  reviewed_at?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Paginated<T> = {
   count: number;
   next: string | null;
