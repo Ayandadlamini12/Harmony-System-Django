@@ -29,9 +29,11 @@ export type Patient = {
   next_of_kin_relationship?: string;
   next_of_kin_relationship_other?: string;
   status: string;
+  consent_status?: "pending" | "generated" | "signed" | "verified";
   last_visit_date?: string | null;
   profile?: PatientProfile;
   conditions?: PatientCondition[];
+  documents?: PatientDocument[];
   visits?: Visit[];
   clinical_access?: "active" | "approval_required";
   current_journey?: PatientJourneySummary | null;
@@ -55,6 +57,24 @@ export type PatientCondition = {
   status: "active" | "historical" | "suspected";
   notes?: string;
   recorded_at?: string;
+};
+
+export type PatientDocument = {
+  id: number;
+  document_id: string;
+  patient: number;
+  document_type: "consent_form" | "patient_upload" | "report";
+  document_type_label?: string;
+  title: string;
+  status: "generated" | "pending_signature" | "signed" | "verified" | "rejected";
+  status_label?: string;
+  file_url?: string;
+  verification_payload?: Record<string, unknown>;
+  signed_at?: string | null;
+  generated_by?: number | null;
+  generated_by_name?: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type Visit = {

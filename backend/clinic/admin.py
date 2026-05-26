@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Appointment, AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 
 
 class PatientProfileInline(admin.StackedInline):
@@ -79,6 +79,14 @@ class PatientConditionAdmin(admin.ModelAdmin):
     list_display = ("patient", "condition_label", "present", "is_confidential", "status", "recorded_at")
     search_fields = ("patient__full_name_display", "patient__patient_code", "condition_label", "condition_code")
     list_filter = ("present", "is_confidential", "status", "recorded_at")
+
+
+@admin.register(PatientDocument)
+class PatientDocumentAdmin(admin.ModelAdmin):
+    list_display = ("title", "patient", "document_type", "status", "generated_by", "created_at")
+    search_fields = ("title", "document_id", "patient__full_name_display", "patient__patient_code")
+    list_filter = ("document_type", "status", "created_at")
+    readonly_fields = ("document_id", "verification_payload", "created_at", "updated_at")
 
 
 admin.site.register(Vital)

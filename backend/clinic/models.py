@@ -14,6 +14,12 @@ class TimeStampedModel(models.Model):
 
 
 class Patient(TimeStampedModel):
+    class ConsentStatus(models.TextChoices):
+        PENDING = "pending", "Pending consent"
+        GENERATED = "generated", "Consent generated"
+        SIGNED = "signed", "Consent signed"
+        VERIFIED = "verified", "Consent verified"
+
     class Gender(models.TextChoices):
         MALE = "male", "Male"
         FEMALE = "female", "Female"
@@ -41,6 +47,7 @@ class Patient(TimeStampedModel):
     town_or_locality = models.CharField(max_length=120, blank=True)
     village = models.CharField(max_length=120, blank=True)
     status = models.CharField(max_length=30, default="active")
+    consent_status = models.CharField(max_length=30, choices=ConsentStatus.choices, default=ConsentStatus.PENDING)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -138,6 +145,57 @@ class PatientCondition(TimeStampedModel):
 
     def __str__(self) -> str:
         return self.condition_label
+
+
+def patient_document_upload_path(instance, filename: str) -> str:
+    return f"patient_documents/patient_{instance.patient_id}/{instance.document_id}/{filename}"
+
+
+class PatientDocument(TimeStampedModel):
+    class DocumentType(models.TextChoices):
+        CONSENT_FORM = "consent_form", "Consent form"
+        PATIENT_UPLOAD = "patient_upload", "Patient upload"
+        REPORT = "report", "Report"
+
+    class Status(models.TextChoices):
+        GENERATED = "generated", "Generated"
+        PENDING_SIGNATURE = "pending_signature", "Pending signature"
+        SIGNED = "signed", "Signed"
+        VERIFIED = "verified", "Verified"
+        REJECTED = "rejected", "Rejected"
+
+    document_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="documents")
+    document_type = models.CharField(max_length=50, choices=DocumentType.choices)
+    title = models.CharField(max_length=180)
+    status = models.CharField(max_length=40, choices=Status.choices, default=Status.GENERATED)
+    file = models.FileField(upload_to=patient_document_upload_path, blank=True)
+    verification_payload = models.JSONField(default=dict, blank=True)
+    signed_at = models.DateTimeField(null=True, blank=True)
+    generated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="generated_patient_documents",
+    )
+    verified_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="verified_patient_documents",
+    )
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["patient", "document_type", "status"]),
+            models.Index(fields=["document_id"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.title} - {self.patient.patient_code}"
 
 
 class ElevatedAccessRequest(TimeStampedModel):

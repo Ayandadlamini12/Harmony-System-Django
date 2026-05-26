@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { Check, ClipboardList, Eye, HeartPulse, ListChecks, LockKeyhole, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
+import { Check, ClipboardList, Download, Eye, FileText, HeartPulse, ListChecks, LockKeyhole, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
 import { useState } from "react";
+import { toast } from "sonner";
 
 import { ClinicalPanel } from "@/components/clinical-panel";
 import { PatientAppointmentDialog } from "@/components/patient-appointment-dialog";
@@ -103,7 +104,7 @@ export function PatientRecordWorkspace({ patient, canCreateVisit }: { patient: P
         {activeTab === "remedies" && <RemediesTab visits={patient.visits || []} />}
         {activeTab === "vitals" && <VitalsTab vitals={allVitals(patient)} />}
         {activeTab === "follow_ups" && <FollowUpsTab visits={patient.visits || []} />}
-        {activeTab === "documents" && <EmptyTab title="Documents" text="No documents have been uploaded or generated for this patient yet." icon={<ClipboardList size={17} />} />}
+        {activeTab === "documents" && <DocumentsTab patient={patient} />}
         {activeTab === "notes" && <NotesTab patient={patient} latestVisit={latestVisit} />}
       </section>
     </>
@@ -349,6 +350,66 @@ function FollowUpsTab({ visits }: { visits: Visit[] }) {
             body: visit.lifestyle_recommendation || visit.dietary_recommendation || visit.remedy
           }))}
       />
+    </ClinicalPanel>
+  );
+}
+
+function DocumentsTab({ patient }: { patient: Patient }) {
+  const [documents, setDocuments] = useState(patient.documents || []);
+  const [generating, setGenerating] = useState(false);
+
+  async function generateConsent() {
+    setGenerating(true);
+    try {
+      const response = await fetch(`/api/patients/${patient.public_id}/documents/consent`, { method: "POST" });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(data.detail || "Consent form could not be generated.");
+        return;
+      }
+      setDocuments((current) => [data, ...current.filter((document) => document.id !== data.id)]);
+      toast.success("Consent form generated");
+      window.open(`/api/patient-documents/${data.id}/download`, "_blank", "noopener,noreferrer");
+    } finally {
+      setGenerating(false);
+    }
+  }
+
+  return (
+    <ClinicalPanel title="Documents" icon={<ClipboardList size={17} />}>
+      <div className="grid gap-4">
+        <div className="flex flex-col gap-3 rounded-lg border border-[#d8c0e8] bg-[#f7f0fb] p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="text-sm font-bold text-[var(--hh-purple-dark)]">Consent form</div>
+            <p className="mt-1 text-sm leading-6 text-[#53605a]">
+              Generate the internal consent document before clinical consultation starts. It can be signed in-system later or printed for manual signing.
+            </p>
+          </div>
+          <Button type="button" onClick={generateConsent} disabled={generating}>
+            <FileText size={16} />
+            {generating ? "Generating..." : "Generate consent"}
+          </Button>
+        </div>
+        <div className="divide-y divide-[var(--hh-border)] rounded-lg border border-[var(--hh-border)] bg-white">
+          {documents.map((document) => (
+            <div key={document.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="font-bold">{document.title}</div>
+                <div className="mt-1 text-xs font-bold uppercase text-[#66736d]">
+                  {document.document_type_label || document.document_type.replaceAll("_", " ")} - {document.status_label || document.status.replaceAll("_", " ")}
+                </div>
+              </div>
+              <Button asChild variant="secondary" size="sm">
+                <a href={`/api/patient-documents/${document.id}/download`} target="_blank" rel="noreferrer">
+                  <Download size={15} />
+                  Open PDF
+                </a>
+              </Button>
+            </div>
+          ))}
+          {documents.length === 0 && <p className="p-4 text-sm text-[#66736d]">No documents have been uploaded or generated for this patient yet.</p>}
+        </div>
+      </div>
     </ClinicalPanel>
   );
 }

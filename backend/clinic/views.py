@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
+from django.http import FileResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 import re
@@ -13,13 +14,15 @@ from rest_framework.response import Response
 
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
-from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .document_generation import generate_consent_pdf
+from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 from .serializers import (
     AuditLogSerializer,
     AppointmentSerializer,
     ElevatedAccessRequestSerializer,
     FormDraftSerializer,
     PatientCheckInSerializer,
+    PatientDocumentSerializer,
     PatientJourneySerializer,
     PatientDetailSerializer,
     PatientListSerializer,
@@ -208,7 +211,7 @@ def transition_active_patient_journey(patient, stage, request=None, note="", vis
 
 
 class PatientViewSet(viewsets.ModelViewSet):
-    queryset = Patient.objects.select_related("profile").prefetch_related("conditions", "visits__vitals")
+    queryset = Patient.objects.select_related("profile").prefetch_related("conditions", "documents", "visits__vitals")
     search_fields = (
         "full_name_display",
         "patient_code",
@@ -302,6 +305,42 @@ class PatientViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["get"], url_path="documents")
+    def documents(self, request, pk=None):
+        patient = self.get_object()
+        documents = patient.documents.all()
+        serializer = PatientDocumentSerializer(documents, many=True, context={"request": request})
+        return Response(serializer.data)
+
+    @action(detail=True, methods=["post"], url_path="documents/consent")
+    def generate_consent(self, request, pk=None):
+        patient = self.get_object()
+        document = generate_consent_pdf(patient, request)
+        write_audit_log(
+            request=request,
+            action="generate",
+            instance=document,
+            entity_type="patient_document",
+            after_data=snapshot_instance(document),
+            details="Consent form generated.",
+        )
+        return Response(PatientDocumentSerializer(document, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+
+class PatientDocumentViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = PatientDocument.objects.select_related("patient", "generated_by", "verified_by")
+    serializer_class = PatientDocumentSerializer
+    filterset_fields = ("patient", "document_type", "status")
+    search_fields = ("patient__full_name_display", "patient__patient_code", "title", "document_id")
+    ordering_fields = ("created_at", "updated_at", "signed_at")
+
+    @action(detail=True, methods=["get"])
+    def download(self, request, pk=None):
+        document = self.get_object()
+        if not document.file:
+            return Response({"detail": "Document file is not available."}, status=status.HTTP_404_NOT_FOUND)
+        return FileResponse(document.file.open("rb"), as_attachment=False, filename=document.file.name.split("/")[-1])
 
 
 class VisitViewSet(viewsets.ModelViewSet):

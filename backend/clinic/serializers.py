@@ -3,7 +3,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import Appointment, AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -34,6 +34,55 @@ class PatientConditionSerializer(serializers.ModelSerializer):
             "recorded_at",
         )
         read_only_fields = ("id", "recorded_at")
+
+
+class PatientDocumentSerializer(serializers.ModelSerializer):
+    document_type_label = serializers.CharField(source="get_document_type_display", read_only=True)
+    status_label = serializers.CharField(source="get_status_display", read_only=True)
+    file_url = serializers.SerializerMethodField()
+    generated_by_name = serializers.CharField(source="generated_by.get_full_name", read_only=True)
+
+    class Meta:
+        model = PatientDocument
+        fields = (
+            "id",
+            "document_id",
+            "patient",
+            "document_type",
+            "document_type_label",
+            "title",
+            "status",
+            "status_label",
+            "file",
+            "file_url",
+            "verification_payload",
+            "signed_at",
+            "generated_by",
+            "generated_by_name",
+            "verified_by",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "document_id",
+            "patient",
+            "document_type_label",
+            "status_label",
+            "file_url",
+            "generated_by",
+            "generated_by_name",
+            "verified_by",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_file_url(self, obj):
+        if not obj.file:
+            return ""
+        request = self.context.get("request")
+        url = obj.file.url
+        return request.build_absolute_uri(url) if request else url
 
 
 class VitalSerializer(serializers.ModelSerializer):
@@ -345,6 +394,7 @@ class PatientListSerializer(serializers.ModelSerializer):
             "next_of_kin_relationship",
             "next_of_kin_relationship_other",
             "status",
+            "consent_status",
             "last_visit_date",
             "current_journey",
             "created_at",
@@ -373,10 +423,11 @@ class PatientListSerializer(serializers.ModelSerializer):
 class PatientDetailSerializer(PatientListSerializer):
     profile = PatientProfileSerializer(required=False)
     conditions = PatientConditionSerializer(many=True, required=False)
+    documents = PatientDocumentSerializer(many=True, read_only=True)
     visits = VisitSerializer(many=True, read_only=True)
 
     class Meta(PatientListSerializer.Meta):
-        fields = PatientListSerializer.Meta.fields + ("profile", "conditions", "visits")
+        fields = PatientListSerializer.Meta.fields + ("profile", "conditions", "documents", "visits")
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

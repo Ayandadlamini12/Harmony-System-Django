@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>{{ document.title }}</title>
+  <style>
+    @page {
+      size: A4;
+      margin: 16mm 14mm 18mm;
+      @bottom-center {
+        content: "Harmony Health consent document - {{ reference }} - Page " counter(page) " of " counter(pages);
+        color: #53605a;
+        font-size: 8pt;
+      }
+    }
+    body {
+      color: #17211d;
+      font-family: "DejaVu Sans", Arial, sans-serif;
+      font-size: 10pt;
+      line-height: 1.45;
+    }
+    h1, h2, h3, p {
+      margin: 0;
+    }
+    h1 {
+      color: #5b2388;
+      font-size: 18pt;
+      line-height: 1.2;
+    }
+    h2 {
+      border-bottom: 1px solid #b7c8bf;
+      color: #5b2388;
+      font-size: 11pt;
+      margin-top: 14pt;
+      padding-bottom: 4pt;
+      text-transform: uppercase;
+    }
+    h3 {
+      font-size: 10pt;
+      margin-top: 9pt;
+    }
+    p, li {
+      margin-top: 5pt;
+    }
+    ul {
+      margin: 4pt 0 0 16pt;
+      padding: 0;
+    }
+    .header {
+      align-items: flex-start;
+      border-bottom: 3px solid #69be28;
+      display: flex;
+      gap: 12pt;
+      justify-content: space-between;
+      padding-bottom: 10pt;
+    }
+    .brand {
+      color: #5b2388;
+      font-size: 10pt;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .tagline {
+      color: #53605a;
+      font-size: 9pt;
+      margin-top: 2pt;
+    }
+    .stamp {
+      border: 2px solid #5b2388;
+      border-radius: 6pt;
+      color: #5b2388;
+      font-size: 8pt;
+      font-weight: 700;
+      padding: 6pt;
+      text-align: center;
+      text-transform: uppercase;
+      width: 118pt;
+    }
+    .meta {
+      border: 1px solid #b7c8bf;
+      border-radius: 6pt;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      margin-top: 12pt;
+    }
+    .meta div {
+      border-bottom: 1px solid #d9e3dd;
+      padding: 6pt 8pt;
+    }
+    .meta div:nth-child(odd) {
+      border-right: 1px solid #d9e3dd;
+    }
+    .label {
+      color: #53605a;
+      display: block;
+      font-size: 7.5pt;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+    .value {
+      display: block;
+      font-size: 10pt;
+      font-weight: 700;
+      margin-top: 2pt;
+    }
+    .notice {
+      background: #f6f0fb;
+      border: 1px solid #d8c0e8;
+      border-radius: 6pt;
+      margin-top: 10pt;
+      padding: 8pt;
+    }
+    .signature-grid {
+      display: grid;
+      gap: 10pt;
+      grid-template-columns: 1fr 1fr;
+      margin-top: 12pt;
+    }
+    .signature-box {
+      border: 1px solid #9fb2aa;
+      border-radius: 6pt;
+      min-height: 78pt;
+      padding: 8pt;
+    }
+    .line {
+      border-bottom: 1px solid #17211d;
+      height: 26pt;
+      margin-top: 8pt;
+    }
+    .verification {
+      align-items: center;
+      border: 1px solid #b7c8bf;
+      border-radius: 6pt;
+      display: flex;
+      gap: 10pt;
+      margin-top: 14pt;
+      padding: 8pt;
+    }
+    .verification svg {
+      height: 72pt;
+      width: 72pt;
+    }
+    .small {
+      color: #53605a;
+      font-size: 8pt;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div>
+      <div class="brand">{{ organization_name }}</div>
+      <div class="tagline">{{ tagline }}</div>
+      <h1>Consent to Homeopathic Care and Wellness Support</h1>
+      <p class="small">Document reference: {{ reference }}</p>
+    </div>
+    <div class="stamp">
+      Generated<br>
+      Pending Signature
+    </div>
+  </header>
+
+  <section class="meta">
+    <div><span class="label">Patient name</span><span class="value">{{ patient.full_name_display }}</span></div>
+    <div><span class="label">Patient code</span><span class="value">{{ patient.patient_code }}</span></div>
+    <div><span class="label">National / Passport ID</span><span class="value">{{ patient.national_id|default:"Not provided" }}</span></div>
+    <div><span class="label">Date of birth</span><span class="value">{{ patient.date_of_birth|default:"Not provided" }}</span></div>
+    <div><span class="label">Primary phone</span><span class="value">{{ patient.primary_phone|default:"Not provided" }}</span></div>
+    <div><span class="label">Generated date</span><span class="value">{{ issued_at|date:"d M Y H:i" }}</span></div>
+    <div><span class="label">Next of kin</span><span class="value">{{ patient.next_of_kin_full_name|default:"Not provided" }}</span></div>
+    <div><span class="label">Next of kin phone</span><span class="value">{{ patient.next_of_kin_phone|default:"Not provided" }}</span></div>
+  </section>
+
+  <section class="notice">
+    <strong>Important:</strong> This document records informed consent for homeopathic and wellness support. It should be read and understood before any clinical consultation, diagnosis discussion, remedy recommendation, or medical-history recording begins.
+  </section>
+
+  <h2>1. Nature of Services</h2>
+  <p>I understand that Harmony Health provides homeopathic and wellness-focused care. Consultations may include discussion of symptoms, lifestyle, diet, emotional wellbeing, personal history, family history, medication use, and other information relevant to holistic assessment.</p>
+  <p>I understand that homeopathic care is complementary in nature and does not replace emergency medical treatment, hospital care, prescribed medication, surgery, or specialist medical advice where such care is required.</p>
+
+  <h2>2. Patient Responsibilities</h2>
+  <ul>
+    <li>I agree to provide accurate and complete information during registration and consultation.</li>
+    <li>I agree to disclose current medication, allergies, known diagnoses, pregnancy status where applicable, and relevant medical history.</li>
+    <li>I understand that I should not stop prescribed medication or delay urgent medical care unless advised by an appropriately qualified medical practitioner.</li>
+    <li>I understand that treatment response can vary and no guaranteed outcome is promised.</li>
+  </ul>
+
+  <h2>3. Consent to Record and Store Information</h2>
+  <p>I consent to Harmony Health recording and storing my personal information, consultation notes, wellness assessments, remedy recommendations, follow-up records, documents, and communication history for care continuity, legal recordkeeping, quality control, and administrative purposes.</p>
+  <p>I understand that sensitive clinical information will be restricted and should only be accessed by authorized personnel with an appropriate role or approved elevated access.</p>
+
+  <h2>4. Privacy and Communication</h2>
+  <p>I consent to being contacted using the phone number, email address, or messaging channels I provide for appointments, follow-ups, administrative notices, and care-related communication. I understand that external channels such as WhatsApp, Telegram, or email may have their own privacy limitations.</p>
+
+  <h2>5. Consent Decision</h2>
+  <p>By signing below, I confirm that I have had an opportunity to read this form, ask questions, and decide whether to proceed. I understand the scope and limits of homeopathic care and consent to the start of my Harmony Health care record.</p>
+
+  <section class="signature-grid">
+    <div class="signature-box">
+      <span class="label">Patient / guardian signature</span>
+      <div class="line"></div>
+      <p class="small">Name: {{ patient.full_name_display }}</p>
+      <p class="small">Date: ___________________________</p>
+    </div>
+    <div class="signature-box">
+      <span class="label">Reception / witness signature</span>
+      <div class="line"></div>
+      <p class="small">Name: ___________________________</p>
+      <p class="small">Date: ___________________________</p>
+    </div>
+  </section>
+
+  <section class="verification">
+    <div>{{ qr_svg|safe }}</div>
+    <div>
+      <h3>Verification and barcode-ready reference</h3>
+      <p class="small">Reference: {{ reference }}</p>
+      <p class="small">Document ID: {{ document.document_id }}</p>
+      <p class="small">Verification target: {{ verification_url }}</p>
+      <p class="small">This QR/reference block links this consent form to the patient document record in Harmony Health MIS.</p>
+    </div>
+  </section>
+</body>
+</html>
