@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { LoadingButton } from "@/components/harmony-loading";
 import { Button } from "@/components/ui/button";
+import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { Patient } from "@/types/clinic";
 
@@ -66,6 +67,13 @@ type CheckInConfirmation = {
   nextAction?: string;
 };
 
+type CheckInError = {
+  title: string;
+  message: string;
+  statusLabel?: string;
+  queueNumber?: number | null;
+};
+
 const identifierOptions = [
   {
     value: "cell_number",
@@ -105,6 +113,7 @@ export function PatientCheckIn({
   const [submittingType, setSubmittingType] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<CheckInConfirmation | null>(null);
   const [activatedPatientIds, setActivatedPatientIds] = useState<Set<number>>(new Set());
+  const [checkInError, setCheckInError] = useState<CheckInError | null>(null);
   const matches = useMemo(() => remotePatients.filter((patient) => matchesPatient(patient, query)).slice(0, 8), [remotePatients, query]);
   const hasQuery = query.trim().length > 0;
   const isTablet = mode === "tablet";
@@ -184,7 +193,12 @@ export function PatientCheckIn({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        toast.error(data.detail || "Check-in could not be completed");
+        setCheckInError({
+          title: response.status === 409 ? "Visit already activated" : "Check-in could not be completed",
+          message: data.detail || "The patient could not be checked in. Please review the details and try again.",
+          statusLabel: data.flow_status_label,
+          queueNumber: data.queue_number
+        });
         return;
       }
       if (patient || lookup?.patient) {
@@ -209,6 +223,38 @@ export function PatientCheckIn({
 
   return (
     <div className={isTablet ? "mx-auto grid w-full max-w-5xl gap-6" : "grid gap-5"}>
+      <Dialog open={Boolean(checkInError)} onOpenChange={(open) => !open && setCheckInError(null)}>
+        <DialogContent className="w-[min(92vw,520px)] overflow-hidden">
+          <div className="border-b border-[var(--hh-border-strong)] px-5 py-4">
+            <div className="flex items-center gap-3">
+              <div className="flex h-11 w-11 items-center justify-center rounded-lg border border-[#f6d58b] bg-[#fff8e6] text-[#875400]">
+                <ShieldCheck size={22} />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold text-[#3f1d58]">{checkInError?.title}</DialogTitle>
+                <DialogDescription className="mt-1 text-sm text-[#66736d]">Patient flow activation was not completed.</DialogDescription>
+              </div>
+            </div>
+          </div>
+          <div className="grid gap-4 p-5">
+            <div className="rounded-lg border border-[#f6d58b] bg-[#fff8e6] p-4 text-sm font-semibold leading-6 text-[#875400]">
+              {checkInError?.message}
+            </div>
+            {(checkInError?.statusLabel || checkInError?.queueNumber) && (
+              <div className="flex flex-wrap gap-2 text-sm">
+                {checkInError.statusLabel && <span className="rounded-full border border-[var(--hh-border)] bg-white px-3 py-1 font-bold">{checkInError.statusLabel}</span>}
+                {checkInError.queueNumber ? <span className="rounded-full border border-[var(--hh-border)] bg-white px-3 py-1 font-bold">Queue #{checkInError.queueNumber}</span> : null}
+              </div>
+            )}
+            <div className="flex justify-end">
+              <DialogClose asChild>
+                <Button type="button">OK</Button>
+              </DialogClose>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {confirmation && (
         <div className="rounded-lg border border-[var(--hh-green)] bg-[var(--hh-green-light)] p-4 text-[var(--hh-green-dark)]">
           <div className="flex items-start gap-3">
