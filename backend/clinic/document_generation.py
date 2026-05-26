@@ -164,22 +164,26 @@ def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, ref
         story.append(Paragraph(heading, styles["HarmonyHeading"]))
         story.append(Paragraph(body, styles["HarmonyBody"]))
     signature_image = signature_image_buffer(signature_data)
-    signature_record = "Awaiting in-system handwritten signature"
+    patient_signature_content = [Paragraph("\n\n_______________________________\nName: %s\nDate: ______________________" % patient.full_name_display, styles["Small"])]
+    signature_audit = [Paragraph("Awaiting in-system handwritten signature", styles["Small"])]
     if signature_data:
-        signature_record = (
-            f"Signed by {signature_data.get('signer_name')} as {signature_data.get('signer_capacity')}<br/>"
-            f"Method: {signature_data.get('method')}<br/>"
-            f"Timestamp: {signature_data.get('signed_at')}"
-        )
-    signature_content = [Paragraph(signature_record, styles["Small"])]
-    if signature_image:
-        signature_content.insert(0, Image(signature_image, width=62 * mm, height=22 * mm))
+        patient_signature_content = [
+            Image(signature_image, width=70 * mm, height=24 * mm) if signature_image else Paragraph("Signature captured in Harmony Health MIS", styles["Small"]),
+            Paragraph(f"Name: {signature_data.get('signer_name')}<br/>Date: {signature_data.get('signed_at')}", styles["Small"]),
+        ]
+        signature_audit = [
+            Paragraph(
+                f"<b>Signature audit:</b> Signed in Harmony Health MIS by {signature_data.get('signer_name')} "
+                f"as {signature_data.get('signer_capacity')} using {signature_data.get('method')} at {signature_data.get('signed_at')}",
+                styles["Small"],
+            )
+        ]
     signature_table = Table(
         [
-            ["Patient / guardian manual signature", "In-system handwritten signature"],
+            ["Patient / guardian signature", "Reception / witness confirmation"],
             [
-                "\n\n_______________________________\nName: %s\nDate: ______________________" % patient.full_name_display,
-                signature_content,
+                patient_signature_content,
+                "\n\n_______________________________\nName: ______________________\nDate: ______________________",
             ],
         ],
         colWidths=[90 * mm, 90 * mm],
@@ -196,7 +200,20 @@ def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, ref
     qr = Image(make_qr_png(verification_url), width=30 * mm, height=30 * mm)
     verification = Table([[qr, Paragraph(f"<b>Verification and barcode-ready reference</b><br/>Reference: {reference}<br/>Document ID: {document.document_id}<br/>Verification target: {verification_url}<br/>Status: {document.get_status_display()}", styles["Small"])]], colWidths=[34 * mm, 140 * mm])
     verification.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#b7c8bf")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
-    story += [Spacer(1, 8), signature_table, Spacer(1, 10), verification]
+    story += [Spacer(1, 8), signature_table, Spacer(1, 8)]
+    if signature_data:
+        audit_table = Table([signature_audit], colWidths=[180 * mm])
+        audit_table.setStyle(TableStyle([
+            ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#69be28")),
+            ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#edf9ef")),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 6),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ]))
+        story += [audit_table, Spacer(1, 10)]
+    else:
+        story += [Spacer(1, 10)]
+    story += [verification]
 
     def footer(canvas, _doc):
         canvas.saveState()

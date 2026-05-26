@@ -143,17 +143,6 @@
       min-height: 78pt;
       padding: 8pt;
     }
-    .system-signature {
-      background: #f7faf8;
-      border: 1px solid #b7c8bf;
-      border-radius: 6pt;
-      margin-top: 10pt;
-      padding: 8pt;
-    }
-    .system-signature.signed {
-      background: #edf9ef;
-      border-color: #69be28;
-    }
     .signature-image {
       background: #ffffff;
       border: 1px solid #b7c8bf;
@@ -167,6 +156,13 @@
       color: #2f7d3b;
       font-size: 13pt;
       font-weight: 700;
+    }
+    .signature-audit {
+      background: #edf9ef;
+      border: 1px solid #69be28;
+      border-radius: 6pt;
+      margin-top: 10pt;
+      padding: 6pt 8pt;
     }
     .line {
       border-bottom: 1px solid #17211d;
@@ -254,9 +250,13 @@
   <section class="signature-grid">
     <div class="signature-box">
       <span class="label">Patient / guardian signature</span>
-      <div class="line"></div>
+      {% if signature_data and signature_data.signature_image %}
+        <img class="signature-image" src="{{ signature_data.signature_image }}" alt="Captured handwritten signature">
+      {% else %}
+        <div class="line"></div>
+      {% endif %}
       <p class="small">Name: {{ patient.full_name_display }}</p>
-      <p class="small">Date: ___________________________</p>
+      <p class="small">Date: {% if signature_data %}{{ signature_data.signed_at }}{% else %}___________________________{% endif %}</p>
     </div>
     <div class="signature-box">
       <span class="label">Reception / witness confirmation</span>
@@ -266,21 +266,16 @@
     </div>
   </section>
 
-  <section class="system-signature {% if signature_data %}signed{% endif %}">
-    <span class="label">In-system handwritten signature</span>
-    {% if signature_data %}
+  {% if signature_data %}
+  <section class="signature-audit">
+      <span class="label">Signature audit</span>
       <p class="signature-mark">Signed in Harmony Health MIS</p>
-      {% if signature_data.signature_image %}
-        <img class="signature-image" src="{{ signature_data.signature_image }}" alt="Captured handwritten signature">
-      {% endif %}
       <p class="small">Signed by: {{ signature_data.signer_name }}</p>
       <p class="small">Capacity: {{ signature_data.signer_capacity }}</p>
       <p class="small">Method: {{ signature_data.method }}</p>
       <p class="small">Timestamp: {{ signature_data.signed_at }}</p>
-    {% else %}
-      <p class="small">This form may be signed manually after printing or signed inside Harmony Health MIS using a handwritten signature pad. A captured signature will be embedded here after signing.</p>
-    {% endif %}
   </section>
+  {% endif %}
 
   <section class="verification">
     <div>{{ qr_svg|safe }}</div>
