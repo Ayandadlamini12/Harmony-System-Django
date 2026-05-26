@@ -363,11 +363,14 @@ class PatientDocumentViewSet(viewsets.ReadOnlyModelViewSet):
             return Response({"detail": "This consent form has already been signed."}, status=status.HTTP_409_CONFLICT)
         signer_name = str(request.data.get("signer_name", "")).strip()
         signer_capacity = str(request.data.get("signer_capacity", "")).strip()
+        signature_image = str(request.data.get("signature_image", "")).strip()
         acknowledgement = bool(request.data.get("acknowledgement"))
         if not signer_name:
             return Response({"detail": "Signer name is required."}, status=status.HTTP_400_BAD_REQUEST)
         if not signer_capacity:
             return Response({"detail": "Signer capacity is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not signature_image.startswith("data:image/png;base64,"):
+            return Response({"detail": "A handwritten signature is required."}, status=status.HTTP_400_BAD_REQUEST)
         if not acknowledgement:
             return Response({"detail": "Consent acknowledgement is required before signing."}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -376,6 +379,7 @@ class PatientDocumentViewSet(viewsets.ReadOnlyModelViewSet):
             document,
             signer_name=signer_name,
             signer_capacity=signer_capacity,
+            signature_image=signature_image,
             request=request,
         )
         after_data = PatientDocumentSerializer(signed_document, context={"request": request}).data

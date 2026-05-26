@@ -143,18 +143,27 @@
       min-height: 78pt;
       padding: 8pt;
     }
-    .digital-signature {
+    .system-signature {
       background: #f7faf8;
       border: 1px solid #b7c8bf;
       border-radius: 6pt;
       margin-top: 10pt;
       padding: 8pt;
     }
-    .digital-signature.signed {
+    .system-signature.signed {
       background: #edf9ef;
       border-color: #69be28;
     }
-    .digital-mark {
+    .signature-image {
+      background: #ffffff;
+      border: 1px solid #b7c8bf;
+      height: 42pt;
+      margin-top: 6pt;
+      object-fit: contain;
+      padding: 3pt;
+      width: 160pt;
+    }
+    .signature-mark {
       color: #2f7d3b;
       font-size: 13pt;
       font-weight: 700;
@@ -257,16 +266,19 @@
     </div>
   </section>
 
-  <section class="digital-signature {% if signature_data %}signed{% endif %}">
-    <span class="label">Digital signature option</span>
+  <section class="system-signature {% if signature_data %}signed{% endif %}">
+    <span class="label">In-system handwritten signature</span>
     {% if signature_data %}
-      <p class="digital-mark">Digitally signed and acknowledged</p>
+      <p class="signature-mark">Signed in Harmony Health MIS</p>
+      {% if signature_data.signature_image %}
+        <img class="signature-image" src="{{ signature_data.signature_image }}" alt="Captured handwritten signature">
+      {% endif %}
       <p class="small">Signed by: {{ signature_data.signer_name }}</p>
       <p class="small">Capacity: {{ signature_data.signer_capacity }}</p>
       <p class="small">Method: {{ signature_data.method }}</p>
       <p class="small">Timestamp: {{ signature_data.signed_at }}</p>
     {% else %}
-      <p class="small">This form may be signed manually after printing or signed inside Harmony Health MIS using typed-name acknowledgement. A digital signature will be written here after signing.</p>
+      <p class="small">This form may be signed manually after printing or signed inside Harmony Health MIS using a handwritten signature pad. A captured signature will be embedded here after signing.</p>
     {% endif %}
   </section>
 

@@ -2,6 +2,7 @@ from django.conf import settings
 from django.core.files.base import ContentFile
 from django.template.loader import render_to_string
 from django.utils import timezone
+import base64
 from io import BytesIO
 from pathlib import Path
 
@@ -31,6 +32,20 @@ def make_qr_png(payload: str) -> BytesIO:
     image.save(buffer, format="PNG")
     buffer.seek(0)
     return buffer
+
+
+def signature_image_buffer(signature_data) -> BytesIO | None:
+    if not signature_data:
+        return None
+    image_data = signature_data.get("signature_image", "")
+    prefix = "data:image/png;base64,"
+    if not image_data.startswith(prefix):
+        return None
+    try:
+        decoded = base64.b64decode(image_data[len(prefix):], validate=True)
+    except Exception:
+        return None
+    return BytesIO(decoded)
 
 
 def logo_path() -> Path:
@@ -109,18 +124,23 @@ def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, ref
     for heading, body in sections:
         story.append(Paragraph(heading, styles["HarmonyHeading"]))
         story.append(Paragraph(body, styles["HarmonyBody"]))
-    digital_signature_text = "Not digitally signed yet"
+    signature_image = signature_image_buffer(signature_data)
+    signature_record = "Awaiting in-system handwritten signature"
     if signature_data:
-        digital_signature_text = (
-            f"Digitally signed by {signature_data.get('signer_name')} "
-            f"as {signature_data.get('signer_capacity')} on {signature_data.get('signed_at')}"
+        signature_record = (
+            f"Signed by {signature_data.get('signer_name')} as {signature_data.get('signer_capacity')}<br/>"
+            f"Method: {signature_data.get('method')}<br/>"
+            f"Timestamp: {signature_data.get('signed_at')}"
         )
+    signature_content = [Paragraph(signature_record, styles["Small"])]
+    if signature_image:
+        signature_content.insert(0, Image(signature_image, width=62 * mm, height=22 * mm))
     signature_table = Table(
         [
-            ["Patient / guardian manual signature", "Digital signature record"],
+            ["Patient / guardian manual signature", "In-system handwritten signature"],
             [
                 "\n\n_______________________________\nName: %s\nDate: ______________________" % patient.full_name_display,
-                f"\n\n{digital_signature_text}\nMethod: {signature_data.get('method', 'Typed name acknowledgement') if signature_data else 'Awaiting in-system signature'}",
+                signature_content,
             ],
         ],
         colWidths=[90 * mm, 90 * mm],
@@ -218,7 +238,7 @@ def generate_consent_pdf(patient: Patient, request=None) -> PatientDocument:
     return document
 
 
-def sign_consent_document(document: PatientDocument, *, signer_name: str, signer_capacity: str, request=None) -> PatientDocument:
+def sign_consent_document(document: PatientDocument, *, signer_name: str, signer_capacity: str, signature_image: str, request=None) -> PatientDocument:
     user = request.user if request and request.user.is_authenticated else None
     signed_at = timezone.now()
     document.status = PatientDocument.Status.SIGNED
@@ -229,7 +249,8 @@ def sign_consent_document(document: PatientDocument, *, signer_name: str, signer
         "digital_signature": {
             "signer_name": signer_name,
             "signer_capacity": signer_capacity,
-            "method": "Typed name acknowledgement",
+            "signature_image": signature_image,
+            "method": "In-system handwritten signature",
             "signed_at": signed_at.isoformat(),
             "signed_by_user_id": user.id if user else None,
             "signed_by_username": user.get_username() if user else "",
