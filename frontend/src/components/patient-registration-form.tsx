@@ -82,8 +82,11 @@ function phoneValue(phone: { country_code: string; number: string }) {
 }
 
 function FieldError({ message }: { message?: string }) {
-  if (!message) return null;
-  return <span className="text-xs font-semibold text-red-600">{message}</span>;
+  return (
+    <span aria-hidden={!message} className={cn("min-h-4 text-xs font-semibold leading-4 text-red-600", !message && "invisible")}>
+      {message || "No validation error"}
+    </span>
+  );
 }
 
 function StepSidebar({
@@ -317,10 +320,10 @@ export function PatientRegistrationForm() {
             <div className={cn(activeStep.id === "identity" ? "block" : "hidden")}>
               <div className={threeColumn}>
                 <label className={fieldClass}><Label>First name</Label><Input {...form.register("first_name")} /><FieldError message={errors.first_name?.message} /></label>
-                <label className={fieldClass}><Label>Middle name</Label><Input {...form.register("middle_name")} /></label>
+                <label className={fieldClass}><Label>Middle name</Label><Input {...form.register("middle_name")} /><FieldError /></label>
                 <label className={fieldClass}><Label>Last name</Label><Input {...form.register("last_name")} /><FieldError message={errors.last_name?.message} /></label>
                 <label className={fieldClass}><Label>National / Passport ID</Label><Input autoCapitalize="characters" {...form.register("national_id")} /><FieldError message={errors.national_id?.message} /></label>
-                <label className={fieldClass}><Label>Date of birth</Label><Input type="date" {...form.register("date_of_birth")} /></label>
+                <label className={fieldClass}><Label>Date of birth</Label><Input type="date" {...form.register("date_of_birth")} /><FieldError /></label>
                 <label className={fieldClass}>
                   <Label>Gender</Label>
                   <Select {...form.register("gender")}>
@@ -329,6 +332,7 @@ export function PatientRegistrationForm() {
                     <option value="other">Other</option>
                     <option value="prefer_not_to_say">Prefer not to say</option>
                   </Select>
+                  <FieldError />
                 </label>
               </div>
             </div>
@@ -362,6 +366,7 @@ export function PatientRegistrationForm() {
                   ) : (
                     <Input {...form.register("region")} />
                   )}
+                  <FieldError />
                 </label>
                 <label className={fieldClass}>
                   <Label>Town or locality</Label>
@@ -373,8 +378,9 @@ export function PatientRegistrationForm() {
                   ) : (
                     <Input {...form.register("town_or_locality")} />
                   )}
+                  <FieldError />
                 </label>
-                <label className={fieldClass}><Label>Village / address area</Label><Input {...form.register("village")} /></label>
+                <label className={fieldClass}><Label>Village / address area</Label><Input {...form.register("village")} /><FieldError /></label>
               </div>
               <datalist id="primary-phone-codes">{countryCodeOptions.map((option) => <option key={`p-${option.country}-${option.dialCode}`} value={option.dialCode}>{option.label}</option>)}</datalist>
               <datalist id="secondary-phone-codes">{countryCodeOptions.map((option) => <option key={`s-${option.country}-${option.dialCode}`} value={option.dialCode}>{option.label}</option>)}</datalist>
@@ -382,7 +388,7 @@ export function PatientRegistrationForm() {
 
             <div className={cn(activeStep.id === "next-of-kin" ? "block" : "hidden")}>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-                <label className={fieldClass}><Label>Next of kin full name(s)</Label><Input {...form.register("next_of_kin_full_name")} /></label>
+                <label className={fieldClass}><Label>Next of kin full name(s)</Label><Input {...form.register("next_of_kin_full_name")} /><FieldError /></label>
                 <label className={fieldClass}>
                   <Label>Next of kin phone</Label>
                   <div className="grid grid-cols-[92px_minmax(10rem,1fr)] gap-2 max-[420px]:grid-cols-1">
@@ -397,8 +403,9 @@ export function PatientRegistrationForm() {
                   <Select {...form.register("next_of_kin_relationship")}>
                     {RELATIONSHIP_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                   </Select>
+                  <FieldError />
                 </label>
-                {relationship === "other" && <label className={fieldClass}><Label>Specify relationship</Label><Input {...form.register("next_of_kin_relationship_other")} /></label>}
+                {relationship === "other" && <label className={fieldClass}><Label>Specify relationship</Label><Input {...form.register("next_of_kin_relationship_other")} /><FieldError /></label>}
               </div>
               <datalist id="kin-phone-codes">{countryCodeOptions.map((option) => <option key={`k-${option.country}-${option.dialCode}`} value={option.dialCode}>{option.label}</option>)}</datalist>
             </div>
@@ -413,12 +420,13 @@ export function PatientRegistrationForm() {
                     <option value="reactive">Reactive</option>
                     <option value="non_reactive">Non-reactive</option>
                   </Select>
+                  <FieldError />
                 </label>
-                <label className={fieldClass}><Label>Children count</Label><Input type="number" min="0" {...form.register("children_count")} /></label>
-                <label className={fieldClass}><Label>Past medical history</Label><Textarea {...form.register("past_medical_history")} /></label>
-                <label className={fieldClass}><Label>Family medical history</Label><Textarea {...form.register("family_medical_history")} /></label>
-                <label className={fieldClass}><Label>Allopathic medication</Label><Textarea {...form.register("allopathic_medication")} /></label>
-                <label className={fieldClass}><Label>Other important information</Label><Textarea {...form.register("other_important_information")} /></label>
+                <label className={fieldClass}><Label>Children count</Label><Input type="number" min="0" {...form.register("children_count")} /><FieldError /></label>
+                <label className={fieldClass}><Label>Past medical history</Label><Textarea {...form.register("past_medical_history")} /><FieldError /></label>
+                <label className={fieldClass}><Label>Family medical history</Label><Textarea {...form.register("family_medical_history")} /><FieldError /></label>
+                <label className={fieldClass}><Label>Allopathic medication</Label><Textarea {...form.register("allopathic_medication")} /><FieldError /></label>
+                <label className={fieldClass}><Label>Other important information</Label><Textarea {...form.register("other_important_information")} /><FieldError /></label>
               </div>
             </div>
 
