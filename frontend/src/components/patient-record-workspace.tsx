@@ -448,6 +448,7 @@ function ConsentSignatureDialog({
   onSigned: (document: PatientDocument) => void;
 }) {
   const [open, setOpen] = useState(false);
+  const [step, setStep] = useState<"review" | "sign">("review");
   const [signing, setSigning] = useState(false);
   const [signerName, setSignerName] = useState(patient.full_name_display);
   const [signerCapacity, setSignerCapacity] = useState("Patient");
@@ -457,30 +458,53 @@ function ConsentSignatureDialog({
   const padRef = useRef<SignaturePad | null>(null);
 
   useEffect(() => {
-    if (!open || !canvasRef.current) return;
+    if (!open || step !== "sign" || !canvasRef.current) return;
     const canvas = canvasRef.current;
     const resizeCanvas = () => {
       const ratio = Math.max(window.devicePixelRatio || 1, 1);
       const { width } = canvas.getBoundingClientRect();
       canvas.width = Math.floor(width * ratio);
       canvas.height = Math.floor(180 * ratio);
-      canvas.getContext("2d")?.scale(ratio, ratio);
+      const context = canvas.getContext("2d");
+      context?.setTransform(ratio, 0, 0, ratio, 0, 0);
       padRef.current?.clear();
     };
-    padRef.current = new SignaturePad(canvas, {
-      backgroundColor: "rgb(255,255,255)",
-      penColor: "rgb(31,41,51)",
-      minWidth: 0.8,
-      maxWidth: 2.4
+    canvas.style.touchAction = "none";
+    window.requestAnimationFrame(() => {
+      resizeCanvas();
+      padRef.current = new SignaturePad(canvas, {
+        backgroundColor: "rgb(255,255,255)",
+        penColor: "rgb(31,41,51)",
+        minWidth: 0.8,
+        maxWidth: 2.4
+      });
+      padRef.current.clear();
     });
-    resizeCanvas();
     window.addEventListener("resize", resizeCanvas);
     return () => {
       window.removeEventListener("resize", resizeCanvas);
       padRef.current?.off();
       padRef.current = null;
     };
-  }, [open]);
+  }, [open, step]);
+
+  function handleOpenChange(nextOpen: boolean) {
+    setOpen(nextOpen);
+    if (!nextOpen) {
+      setStep("review");
+      setAcknowledgement(false);
+      setError(null);
+      padRef.current?.clear();
+    }
+  }
+
+  function continueToSignature() {
+    if (!acknowledgement) {
+      setError("The patient or authorized signer must confirm that they have read and agreed to the consent form before signing.");
+      return;
+    }
+    setStep("sign");
+  }
 
   async function signDocument() {
     const signaturePad = padRef.current;
@@ -519,7 +543,7 @@ function ConsentSignatureDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <ActionErrorDialog
         open={Boolean(error)}
         title="Consent signature unavailable"
@@ -535,32 +559,56 @@ function ConsentSignatureDialog({
       </DialogTrigger>
       <DialogContent className="w-[min(96vw,1120px)]">
         <div className="border-b border-[var(--hh-border)] px-5 py-4">
-          <DialogTitle className="text-lg font-bold text-[var(--hh-purple-dark)]">Sign consent form</DialogTitle>
+          <DialogTitle className="text-lg font-bold text-[var(--hh-purple-dark)]">
+            {step === "review" ? "Review consent form" : "Sign consent form"}
+          </DialogTitle>
           <DialogDescription className="mt-1 text-sm text-[#66736d]">
-            Review the generated consent form, capture the handwritten signature, then regenerate the PDF with the signature embedded.
+            {step === "review"
+              ? "The patient must read the consent document first, then confirm agreement before the signing pad is shown."
+              : "Capture the handwritten signature, then regenerate the PDF with the signature embedded."}
           </DialogDescription>
         </div>
-        <div className="grid max-h-[78vh] gap-4 overflow-y-auto p-5 lg:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="min-h-[640px] overflow-hidden rounded-lg border border-[var(--hh-border)] bg-white">
-            <iframe title="Consent form preview" src={`/api/patient-documents/${document.id}/download`} className="h-[72vh] min-h-[640px] w-full" />
+        {step === "review" ? (
+          <div className="grid max-h-[78vh] gap-4 overflow-y-auto p-5">
+            <div className="min-h-[640px] overflow-hidden rounded-lg border border-[var(--hh-border)] bg-white">
+              <iframe title="Consent form preview" src={`/api/patient-documents/${document.id}/download`} className="h-[72vh] min-h-[640px] w-full" />
+            </div>
+            <div className="sticky bottom-0 grid gap-3 rounded-lg border border-[var(--hh-border)] bg-white p-4 shadow-sm">
+              <label className="flex items-start gap-3 text-sm leading-6 text-[#3f4d47]">
+                <input type="checkbox" className="mt-1 h-4 w-4" checked={acknowledgement} onChange={(event) => setAcknowledgement(event.target.checked)} />
+                <span>I confirm the patient or authorized signer has read the full consent form and agrees to proceed with signing.</span>
+              </label>
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <Button type="button" onClick={continueToSignature} disabled={!acknowledgement}>
+                  <PenLine size={16} />
+                  Continue to signature
+                </Button>
+              </div>
+            </div>
           </div>
-          <div className="grid content-start gap-4">
-            <label className="grid gap-1 text-sm font-bold text-[#53605a]">
-              Signer full name
-              <input className="h-11 rounded-lg border border-[var(--hh-border)] px-3 text-base font-normal text-[#17211d]" value={signerName} onChange={(event) => setSignerName(event.target.value)} />
-            </label>
-            <label className="grid gap-1 text-sm font-bold text-[#53605a]">
-              Signing capacity
-              <select className="h-11 rounded-lg border border-[var(--hh-border)] px-3 text-base font-normal text-[#17211d]" value={signerCapacity} onChange={(event) => setSignerCapacity(event.target.value)}>
-                <option>Patient</option>
-                <option>Parent / guardian</option>
-                <option>Authorized representative</option>
-              </select>
-            </label>
+        ) : (
+          <div className="grid max-h-[78vh] gap-4 overflow-y-auto p-5">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <label className="grid gap-1 text-sm font-bold text-[#53605a]">
+                Signer full name
+                <input className="h-11 rounded-lg border border-[var(--hh-border)] px-3 text-base font-normal text-[#17211d]" value={signerName} onChange={(event) => setSignerName(event.target.value)} />
+              </label>
+              <label className="grid gap-1 text-sm font-bold text-[#53605a]">
+                Signing capacity
+                <select className="h-11 rounded-lg border border-[var(--hh-border)] px-3 text-base font-normal text-[#17211d]" value={signerCapacity} onChange={(event) => setSignerCapacity(event.target.value)}>
+                  <option>Patient</option>
+                  <option>Parent / guardian</option>
+                  <option>Authorized representative</option>
+                </select>
+              </label>
+            </div>
             <div className="grid gap-2">
               <div className="text-sm font-bold text-[#53605a]">Handwritten signature</div>
               <div className="rounded-lg border border-[var(--hh-border)] bg-white p-2">
-                <canvas ref={canvasRef} className="h-[180px] w-full touch-none rounded-md border border-dashed border-[#b7c8bf] bg-white" />
+                <canvas ref={canvasRef} className="block h-[180px] w-full touch-none rounded-md border border-dashed border-[#b7c8bf] bg-white" />
               </div>
               <div className="flex justify-end">
                 <Button type="button" variant="secondary" size="sm" onClick={() => padRef.current?.clear()}>
@@ -568,13 +616,9 @@ function ConsentSignatureDialog({
                 </Button>
               </div>
             </div>
-            <label className="flex items-start gap-3 rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-3 text-sm leading-6 text-[#3f4d47]">
-              <input type="checkbox" className="mt-1 h-4 w-4" checked={acknowledgement} onChange={(event) => setAcknowledgement(event.target.checked)} />
-              <span>I confirm the patient or authorized signer has read, understood, and agreed to the Harmony Health consent form shown here.</span>
-            </label>
             <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
-                Cancel
+              <Button type="button" variant="secondary" onClick={() => setStep("review")}>
+                Back to document
               </Button>
               <Button type="button" onClick={signDocument} disabled={signing}>
                 <PenLine size={16} />
@@ -582,7 +626,7 @@ function ConsentSignatureDialog({
               </Button>
             </div>
           </div>
-        </div>
+        )}
       </DialogContent>
     </Dialog>
   );
