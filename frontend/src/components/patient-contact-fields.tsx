@@ -67,7 +67,7 @@ export function PatientContactFields({
   }, [country, selectedRegionIsoCode]);
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
       <PhoneNumberInput
         label="Primary phone"
         name="primary_phone"

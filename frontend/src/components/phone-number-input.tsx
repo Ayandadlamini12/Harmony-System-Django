@@ -54,7 +54,7 @@ export function PhoneNumberInput({
   return (
     <div className="grid gap-1.5">
       <Label>{label}</Label>
-      <div className="grid grid-cols-[minmax(112px,150px)_1fr] gap-2">
+      <div className="grid grid-cols-[92px_minmax(10rem,1fr)] gap-2 max-[420px]:grid-cols-1">
         <input
           className="hh-input"
           defaultValue={parsed.countryCode}
