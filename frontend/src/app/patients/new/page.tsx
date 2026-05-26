@@ -46,6 +46,12 @@ export default async function RegisterPatientPage({ searchParams }: { searchPara
       content: <PatientContactFields />
     },
     {
+      id: "next-of-kin",
+      title: "Next of kin",
+      description: "Emergency contact and relationship details.",
+      content: <NextOfKinFields />
+    },
+    {
       id: "clinical",
       title: "Clinical profile",
       description: "Semi-stable medical history and important patient notes.",
@@ -67,12 +73,6 @@ export default async function RegisterPatientPage({ searchParams }: { searchPara
           <label className={fieldClass}><Label>Other important information</Label><Textarea name="other_important_information" /></label>
         </div>
       )
-    },
-    {
-      id: "next-of-kin",
-      title: "Next of kin",
-      description: "Emergency contact and relationship details.",
-      content: <NextOfKinFields />
     },
     {
       id: "conditions",
