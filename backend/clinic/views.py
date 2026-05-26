@@ -466,8 +466,19 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
             data["patient"] = patient.id
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
-        return Response(serializer.data, status=status.HTTP_201_CREATED)
+        journey = self.perform_create(serializer)
+        response_data = serializer.data
+        response_data["journey"] = PatientJourneySerializer(journey).data if journey else None
+        response_data["appointment_matched"] = bool(journey and journey.appointment_matched)
+        response_data["queue_number"] = journey.queue_number if journey else None
+        response_data["flow_status"] = journey.current_stage if journey else ""
+        response_data["flow_status_label"] = journey.get_current_stage_display() if journey else ""
+        response_data["next_action"] = (
+            "Record vitals, then wait for the clinician."
+            if journey and not journey.appointment_matched
+            else "Appointment checked in. Record vitals, then wait for the clinician."
+        )
+        return Response(response_data, status=status.HTTP_201_CREATED)
 
     def perform_create(self, serializer):
         check_in = serializer.save()
@@ -487,6 +498,7 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
             after_data=snapshot_instance(journey),
             details="Patient journey tracking started.",
         )
+        return journey
 
     def perform_update(self, serializer):
         before_data = snapshot_instance(self.get_object())

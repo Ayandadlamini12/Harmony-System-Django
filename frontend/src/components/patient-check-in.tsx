@@ -44,6 +44,16 @@ type LookupResult = {
   primary_phone?: string;
 };
 
+type CheckInConfirmation = {
+  patientName: string;
+  patientCode?: string;
+  statusLabel?: string;
+  queueNumber?: number | null;
+  appointmentMatched?: boolean;
+  visitType: "new_consultation" | "follow_up";
+  nextAction?: string;
+};
+
 const identifierOptions = [
   {
     value: "cell_number",
@@ -81,7 +91,7 @@ export function PatientCheckIn({
   const [remotePatients, setRemotePatients] = useState(patients);
   const [searching, setSearching] = useState(false);
   const [submittingType, setSubmittingType] = useState<string | null>(null);
-  const [checkedInName, setCheckedInName] = useState("");
+  const [confirmation, setConfirmation] = useState<CheckInConfirmation | null>(null);
   const matches = useMemo(() => remotePatients.filter((patient) => matchesPatient(patient, query)).slice(0, 8), [remotePatients, query]);
   const hasQuery = query.trim().length > 0;
   const isTablet = mode === "tablet";
@@ -164,10 +174,18 @@ export function PatientCheckIn({
         toast.error(data.detail || "Check-in could not be completed");
         return;
       }
-      setCheckedInName(data.patient_name || lookup?.patient_name || "Patient");
+      setConfirmation({
+        patientName: data.patient_name || lookup?.patient_name || "Patient",
+        patientCode: data.patient_code || lookup?.patient_code,
+        statusLabel: data.flow_status_label,
+        queueNumber: data.queue_number,
+        appointmentMatched: data.appointment_matched,
+        visitType,
+        nextAction: data.next_action
+      });
       setQuery("");
       setLookup(null);
-      toast.success("Patient checked in");
+      toast.success(data.appointment_matched ? "Appointment checked in" : "Patient added to waiting list");
     } finally {
       setSubmittingType(null);
     }
@@ -175,13 +193,23 @@ export function PatientCheckIn({
 
   return (
     <div className={isTablet ? "mx-auto grid w-full max-w-5xl gap-6" : "grid gap-5"}>
-      {checkedInName && (
+      {confirmation && (
         <div className="rounded-lg border border-[var(--hh-green)] bg-[var(--hh-green-light)] p-4 text-[var(--hh-green-dark)]">
-          <div className="flex items-center gap-3">
+          <div className="flex items-start gap-3">
             <CheckCircle2 size={22} />
-            <div>
-              <div className="font-bold">{checkedInName} is checked in.</div>
-              <div className="text-sm">Please wait for the clinician or receptionist to call the patient.</div>
+            <div className="grid gap-2">
+              <div className="font-bold">{confirmation.patientName} has been checked in.</div>
+              <div className="flex flex-wrap gap-2 text-sm">
+                {confirmation.patientCode && <span className="rounded-full bg-white px-2.5 py-1 font-mono text-[var(--hh-purple)]">{confirmation.patientCode}</span>}
+                <span className="rounded-full bg-white px-2.5 py-1 font-bold">
+                  {confirmation.visitType === "new_consultation" ? "New visit activated" : "Follow-up activated"}
+                </span>
+                <span className="rounded-full bg-white px-2.5 py-1 font-bold">
+                  {confirmation.appointmentMatched ? "Appointment check-in" : "Waiting list"}
+                </span>
+                {confirmation.queueNumber ? <span className="rounded-full bg-white px-2.5 py-1 font-bold">Queue #{confirmation.queueNumber}</span> : null}
+              </div>
+              <div className="text-sm">{confirmation.nextAction || "Record vitals, then wait for the clinician."}</div>
             </div>
           </div>
         </div>
@@ -196,7 +224,7 @@ export function PatientCheckIn({
             <p className={isTablet ? "mt-2 max-w-3xl text-base leading-7 text-[#66736d]" : "mt-1 max-w-2xl text-sm leading-6 text-[#66736d]"}>
               {isTablet
                 ? "Choose what you want to use, enter the details, then select whether this is a new visit or follow-up."
-                : "Enter a cell number, Harmony patient ID, or National / Passport ID, then choose whether this is a new visit or follow-up."}
+                : "Search for the patient, choose New visit or Follow up, and the system will activate today's visit flow. If there is no appointment, the patient is added to the waiting list with a queue number."}
             </p>
           </div>
           {!isTablet && (
@@ -268,7 +296,7 @@ export function PatientCheckIn({
                   type="button"
                 >
                   <ClipboardPlus size={18} />
-                  New visit
+                  Activate new visit
                 </LoadingButton>
                 <LoadingButton
                   loading={submittingType === `${lookup.patient}-follow_up`}
@@ -318,7 +346,7 @@ export function PatientCheckIn({
                   type="button"
                 >
                   <ClipboardPlus size={17} />
-                  New visit
+                  Activate new visit
                 </LoadingButton>
                 <LoadingButton
                   loading={submittingType === `${patient.id}-follow_up`}
