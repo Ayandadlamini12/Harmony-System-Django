@@ -252,8 +252,11 @@ def render_consent_pdf(patient: Patient, document: PatientDocument) -> bytes:
 def save_consent_pdf(document: PatientDocument) -> PatientDocument:
     pdf_bytes = render_consent_pdf(document.patient, document)
     reference = consent_document_reference(document.patient, document)
-    document.file.save(f"{reference}.pdf", ContentFile(pdf_bytes), save=False)
-    document.save(update_fields=["file", "verification_payload", "updated_at"])
+    previous_file_name = document.file.name if document.file else ""
+    if previous_file_name and document.file.storage.exists(previous_file_name):
+        document.file.storage.delete(previous_file_name)
+    document.file.save("consent.pdf", ContentFile(pdf_bytes), save=False)
+    document.save(update_fields=["file", "status", "verification_payload", "signed_at", "verified_by", "updated_at"])
     return document
 
 

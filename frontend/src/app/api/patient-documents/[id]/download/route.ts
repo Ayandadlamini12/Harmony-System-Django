@@ -12,7 +12,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
     status: response.status,
     headers: {
       "Content-Type": response.headers.get("Content-Type") || "application/pdf",
-      "Content-Disposition": response.headers.get("Content-Disposition") || "inline"
+      "Content-Disposition": response.headers.get("Content-Disposition") || "inline",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      "Pragma": "no-cache"
     }
   });
 }

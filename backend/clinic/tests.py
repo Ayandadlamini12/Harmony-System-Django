@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientJourney, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientProfile, Visit, Vital
 
 User = get_user_model()
 
@@ -130,6 +130,47 @@ class PatientApiTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["id"], patient.id)
         self.assertEqual(response.data["public_id"], str(patient.public_id))
+
+    def test_consent_signature_updates_document_and_download(self):
+        patient = Patient.objects.create(
+            first_name="Zahara",
+            last_name="Dlamini",
+            gender="female",
+            primary_phone="+26876001048",
+        )
+
+        create_response = self.client.post(f"/api/patients/{patient.public_id}/documents/consent/", {}, format="json")
+        self.assertEqual(create_response.status_code, 201)
+        document = PatientDocument.objects.get()
+        original_file_name = document.file.name
+
+        signature_response = self.client.post(
+            f"/api/patient-documents/{document.id}/sign/",
+            {
+                "signer_name": "Zahara Dlamini",
+                "signer_capacity": "Patient",
+                "acknowledgement": True,
+                "signature_image": "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+/p9sAAAAASUVORK5CYII=",
+            },
+            format="json",
+        )
+
+        self.assertEqual(signature_response.status_code, 200)
+        document.refresh_from_db()
+        patient.refresh_from_db()
+        self.assertEqual(document.status, PatientDocument.Status.SIGNED)
+        self.assertEqual(signature_response.data["status"], PatientDocument.Status.SIGNED)
+        self.assertEqual(patient.consent_status, Patient.ConsentStatus.SIGNED)
+        self.assertIn("digital_signature", document.verification_payload)
+        self.assertTrue(document.file.name.endswith(".pdf"))
+        self.assertNotEqual(document.file.name, "")
+        self.assertEqual(PatientDocument.objects.count(), 1)
+
+        download_response = self.client.get(f"/api/patient-documents/{document.id}/download/")
+        self.assertEqual(download_response.status_code, 200)
+        self.assertEqual(download_response["Cache-Control"], "no-store, no-cache, must-revalidate, max-age=0")
+        document.refresh_from_db()
+        self.assertEqual(document.file.name, original_file_name)
 
 
 class DashboardApiTests(APITestCase):

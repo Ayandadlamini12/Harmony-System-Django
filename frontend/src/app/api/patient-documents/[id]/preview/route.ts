@@ -11,7 +11,9 @@ export async function GET(_request: Request, { params }: { params: Promise<{ id:
   return new Response(await response.text(), {
     status: response.status,
     headers: {
-      "Content-Type": response.headers.get("Content-Type") || "text/html; charset=utf-8"
+      "Content-Type": response.headers.get("Content-Type") || "text/html; charset=utf-8",
+      "Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+      "Pragma": "no-cache"
     }
   });
 }

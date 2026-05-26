@@ -375,7 +375,7 @@ function DocumentsTab({ patient }: { patient: Patient }) {
       }
       setDocuments((current) => [data, ...current.filter((document) => document.id !== data.id)]);
       toast.success(response.status === 201 ? "Consent form generated" : "Existing consent form opened");
-      window.open(`/api/patient-documents/${data.id}/download`, "_blank", "noopener,noreferrer");
+      window.open(`/api/patient-documents/${data.id}/download?v=${Date.now()}`, "_blank", "noopener,noreferrer");
     } catch {
       setError("Consent form could not be generated. Check the connection and try again.");
     } finally {
@@ -423,7 +423,7 @@ function DocumentsTab({ patient }: { patient: Patient }) {
                   />
                 )}
                 <Button asChild variant="secondary" size="sm">
-                  <a href={`/api/patient-documents/${document.id}/download`} target="_blank" rel="noreferrer">
+                  <a href={`/api/patient-documents/${document.id}/download?v=${encodeURIComponent(document.updated_at || document.status)}`} target="_blank" rel="noreferrer">
                     <Download size={15} />
                     Open PDF
                   </a>
@@ -533,7 +533,7 @@ function ConsentSignatureDialog({
       }
       onSigned(data);
       toast.success("Consent form signed");
-      window.open(`/api/patient-documents/${data.id}/download`, "_blank", "noopener,noreferrer");
+      window.open(`/api/patient-documents/${data.id}/download?v=${Date.now()}`, "_blank", "noopener,noreferrer");
       setOpen(false);
     } catch {
       setError("Consent form could not be signed. Check the connection and try again.");
