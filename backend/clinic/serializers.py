@@ -1,4 +1,5 @@
 from django.db import transaction
+from django.utils import timezone
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
@@ -354,7 +355,7 @@ class PatientListSerializer(serializers.ModelSerializer):
         return visit.visit_date if visit else None
 
     def get_current_journey(self, obj):
-        journey = obj.journeys.filter(is_active=True).order_by("-service_date", "-created_at").first()
+        journey = obj.journeys.filter(is_active=True, service_date=timezone.localdate()).order_by("-created_at").first()
         if not journey:
             return None
         return {

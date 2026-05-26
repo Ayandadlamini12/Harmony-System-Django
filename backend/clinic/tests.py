@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
@@ -306,6 +308,43 @@ class PatientCheckInApiTests(APITestCase):
 
         self.assertEqual(PatientJourney.objects.get(patient=self.patient).queue_number, 1)
         self.assertEqual(PatientJourney.objects.get(patient=second_patient).queue_number, 2)
+
+    def test_patient_cannot_be_checked_in_twice_on_same_service_day(self):
+        first_response = self.client.post(
+            "/api/check-ins/",
+            {"identifier": self.patient.patient_code, "visit_type": "new_consultation", "method": "tablet", "identifier_type": "patient_code"},
+            format="json",
+        )
+        second_response = self.client.post(
+            "/api/check-ins/",
+            {"identifier": self.patient.patient_code, "visit_type": "new_consultation", "method": "tablet", "identifier_type": "patient_code"},
+            format="json",
+        )
+
+        self.assertEqual(first_response.status_code, 201)
+        self.assertEqual(second_response.status_code, 409)
+        self.assertIn("already has an active visit flow today", second_response.data["detail"])
+        self.assertEqual(PatientCheckIn.objects.filter(patient=self.patient).count(), 1)
+
+    def test_check_in_allows_new_activation_after_midnight_service_date_changes(self):
+        yesterday_check_in = PatientCheckIn.objects.create(patient=self.patient, visit_type="new_consultation")
+        PatientJourney.objects.create(
+            patient=self.patient,
+            check_in=yesterday_check_in,
+            service_date=timezone.localdate() - timedelta(days=1),
+            current_stage=PatientJourney.Stage.QUEUED,
+            flow_type=PatientJourney.FlowType.WALK_IN_QUEUE,
+            queue_number=1,
+        )
+
+        response = self.client.post(
+            "/api/check-ins/",
+            {"identifier": self.patient.patient_code, "visit_type": "follow_up", "method": "tablet", "identifier_type": "patient_code"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertEqual(PatientCheckIn.objects.filter(patient=self.patient).count(), 2)
 
     def test_check_in_matches_same_day_appointment(self):
         clinician = User.objects.create_user(username="doctor_appt", password="password123", role="clinician")

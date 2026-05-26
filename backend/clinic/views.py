@@ -152,6 +152,33 @@ def start_journey_for_check_in(check_in, request=None):
     return journey
 
 
+def active_journey_for_today(patient):
+    return (
+        PatientJourney.objects.filter(
+            patient=patient,
+            service_date=timezone.localdate(),
+            is_active=True,
+        )
+        .order_by("-created_at")
+        .first()
+    )
+
+
+def check_in_response_payload(serializer, journey):
+    response_data = serializer.data
+    response_data["journey"] = PatientJourneySerializer(journey).data if journey else None
+    response_data["appointment_matched"] = bool(journey and journey.appointment_matched)
+    response_data["queue_number"] = journey.queue_number if journey else None
+    response_data["flow_status"] = journey.current_stage if journey else ""
+    response_data["flow_status_label"] = journey.get_current_stage_display() if journey else ""
+    response_data["next_action"] = (
+        "Record vitals, then wait for the clinician."
+        if journey and not journey.appointment_matched
+        else "Appointment checked in. Record vitals, then wait for the clinician."
+    )
+    return response_data
+
+
 def default_clinician():
     clinician = User.objects.filter(is_active=True, role="clinician").order_by("id").first()
     if clinician:
@@ -453,6 +480,7 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
                 "patient_name": patient.full_name_display,
                 "patient_code": patient.patient_code,
                 "primary_phone": patient.primary_phone,
+                "current_journey": PatientJourneySerializer(active_journey_for_today(patient)).data if active_journey_for_today(patient) else None,
             }
         )
 
@@ -464,21 +492,26 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
             if not patient:
                 return Response({"detail": "No matching registered patient found."}, status=status.HTTP_404_NOT_FOUND)
             data["patient"] = patient.id
+        else:
+            patient = get_object_or_404(Patient, pk=data.get("patient"))
+
+        existing_journey = active_journey_for_today(patient)
+        if existing_journey:
+            return Response(
+                {
+                    "detail": "This patient already has an active visit flow today. Activations reset at 00:00.",
+                    "journey": PatientJourneySerializer(existing_journey).data,
+                    "appointment_matched": existing_journey.appointment_matched,
+                    "queue_number": existing_journey.queue_number,
+                    "flow_status": existing_journey.current_stage,
+                    "flow_status_label": existing_journey.get_current_stage_display(),
+                },
+                status=status.HTTP_409_CONFLICT,
+            )
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
         journey = self.perform_create(serializer)
-        response_data = serializer.data
-        response_data["journey"] = PatientJourneySerializer(journey).data if journey else None
-        response_data["appointment_matched"] = bool(journey and journey.appointment_matched)
-        response_data["queue_number"] = journey.queue_number if journey else None
-        response_data["flow_status"] = journey.current_stage if journey else ""
-        response_data["flow_status_label"] = journey.get_current_stage_display() if journey else ""
-        response_data["next_action"] = (
-            "Record vitals, then wait for the clinician."
-            if journey and not journey.appointment_matched
-            else "Appointment checked in. Record vitals, then wait for the clinician."
-        )
-        return Response(response_data, status=status.HTTP_201_CREATED)
+        return Response(check_in_response_payload(serializer, journey), status=status.HTTP_201_CREATED)
 
     def perform_create(self, serializer):
         check_in = serializer.save()

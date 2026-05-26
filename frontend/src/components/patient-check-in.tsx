@@ -37,11 +37,23 @@ function matchesPatient(patient: Patient, query: string) {
   return searchableText.includes(text) || (digits.length >= 4 && searchableDigits.includes(digits));
 }
 
+function todayKey() {
+  const today = new Date();
+  const month = String(today.getMonth() + 1).padStart(2, "0");
+  const day = String(today.getDate()).padStart(2, "0");
+  return `${today.getFullYear()}-${month}-${day}`;
+}
+
+function hasTodayActivation(patient: Patient, activatedPatientIds: Set<number>) {
+  return activatedPatientIds.has(patient.id) || patient.current_journey?.service_date === todayKey();
+}
+
 type LookupResult = {
   patient: number;
   patient_name: string;
   patient_code: string;
   primary_phone?: string;
+  current_journey?: Patient["current_journey"];
 };
 
 type CheckInConfirmation = {
@@ -92,6 +104,7 @@ export function PatientCheckIn({
   const [searching, setSearching] = useState(false);
   const [submittingType, setSubmittingType] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<CheckInConfirmation | null>(null);
+  const [activatedPatientIds, setActivatedPatientIds] = useState<Set<number>>(new Set());
   const matches = useMemo(() => remotePatients.filter((patient) => matchesPatient(patient, query)).slice(0, 8), [remotePatients, query]);
   const hasQuery = query.trim().length > 0;
   const isTablet = mode === "tablet";
@@ -173,6 +186,9 @@ export function PatientCheckIn({
       if (!response.ok) {
         toast.error(data.detail || "Check-in could not be completed");
         return;
+      }
+      if (patient || lookup?.patient) {
+        setActivatedPatientIds((current) => new Set(current).add(patient || lookup!.patient));
       }
       setConfirmation({
         patientName: data.patient_name || lookup?.patient_name || "Patient",
@@ -290,6 +306,7 @@ export function PatientCheckIn({
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
                 <LoadingButton
+                  disabled={lookup.current_journey?.service_date === todayKey() || activatedPatientIds.has(lookup.patient)}
                   loading={submittingType === `${lookup.patient}-new_consultation`}
                   loadingText="Checking in..."
                   onClick={() => checkIn({ patient: lookup.patient, visitType: "new_consultation" })}
@@ -299,6 +316,7 @@ export function PatientCheckIn({
                   Activate new visit
                 </LoadingButton>
                 <LoadingButton
+                  disabled={lookup.current_journey?.service_date === todayKey() || activatedPatientIds.has(lookup.patient)}
                   loading={submittingType === `${lookup.patient}-follow_up`}
                   loadingText="Checking in..."
                   onClick={() => checkIn({ patient: lookup.patient, visitType: "follow_up" })}
@@ -309,6 +327,11 @@ export function PatientCheckIn({
                   Follow up
                 </LoadingButton>
               </div>
+              {(lookup.current_journey?.service_date === todayKey() || activatedPatientIds.has(lookup.patient)) && (
+                <div className="rounded-lg border border-[#f6d58b] bg-[#fff8e6] p-3 text-sm font-semibold text-[#875400]">
+                  This patient already has an active visit flow today. Activations reset at 00:00.
+                </div>
+              )}
             </div>
           ) : (
             <div className="flex items-start gap-3 rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4 text-[#66736d]">
@@ -336,10 +359,12 @@ export function PatientCheckIn({
                   {patient.primary_phone && <span>{patient.primary_phone}</span>}
                   {patient.national_id && <span>ID: {patient.national_id}</span>}
                   {patient.town_or_locality && <span>{patient.town_or_locality}</span>}
+                  {hasTodayActivation(patient, activatedPatientIds) && <span className="font-bold text-[#875400]">Already activated today</span>}
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
                 <LoadingButton
+                  disabled={hasTodayActivation(patient, activatedPatientIds)}
                   loading={submittingType === `${patient.id}-new_consultation`}
                   loadingText="Checking in..."
                   onClick={() => checkIn({ patient: patient.id, visitType: "new_consultation" })}
@@ -349,6 +374,7 @@ export function PatientCheckIn({
                   Activate new visit
                 </LoadingButton>
                 <LoadingButton
+                  disabled={hasTodayActivation(patient, activatedPatientIds)}
                   loading={submittingType === `${patient.id}-follow_up`}
                   loadingText="Checking in..."
                   onClick={() => checkIn({ patient: patient.id, visitType: "follow_up" })}
