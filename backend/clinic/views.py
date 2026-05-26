@@ -316,16 +316,28 @@ class PatientViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"], url_path="documents/consent")
     def generate_consent(self, request, pk=None):
         patient = self.get_object()
+        existing_document = (
+            patient.documents.filter(document_type=PatientDocument.DocumentType.CONSENT_FORM)
+            .exclude(status=PatientDocument.Status.REJECTED)
+            .exclude(file="")
+            .order_by("-created_at")
+            .first()
+        )
+        if existing_document:
+            serializer = PatientDocumentSerializer(existing_document, context={"request": request})
+            return Response(serializer.data, status=status.HTTP_200_OK)
+
         document = generate_consent_pdf(patient, request)
+        audit_data = PatientDocumentSerializer(document, context={"request": request}).data
         write_audit_log(
             request=request,
             action="generate",
             instance=document,
             entity_type="patient_document",
-            after_data=snapshot_instance(document),
+            after_data=audit_data,
             details="Consent form generated.",
         )
-        return Response(PatientDocumentSerializer(document, context={"request": request}).data, status=status.HTTP_201_CREATED)
+        return Response(audit_data, status=status.HTTP_201_CREATED)
 
 
 class PatientDocumentViewSet(viewsets.ReadOnlyModelViewSet):

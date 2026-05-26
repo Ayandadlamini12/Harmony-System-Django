@@ -5,6 +5,7 @@ import { Check, ClipboardList, Download, Eye, FileText, HeartPulse, ListChecks, 
 import { useState } from "react";
 import { toast } from "sonner";
 
+import { ActionErrorDialog } from "@/components/action-error-dialog";
 import { ClinicalPanel } from "@/components/clinical-panel";
 import { PatientAppointmentDialog } from "@/components/patient-appointment-dialog";
 import { PatientVitalsDialog } from "@/components/patient-vitals-dialog";
@@ -357,19 +358,24 @@ function FollowUpsTab({ visits }: { visits: Visit[] }) {
 function DocumentsTab({ patient }: { patient: Patient }) {
   const [documents, setDocuments] = useState(patient.documents || []);
   const [generating, setGenerating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const activeConsentDocument = documents.find((document) => document.document_type === "consent_form" && document.status !== "rejected");
 
   async function generateConsent() {
     setGenerating(true);
+    setError(null);
     try {
       const response = await fetch(`/api/patients/${patient.public_id}/documents/consent`, { method: "POST" });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        toast.error(data.detail || "Consent form could not be generated.");
+        setError(data.detail || "Consent form could not be generated. Please try again or refresh the patient record.");
         return;
       }
       setDocuments((current) => [data, ...current.filter((document) => document.id !== data.id)]);
-      toast.success("Consent form generated");
+      toast.success(response.status === 201 ? "Consent form generated" : "Existing consent form opened");
       window.open(`/api/patient-documents/${data.id}/download`, "_blank", "noopener,noreferrer");
+    } catch {
+      setError("Consent form could not be generated. Check the connection and try again.");
     } finally {
       setGenerating(false);
     }
@@ -377,17 +383,24 @@ function DocumentsTab({ patient }: { patient: Patient }) {
 
   return (
     <ClinicalPanel title="Documents" icon={<ClipboardList size={17} />}>
+      <ActionErrorDialog
+        open={Boolean(error)}
+        title="Consent form unavailable"
+        description="The document action was not completed."
+        message={error || ""}
+        onOpenChange={(open) => !open && setError(null)}
+      />
       <div className="grid gap-4">
         <div className="flex flex-col gap-3 rounded-lg border border-[#d8c0e8] bg-[#f7f0fb] p-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <div className="text-sm font-bold text-[var(--hh-purple-dark)]">Consent form</div>
             <p className="mt-1 text-sm leading-6 text-[#53605a]">
-              Generate the internal consent document before clinical consultation starts. It can be signed in-system later or printed for manual signing.
+              Generate the internal consent document before clinical consultation starts. If one already exists, the system opens the existing document instead of creating another copy.
             </p>
           </div>
           <Button type="button" onClick={generateConsent} disabled={generating}>
             <FileText size={16} />
-            {generating ? "Generating..." : "Generate consent"}
+            {generating ? "Opening..." : activeConsentDocument ? "Open consent" : "Generate consent"}
           </Button>
         </div>
         <div className="divide-y divide-[var(--hh-border)] rounded-lg border border-[var(--hh-border)] bg-white">
