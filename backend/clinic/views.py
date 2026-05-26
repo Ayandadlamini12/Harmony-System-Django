@@ -14,7 +14,7 @@ from rest_framework.response import Response
 
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
-from .document_generation import generate_consent_pdf
+from .document_generation import generate_consent_pdf, sign_consent_document
 from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 from .serializers import (
     AuditLogSerializer,
@@ -353,6 +353,42 @@ class PatientDocumentViewSet(viewsets.ReadOnlyModelViewSet):
         if not document.file:
             return Response({"detail": "Document file is not available."}, status=status.HTTP_404_NOT_FOUND)
         return FileResponse(document.file.open("rb"), as_attachment=False, filename=document.file.name.split("/")[-1])
+
+    @action(detail=True, methods=["post"])
+    def sign(self, request, pk=None):
+        document = self.get_object()
+        if document.document_type != PatientDocument.DocumentType.CONSENT_FORM:
+            return Response({"detail": "Only consent forms can be digitally signed here."}, status=status.HTTP_400_BAD_REQUEST)
+        if document.status in {PatientDocument.Status.SIGNED, PatientDocument.Status.VERIFIED}:
+            return Response({"detail": "This consent form has already been signed."}, status=status.HTTP_409_CONFLICT)
+        signer_name = str(request.data.get("signer_name", "")).strip()
+        signer_capacity = str(request.data.get("signer_capacity", "")).strip()
+        acknowledgement = bool(request.data.get("acknowledgement"))
+        if not signer_name:
+            return Response({"detail": "Signer name is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not signer_capacity:
+            return Response({"detail": "Signer capacity is required."}, status=status.HTTP_400_BAD_REQUEST)
+        if not acknowledgement:
+            return Response({"detail": "Consent acknowledgement is required before signing."}, status=status.HTTP_400_BAD_REQUEST)
+
+        before_data = PatientDocumentSerializer(document, context={"request": request}).data
+        signed_document = sign_consent_document(
+            document,
+            signer_name=signer_name,
+            signer_capacity=signer_capacity,
+            request=request,
+        )
+        after_data = PatientDocumentSerializer(signed_document, context={"request": request}).data
+        write_audit_log(
+            request=request,
+            action="sign",
+            instance=signed_document,
+            entity_type="patient_document",
+            before_data=before_data,
+            after_data=after_data,
+            details="Consent form digitally signed.",
+        )
+        return Response(after_data)
 
 
 class VisitViewSet(viewsets.ModelViewSet):

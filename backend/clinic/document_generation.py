@@ -3,6 +3,7 @@ from django.core.files.base import ContentFile
 from django.template.loader import render_to_string
 from django.utils import timezone
 from io import BytesIO
+from pathlib import Path
 
 from .models import Patient, PatientDocument
 
@@ -32,7 +33,11 @@ def make_qr_png(payload: str) -> BytesIO:
     return buffer
 
 
-def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, reference: str, verification_url: str) -> bytes:
+def logo_path() -> Path:
+    return settings.BASE_DIR / "clinic" / "static" / "clinic" / "brand" / "harmony-letterhead.webp"
+
+
+def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, reference: str, verification_url: str, signature_data=None) -> bytes:
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -54,12 +59,26 @@ def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, ref
     styles.add(ParagraphStyle(name="HarmonyHeading", parent=styles["Heading2"], textColor=colors.HexColor("#5b2388"), fontSize=11, leading=14, spaceBefore=10, spaceAfter=4))
     styles.add(ParagraphStyle(name="HarmonyBody", parent=styles["BodyText"], fontSize=9.5, leading=14, spaceAfter=5))
     styles.add(ParagraphStyle(name="Small", parent=styles["BodyText"], fontSize=7.5, leading=10, textColor=colors.HexColor("#53605a")))
-    story = [
-        Paragraph("Harmony Health", styles["Small"]),
-        Paragraph("Consent to Homeopathic Care and Wellness Support", styles["HarmonyTitle"]),
-        Paragraph(f"Document reference: {reference}", styles["Small"]),
-        Spacer(1, 8),
-    ]
+    header_cells = []
+    if logo_path().exists():
+        header_cells.append(Image(str(logo_path()), width=42 * mm, height=32 * mm))
+    else:
+        header_cells.append(Paragraph("<b>Harmony Health</b><br/>Healthy Choices Today", styles["Small"]))
+    header_cells.append(
+        Paragraph(
+            "<b>Consent to Homeopathic Care and Wellness Support</b><br/>"
+            f"<font size='8'>Document reference: {reference}</font><br/>"
+            "<font size='8'>Private patient record - consent required before clinical care</font>",
+            styles["HarmonyTitle"],
+        )
+    )
+    header = Table([header_cells], colWidths=[48 * mm, 132 * mm])
+    header.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LINEBELOW", (0, 0), (-1, -1), 2, colors.HexColor("#69be28")),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+    story = [header, Spacer(1, 8)]
     meta = [
         ["Patient name", patient.full_name_display, "Patient code", patient.patient_code],
         ["National / Passport ID", patient.national_id or "Not provided", "Date of birth", patient.date_of_birth or "Not provided"],
@@ -90,10 +109,19 @@ def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, ref
     for heading, body in sections:
         story.append(Paragraph(heading, styles["HarmonyHeading"]))
         story.append(Paragraph(body, styles["HarmonyBody"]))
+    digital_signature_text = "Not digitally signed yet"
+    if signature_data:
+        digital_signature_text = (
+            f"Digitally signed by {signature_data.get('signer_name')} "
+            f"as {signature_data.get('signer_capacity')} on {signature_data.get('signed_at')}"
+        )
     signature_table = Table(
         [
-            ["Patient / guardian signature", "Reception / witness signature"],
-            ["\n\n_______________________________\nName: %s\nDate: ______________________" % patient.full_name_display, "\n\n_______________________________\nName: ______________________\nDate: ______________________"],
+            ["Patient / guardian manual signature", "Digital signature record"],
+            [
+                "\n\n_______________________________\nName: %s\nDate: ______________________" % patient.full_name_display,
+                f"\n\n{digital_signature_text}\nMethod: {signature_data.get('method', 'Typed name acknowledgement') if signature_data else 'Awaiting in-system signature'}",
+            ],
         ],
         colWidths=[90 * mm, 90 * mm],
     )
@@ -107,7 +135,7 @@ def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, ref
         ("TOPPADDING", (0, 0), (-1, -1), 8),
     ]))
     qr = Image(make_qr_png(verification_url), width=30 * mm, height=30 * mm)
-    verification = Table([[qr, Paragraph(f"<b>Verification and barcode-ready reference</b><br/>Reference: {reference}<br/>Document ID: {document.document_id}<br/>Verification target: {verification_url}", styles["Small"])]], colWidths=[34 * mm, 140 * mm])
+    verification = Table([[qr, Paragraph(f"<b>Verification and barcode-ready reference</b><br/>Reference: {reference}<br/>Document ID: {document.document_id}<br/>Verification target: {verification_url}<br/>Status: {document.get_status_display()}", styles["Small"])]], colWidths=[34 * mm, 140 * mm])
     verification.setStyle(TableStyle([("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#b7c8bf")), ("VALIGN", (0, 0), (-1, -1), "MIDDLE")]))
     story += [Spacer(1, 8), signature_table, Spacer(1, 10), verification]
 
@@ -122,24 +150,19 @@ def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, ref
     return buffer.getvalue()
 
 
-def generate_consent_pdf(patient: Patient, request=None) -> PatientDocument:
-    user = request.user if request and request.user.is_authenticated else None
-    document = PatientDocument.objects.create(
-        patient=patient,
-        document_type=PatientDocument.DocumentType.CONSENT_FORM,
-        title="Harmony Health Consent to Homeopathic Care",
-        status=PatientDocument.Status.PENDING_SIGNATURE,
-        generated_by=user,
-    )
+def render_consent_pdf(patient: Patient, document: PatientDocument) -> bytes:
     public_base_url = getattr(settings, "HARMONY_PUBLIC_URL", "").rstrip("/")
     verification_url = f"{public_base_url}/documents/verify/{document.document_id}" if public_base_url else str(document.document_id)
     reference = consent_document_reference(patient, document)
+    signature_data = document.verification_payload.get("digital_signature") if document.verification_payload else None
     document.verification_payload = {
+        **document.verification_payload,
         "reference": reference,
         "document_id": str(document.document_id),
         "patient_code": patient.patient_code,
         "patient_name": patient.full_name_display,
         "document_type": document.document_type,
+        "status": document.status,
         "issued_at": timezone.now().isoformat(),
         "verification_url": verification_url,
     }
@@ -153,6 +176,8 @@ def generate_consent_pdf(patient: Patient, request=None) -> PatientDocument:
             "issued_at": timezone.localtime(),
             "verification_url": verification_url,
             "qr_svg": make_qr_svg(verification_url),
+            "logo_url": logo_path().as_uri() if logo_path().exists() else "",
+            "signature_data": signature_data,
             "organization_name": "Harmony Health",
             "tagline": "Healthy Choices Today",
         },
@@ -163,12 +188,55 @@ def generate_consent_pdf(patient: Patient, request=None) -> PatientDocument:
 
         pdf_bytes = HTML(string=html, base_url=str(settings.BASE_DIR)).write_pdf()
     except Exception:
-        pdf_bytes = build_reportlab_consent_pdf(patient, document, reference, verification_url)
+        pdf_bytes = build_reportlab_consent_pdf(patient, document, reference, verification_url, signature_data)
+    return pdf_bytes
+
+
+def save_consent_pdf(document: PatientDocument) -> PatientDocument:
+    pdf_bytes = render_consent_pdf(document.patient, document)
+    reference = consent_document_reference(document.patient, document)
     document.file.save(f"{reference}.pdf", ContentFile(pdf_bytes), save=False)
     document.save(update_fields=["file", "verification_payload", "updated_at"])
+    return document
+
+
+def generate_consent_pdf(patient: Patient, request=None) -> PatientDocument:
+    user = request.user if request and request.user.is_authenticated else None
+    document = PatientDocument.objects.create(
+        patient=patient,
+        document_type=PatientDocument.DocumentType.CONSENT_FORM,
+        title="Harmony Health Consent to Homeopathic Care",
+        status=PatientDocument.Status.PENDING_SIGNATURE,
+        generated_by=user,
+    )
+    save_consent_pdf(document)
 
     if patient.consent_status == Patient.ConsentStatus.PENDING:
         patient.consent_status = Patient.ConsentStatus.GENERATED
         patient.save(update_fields=["consent_status", "updated_at"])
 
+    return document
+
+
+def sign_consent_document(document: PatientDocument, *, signer_name: str, signer_capacity: str, request=None) -> PatientDocument:
+    user = request.user if request and request.user.is_authenticated else None
+    signed_at = timezone.now()
+    document.status = PatientDocument.Status.SIGNED
+    document.signed_at = signed_at
+    document.verified_by = user
+    document.verification_payload = {
+        **document.verification_payload,
+        "digital_signature": {
+            "signer_name": signer_name,
+            "signer_capacity": signer_capacity,
+            "method": "Typed name acknowledgement",
+            "signed_at": signed_at.isoformat(),
+            "signed_by_user_id": user.id if user else None,
+            "signed_by_username": user.get_username() if user else "",
+        },
+    }
+    save_consent_pdf(document)
+    patient = document.patient
+    patient.consent_status = Patient.ConsentStatus.SIGNED
+    patient.save(update_fields=["consent_status", "updated_at"])
     return document

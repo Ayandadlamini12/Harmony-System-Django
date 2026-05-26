@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Check, ClipboardList, Download, Eye, FileText, HeartPulse, ListChecks, LockKeyhole, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
+import { Check, ClipboardList, Download, Eye, FileText, HeartPulse, ListChecks, LockKeyhole, PenLine, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 
@@ -12,9 +12,10 @@ import { PatientVitalsDialog } from "@/components/patient-vitals-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
 import { relationshipLabel } from "@/lib/relationships";
-import type { Patient, Visit, Vital } from "@/types/clinic";
+import type { Patient, PatientDocument, Visit, Vital } from "@/types/clinic";
 
 const recordTabs = [
   { key: "overview", label: "Overview" },
@@ -412,18 +413,126 @@ function DocumentsTab({ patient }: { patient: Patient }) {
                   {document.document_type_label || document.document_type.replaceAll("_", " ")} - {document.status_label || document.status.replaceAll("_", " ")}
                 </div>
               </div>
-              <Button asChild variant="secondary" size="sm">
-                <a href={`/api/patient-documents/${document.id}/download`} target="_blank" rel="noreferrer">
-                  <Download size={15} />
-                  Open PDF
-                </a>
-              </Button>
+              <div className="flex flex-wrap gap-2">
+                {document.document_type === "consent_form" && document.status === "pending_signature" && (
+                  <ConsentSignatureDialog
+                    document={document}
+                    patient={patient}
+                    onSigned={(signedDocument) => setDocuments((current) => current.map((item) => (item.id === signedDocument.id ? signedDocument : item)))}
+                  />
+                )}
+                <Button asChild variant="secondary" size="sm">
+                  <a href={`/api/patient-documents/${document.id}/download`} target="_blank" rel="noreferrer">
+                    <Download size={15} />
+                    Open PDF
+                  </a>
+                </Button>
+              </div>
             </div>
           ))}
           {documents.length === 0 && <p className="p-4 text-sm text-[#66736d]">No documents have been uploaded or generated for this patient yet.</p>}
         </div>
       </div>
     </ClinicalPanel>
+  );
+}
+
+function ConsentSignatureDialog({
+  document,
+  patient,
+  onSigned
+}: {
+  document: PatientDocument;
+  patient: Patient;
+  onSigned: (document: PatientDocument) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [signing, setSigning] = useState(false);
+  const [signerName, setSignerName] = useState(patient.full_name_display);
+  const [signerCapacity, setSignerCapacity] = useState("Patient");
+  const [acknowledgement, setAcknowledgement] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function signDocument() {
+    setSigning(true);
+    setError(null);
+    try {
+      const response = await fetch(`/api/patient-documents/${document.id}/sign`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          signer_name: signerName,
+          signer_capacity: signerCapacity,
+          acknowledgement
+        })
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        setError(data.detail || "Consent form could not be signed.");
+        return;
+      }
+      onSigned(data);
+      toast.success("Consent form signed");
+      window.open(`/api/patient-documents/${data.id}/download`, "_blank", "noopener,noreferrer");
+      setOpen(false);
+    } catch {
+      setError("Consent form could not be signed. Check the connection and try again.");
+    } finally {
+      setSigning(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <ActionErrorDialog
+        open={Boolean(error)}
+        title="Consent signature unavailable"
+        description="The digital signature was not completed."
+        message={error || ""}
+        onOpenChange={(dialogOpen) => !dialogOpen && setError(null)}
+      />
+      <DialogTrigger asChild>
+        <Button type="button" size="sm">
+          <PenLine size={15} />
+          Sign digitally
+        </Button>
+      </DialogTrigger>
+      <DialogContent className="w-[min(94vw,560px)]">
+        <div className="border-b border-[var(--hh-border)] px-5 py-4">
+          <DialogTitle className="text-lg font-bold text-[var(--hh-purple-dark)]">Digital consent signature</DialogTitle>
+          <DialogDescription className="mt-1 text-sm text-[#66736d]">
+            Capture typed-name consent for {patient.full_name_display}. The PDF will be regenerated with the signature record.
+          </DialogDescription>
+        </div>
+        <div className="grid gap-4 p-5">
+          <label className="grid gap-1 text-sm font-bold text-[#53605a]">
+            Signer full name
+            <input className="h-11 rounded-lg border border-[var(--hh-border)] px-3 text-base font-normal text-[#17211d]" value={signerName} onChange={(event) => setSignerName(event.target.value)} />
+          </label>
+          <label className="grid gap-1 text-sm font-bold text-[#53605a]">
+            Signing capacity
+            <select className="h-11 rounded-lg border border-[var(--hh-border)] px-3 text-base font-normal text-[#17211d]" value={signerCapacity} onChange={(event) => setSignerCapacity(event.target.value)}>
+              <option>Patient</option>
+              <option>Parent / guardian</option>
+              <option>Authorized representative</option>
+            </select>
+          </label>
+          <label className="flex items-start gap-3 rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-3 text-sm leading-6 text-[#3f4d47]">
+            <input type="checkbox" className="mt-1 h-4 w-4" checked={acknowledgement} onChange={(event) => setAcknowledgement(event.target.checked)} />
+            <span>I confirm the patient or authorized signer has read, understood, and agreed to the Harmony Health consent form.</span>
+          </label>
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="button" onClick={signDocument} disabled={signing}>
+              <PenLine size={16} />
+              {signing ? "Signing..." : "Sign consent"}
+            </Button>
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
 }
 

@@ -47,16 +47,26 @@
       padding: 0;
     }
     .header {
-      align-items: flex-start;
+      align-items: center;
       border-bottom: 3px solid #69be28;
       display: flex;
       gap: 12pt;
       justify-content: space-between;
       padding-bottom: 10pt;
     }
+    .logo {
+      height: 62pt;
+      object-fit: contain;
+      width: 92pt;
+    }
+    .letterhead-main {
+      align-items: center;
+      display: flex;
+      gap: 12pt;
+    }
     .brand {
       color: #5b2388;
-      font-size: 10pt;
+      font-size: 15pt;
       font-weight: 700;
       text-transform: uppercase;
     }
@@ -75,6 +85,17 @@
       text-align: center;
       text-transform: uppercase;
       width: 118pt;
+    }
+    .document-strip {
+      background: #f7faf8;
+      border: 1px solid #b7c8bf;
+      border-radius: 6pt;
+      color: #53605a;
+      display: flex;
+      font-size: 8pt;
+      justify-content: space-between;
+      margin-top: 8pt;
+      padding: 5pt 8pt;
     }
     .meta {
       border: 1px solid #b7c8bf;
@@ -122,6 +143,22 @@
       min-height: 78pt;
       padding: 8pt;
     }
+    .digital-signature {
+      background: #f7faf8;
+      border: 1px solid #b7c8bf;
+      border-radius: 6pt;
+      margin-top: 10pt;
+      padding: 8pt;
+    }
+    .digital-signature.signed {
+      background: #edf9ef;
+      border-color: #69be28;
+    }
+    .digital-mark {
+      color: #2f7d3b;
+      font-size: 13pt;
+      font-weight: 700;
+    }
     .line {
       border-bottom: 1px solid #17211d;
       height: 26pt;
@@ -148,17 +185,25 @@
 </head>
 <body>
   <header class="header">
-    <div>
-      <div class="brand">{{ organization_name }}</div>
-      <div class="tagline">{{ tagline }}</div>
-      <h1>Consent to Homeopathic Care and Wellness Support</h1>
-      <p class="small">Document reference: {{ reference }}</p>
+    <div class="letterhead-main">
+      {% if logo_url %}
+      <img class="logo" src="{{ logo_url }}" alt="{{ organization_name }} logo">
+      {% endif %}
+      <div>
+        <div class="brand">{{ organization_name }}</div>
+        <div class="tagline">{{ tagline }}</div>
+        <h1>Consent to Homeopathic Care and Wellness Support</h1>
+      </div>
     </div>
     <div class="stamp">
-      Generated<br>
-      Pending Signature
+      {{ document.get_status_display }}<br>
+      Patient Consent
     </div>
   </header>
+  <section class="document-strip">
+    <span>Document reference: {{ reference }}</span>
+    <span>Generated: {{ issued_at|date:"d M Y H:i" }}</span>
+  </section>
 
   <section class="meta">
     <div><span class="label">Patient name</span><span class="value">{{ patient.full_name_display }}</span></div>
@@ -205,11 +250,24 @@
       <p class="small">Date: ___________________________</p>
     </div>
     <div class="signature-box">
-      <span class="label">Reception / witness signature</span>
+      <span class="label">Reception / witness confirmation</span>
       <div class="line"></div>
       <p class="small">Name: ___________________________</p>
       <p class="small">Date: ___________________________</p>
     </div>
+  </section>
+
+  <section class="digital-signature {% if signature_data %}signed{% endif %}">
+    <span class="label">Digital signature option</span>
+    {% if signature_data %}
+      <p class="digital-mark">Digitally signed and acknowledged</p>
+      <p class="small">Signed by: {{ signature_data.signer_name }}</p>
+      <p class="small">Capacity: {{ signature_data.signer_capacity }}</p>
+      <p class="small">Method: {{ signature_data.method }}</p>
+      <p class="small">Timestamp: {{ signature_data.signed_at }}</p>
+    {% else %}
+      <p class="small">This form may be signed manually after printing or signed inside Harmony Health MIS using typed-name acknowledgement. A digital signature will be written here after signing.</p>
+    {% endif %}
   </section>
 
   <section class="verification">
