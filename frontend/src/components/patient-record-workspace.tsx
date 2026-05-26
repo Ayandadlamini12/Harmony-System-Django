@@ -571,7 +571,7 @@ function ConsentSignatureDialog({
         {step === "review" ? (
           <div className="grid max-h-[78vh] gap-4 overflow-y-auto p-5">
             <div className="min-h-[640px] overflow-hidden rounded-lg border border-[var(--hh-border)] bg-white">
-              <iframe title="Consent form preview" src={`/api/patient-documents/${document.id}/download`} className="h-[72vh] min-h-[640px] w-full" />
+              <iframe title="Consent form preview" src={`/api/patient-documents/${document.id}/preview`} className="h-[72vh] min-h-[640px] w-full bg-white" />
             </div>
             <div className="sticky bottom-0 grid gap-3 rounded-lg border border-[var(--hh-border)] bg-white p-4 shadow-sm">
               <label className="flex items-start gap-3 text-sm leading-6 text-[#3f4d47]">

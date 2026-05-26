@@ -1,7 +1,7 @@
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.http import FileResponse
+from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
 import re
@@ -14,7 +14,7 @@ from rest_framework.response import Response
 
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
-from .document_generation import generate_consent_pdf, sign_consent_document
+from .document_generation import generate_consent_pdf, render_consent_html, sign_consent_document
 from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 from .serializers import (
     AuditLogSerializer,
@@ -353,6 +353,13 @@ class PatientDocumentViewSet(viewsets.ReadOnlyModelViewSet):
         if not document.file:
             return Response({"detail": "Document file is not available."}, status=status.HTTP_404_NOT_FOUND)
         return FileResponse(document.file.open("rb"), as_attachment=False, filename=document.file.name.split("/")[-1])
+
+    @action(detail=True, methods=["get"])
+    def preview(self, request, pk=None):
+        document = self.get_object()
+        if document.document_type != PatientDocument.DocumentType.CONSENT_FORM:
+            return Response({"detail": "Preview is only available for consent forms."}, status=status.HTTP_400_BAD_REQUEST)
+        return HttpResponse(render_consent_html(document), content_type="text/html; charset=utf-8")
 
     @action(detail=True, methods=["post"])
     def sign(self, request, pk=None):

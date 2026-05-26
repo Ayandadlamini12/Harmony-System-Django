@@ -4,6 +4,7 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 import base64
 from io import BytesIO
+from mimetypes import guess_type
 from pathlib import Path
 
 from .models import Patient, PatientDocument
@@ -50,6 +51,44 @@ def signature_image_buffer(signature_data) -> BytesIO | None:
 
 def logo_path() -> Path:
     return settings.BASE_DIR / "clinic" / "static" / "clinic" / "brand" / "harmony-letterhead.webp"
+
+
+def file_data_url(path: Path) -> str:
+    if not path.exists():
+        return ""
+    content_type = guess_type(path.name)[0] or "application/octet-stream"
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{content_type};base64,{encoded}"
+
+
+def consent_context(patient: Patient, document: PatientDocument) -> dict:
+    public_base_url = getattr(settings, "HARMONY_PUBLIC_URL", "").rstrip("/")
+    verification_url = f"{public_base_url}/documents/verify/{document.document_id}" if public_base_url else str(document.document_id)
+    reference = consent_document_reference(patient, document)
+    signature_data = document.verification_payload.get("digital_signature") if document.verification_payload else None
+    document.verification_payload = {
+        **document.verification_payload,
+        "reference": reference,
+        "document_id": str(document.document_id),
+        "patient_code": patient.patient_code,
+        "patient_name": patient.full_name_display,
+        "document_type": document.document_type,
+        "status": document.status,
+        "issued_at": timezone.now().isoformat(),
+        "verification_url": verification_url,
+    }
+    return {
+        "document": document,
+        "patient": patient,
+        "reference": reference,
+        "issued_at": timezone.localtime(),
+        "verification_url": verification_url,
+        "qr_svg": make_qr_svg(verification_url),
+        "logo_url": file_data_url(logo_path()),
+        "signature_data": signature_data,
+        "organization_name": "Harmony Health",
+        "tagline": "Healthy Choices Today",
+    }
 
 
 def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, reference: str, verification_url: str, signature_data=None) -> bytes:
@@ -170,45 +209,26 @@ def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, ref
     return buffer.getvalue()
 
 
-def render_consent_pdf(patient: Patient, document: PatientDocument) -> bytes:
-    public_base_url = getattr(settings, "HARMONY_PUBLIC_URL", "").rstrip("/")
-    verification_url = f"{public_base_url}/documents/verify/{document.document_id}" if public_base_url else str(document.document_id)
-    reference = consent_document_reference(patient, document)
-    signature_data = document.verification_payload.get("digital_signature") if document.verification_payload else None
-    document.verification_payload = {
-        **document.verification_payload,
-        "reference": reference,
-        "document_id": str(document.document_id),
-        "patient_code": patient.patient_code,
-        "patient_name": patient.full_name_display,
-        "document_type": document.document_type,
-        "status": document.status,
-        "issued_at": timezone.now().isoformat(),
-        "verification_url": verification_url,
-    }
+def render_consent_html(document: PatientDocument) -> str:
+    return render_to_string("clinic/documents/consent_form.html", consent_context(document.patient, document))
 
-    html = render_to_string(
-        "clinic/documents/consent_form.html",
-        {
-            "document": document,
-            "patient": patient,
-            "reference": reference,
-            "issued_at": timezone.localtime(),
-            "verification_url": verification_url,
-            "qr_svg": make_qr_svg(verification_url),
-            "logo_url": logo_path().as_uri() if logo_path().exists() else "",
-            "signature_data": signature_data,
-            "organization_name": "Harmony Health",
-            "tagline": "Healthy Choices Today",
-        },
-    )
+
+def render_consent_pdf(patient: Patient, document: PatientDocument) -> bytes:
+    context = consent_context(patient, document)
+    html = render_to_string("clinic/documents/consent_form.html", context)
 
     try:
         from weasyprint import HTML
 
         pdf_bytes = HTML(string=html, base_url=str(settings.BASE_DIR)).write_pdf()
     except Exception:
-        pdf_bytes = build_reportlab_consent_pdf(patient, document, reference, verification_url, signature_data)
+        pdf_bytes = build_reportlab_consent_pdf(
+            patient,
+            document,
+            context["reference"],
+            context["verification_url"],
+            context["signature_data"],
+        )
     return pdf_bytes
 
 
