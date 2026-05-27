@@ -1,15 +1,13 @@
+from datetime import timedelta
+
 from django.conf import settings
-from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.http import FileResponse, HttpResponse
+from django.http import HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-import re
-import uuid
-
-from django.db.models import Max, Q
-from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework import status, viewsets
+from rest_framework.decorators import action
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .access import has_patient_clinical_access, is_clinical_user
@@ -338,6 +336,20 @@ class PatientViewSet(viewsets.ModelViewSet):
             details="Consent form generated.",
         )
         return Response(audit_data, status=status.HTTP_201_CREATED)
+
+    @action(detail=False, methods=["get"], url_path="consent-forms")
+    def consent_forms(self, request):
+        renewal_days = getattr(settings, "CONSENT_RENEWAL_DAYS", 365)
+        cutoff = timezone.now().date() - timedelta(days=renewal_days)
+        pending = Patient.objects.filter(consent_status__in=("pending", "generated")).order_by("-created_at")
+        needs_renewal = Patient.objects.filter(
+            consent_status="signed",
+            documents__document_type=PatientDocument.DocumentType.CONSENT_FORM,
+            documents__status=PatientDocument.Status.SIGNED,
+            documents__signed_at__date__lt=cutoff,
+        ).distinct().order_by("-created_at")
+        serializer = PatientListSerializer(list(pending) + list(needs_renewal), many=True, context={"request": request})
+        return Response(serializer.data)
 
 
 class PatientDocumentViewSet(viewsets.ReadOnlyModelViewSet):

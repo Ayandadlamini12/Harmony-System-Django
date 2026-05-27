@@ -215,7 +215,60 @@ def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, ref
         story += [Spacer(1, 10)]
     story += [verification]
 
+    def draw_stamp(canvas):
+        """Draw a rubber stamp-style impression on the PDF."""
+        status_text = document.get_status_display().upper()
+        
+        # Determine stamp color and ink intensity based on status
+        if document.status == PatientDocument.Status.SIGNED:
+            stamp_color = colors.HexColor("#2E7D32")  # Green
+            fill_alpha = 0.25
+        elif document.status == PatientDocument.Status.PENDING_SIGNATURE:
+            stamp_color = colors.HexColor("#E67E22")  # Orange
+            fill_alpha = 0.25
+        elif document.status == PatientDocument.Status.VERIFIED:
+            stamp_color = colors.HexColor("#1565C0")  # Blue
+            fill_alpha = 0.25
+        else:
+            stamp_color = colors.HexColor("#757575")  # Grey
+            fill_alpha = 0.20
+        
+        canvas.saveState()
+        
+        # Position stamp in center-right of page, rotated 25 degrees
+        canvas.translate(A4[0] * 0.7, A4[1] * 0.5)
+        canvas.rotate(25)
+        
+        # Draw outer border rectangle (ink stamp frame)
+        border_width = 90 * mm
+        border_height = 50 * mm
+        canvas.setLineWidth(2)
+        canvas.setStrokeColor(stamp_color)
+        canvas.setFillAlpha(0)
+        canvas.rect(-border_width / 2, -border_height / 2, border_width, border_height)
+        
+        # Draw inner text with slight distortion effect (multiple layers for ink effect)
+        canvas.setFont("Helvetica-Bold", 24)
+        canvas.setFillColor(stamp_color)
+        canvas.setFillAlpha(fill_alpha)
+        
+        # Draw main status text
+        canvas.drawCentredString(0, 8, status_text)
+        
+        # Add company name below status
+        canvas.setFont("Helvetica-Bold", 10)
+        canvas.drawCentredString(0, -8, "HARMONY HEALTH")
+        
+        # Add date/time if signed
+        if document.signed_at:
+            signed_date = document.signed_at.strftime("%d %b %Y")
+            canvas.setFont("Helvetica", 9)
+            canvas.drawCentredString(0, -16, signed_date)
+        
+        canvas.restoreState()
+
     def footer(canvas, _doc):
+        draw_stamp(canvas)
         canvas.saveState()
         canvas.setFont("Helvetica", 7)
         canvas.setFillColor(colors.HexColor("#53605a"))

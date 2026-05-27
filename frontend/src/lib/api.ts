@@ -127,6 +127,15 @@ export function getMyClinicianProfile() {
   return apiGet<ClinicianProfile | null>("/users/me/clinician-profile/", null);
 }
 
+export function getConsentForms() {
+  return apiGet<Paginated<Patient>>("/patients/consent-forms/", {
+    count: 0,
+    next: null,
+    previous: null,
+    results: []
+  });
+}
+
 export function getEmployeeEnrollmentRequests(status = "") {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
   return apiGet<Paginated<EmployeeEnrollmentRequest>>(`/employee-enrollment-requests/${query}`, {
