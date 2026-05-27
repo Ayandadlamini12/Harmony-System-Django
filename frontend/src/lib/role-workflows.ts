@@ -53,10 +53,10 @@ export const navItems: NavItem[] = [
       { href: "/check-ins", label: "Check-In", icon: ClipboardCheck, roles: ["admin", "receptionist"] },
       { href: "/patient-flow", label: "Track Patient Flow", icon: ListChecks, roles: ["admin", "clinician", "receptionist"] },
       { href: "/vitals/new", label: "Add Vitals", icon: HeartPulse, roles: ["admin", "clinician"] },
-      { href: "/consent-forms", label: "Consent Forms", icon: FileText, roles: ["admin", "clinician", "receptionist"] },
       { href: "/messages", label: "Send Message", icon: MessageSquare, roles: ["admin", "clinician", "receptionist"], status: "planned" }
     ]
   },
+  { href: "/consent-forms", label: "Consent Forms", icon: FileText, roles: ["admin", "clinician", "receptionist"] },
   { href: "/appointments", label: "Appointments", icon: CalendarCheck, roles: ["admin", "clinician", "receptionist"] },
   { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "clinician"] },
   { href: "/messages", label: "Messages", icon: MessageSquare, roles: ["admin", "clinician", "receptionist"] },
@@ -100,6 +100,13 @@ export const workflowCards: WorkflowCard[] = [
     icon: ShieldCheck,
     roles: ["admin", "clinician"],
     status: "planned"
+  },
+  {
+    title: "Consent Forms",
+    description: "Patients awaiting consent signature or requiring renewal.",
+    href: "/consent-forms",
+    icon: FileText,
+    roles: ["admin", "clinician", "receptionist"]
   },
   {
     title: "Appointments",
