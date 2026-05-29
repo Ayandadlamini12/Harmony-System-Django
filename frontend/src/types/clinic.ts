@@ -107,6 +107,37 @@ export type FollowUpEvaluation = {
   evaluation_notes?: string;
 };
 
+export type Case = {
+  id: number;
+  patient: number;
+  patient_name?: string;
+  patient_code?: string;
+  visit: number;
+  visit_date?: string;
+  parent_case?: number | null;
+  parent_case_title?: string | null;
+  title: string;
+  main_complaint?: string;
+  physical_examination?: string;
+  diagnosis?: string;
+  remedy?: string;
+  reason_for_remedy?: string;
+  dietary_recommendation?: string;
+  lifestyle_recommendation?: string;
+  previous_consult_symptoms?: string;
+  dietary_changes?: string;
+  lifestyle_changes?: string;
+  exercise_notes?: string;
+  energy_notes?: string;
+  evaluation_notes?: string;
+  notes?: string;
+  status: "open" | "resolved";
+  resolved_at?: string | null;
+  practitioner?: number | null;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Vital = {
   id: number;
   visit: number;
