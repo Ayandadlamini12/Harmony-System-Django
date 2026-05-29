@@ -58,6 +58,7 @@
       height: 62pt;
       object-fit: contain;
       width: 92pt;
+      filter: drop-shadow(0 0 8px rgba(26, 77, 122, 0.3));
     }
     .letterhead-main {
       align-items: center;
@@ -258,11 +259,36 @@
       <p class="small">Name: {{ patient.full_name_display }}</p>
       <p class="small">Date: {% if signature_data %}{{ signature_data.signed_at }}{% else %}___________________________{% endif %}</p>
     </div>
-    <div class="signature-box">
-      <span class="label">Reception / witness confirmation</span>
-      <div class="line"></div>
-      <p class="small">Name: ___________________________</p>
-      <p class="small">Date: ___________________________</p>
+    <div class="signature-box" style="position: relative; background: #f9fafc; border: 1px dashed #1a4d7a;">
+      <span class="label">Harmony Health Confirmation Stamp</span>
+      <!-- Navy Blue Rubber Stamp -->
+      <div style="
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        width: 110px;
+        height: 55px;
+        transform: translate(-50%, -50%) rotate(25deg);
+        border: 2px solid #1a4d7a;
+        border-radius: 4px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        opacity: 0.15;
+        font-weight: bold;
+        font-size: 16px;
+        color: #1a4d7a;
+        line-height: 1.2;
+        pointer-events: none;
+      ">
+        <div>{{ document.get_status_display|upper }}</div>
+        <div style="font-size: 9px; margin-top: 2px;">HARMONY HEALTH</div>
+      </div>
+      <p class="small" style="color: #1a4d7a; font-size: 7.5pt; margin-top: 12pt; position: relative; z-index: 1;">
+        <em>The company stamp appears in this area automatically when the document is processed.</em>
+      </p>
+      <div style="height: 50pt; margin-top: 24pt;"></div>
     </div>
   </section>
 
