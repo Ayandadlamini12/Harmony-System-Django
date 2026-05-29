@@ -216,54 +216,51 @@ def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, ref
     story += [verification]
 
     def draw_stamp(canvas):
-        """Draw a rubber stamp-style impression on the PDF."""
-        status_text = document.get_status_display().upper()
-        
-        # Determine stamp color and ink intensity based on status
-        if document.status == PatientDocument.Status.SIGNED:
-            stamp_color = colors.HexColor("#2E7D32")  # Green
-            fill_alpha = 0.25
-        elif document.status == PatientDocument.Status.PENDING_SIGNATURE:
-            stamp_color = colors.HexColor("#E67E22")  # Orange
-            fill_alpha = 0.25
-        elif document.status == PatientDocument.Status.VERIFIED:
-            stamp_color = colors.HexColor("#1565C0")  # Blue
-            fill_alpha = 0.25
-        else:
-            stamp_color = colors.HexColor("#757575")  # Grey
-            fill_alpha = 0.20
+        """Draw company rubber stamp with details on the PDF."""
+        stamp_color = colors.HexColor("#1a4d7a")  # Navy blue
+        fill_alpha = 0.55
         
         canvas.saveState()
         
-        # Position stamp in center-right of page, rotated 25 degrees
-        canvas.translate(A4[0] * 0.7, A4[1] * 0.5)
+        # Position stamp in signature area (right column, lower area)
+        canvas.translate(A4[0] * 0.65, A4[1] * 0.35)
         canvas.rotate(25)
         
-        # Draw outer border rectangle (ink stamp frame)
-        border_width = 90 * mm
-        border_height = 50 * mm
-        canvas.setLineWidth(2)
+        # Draw outer border rectangle (stamp frame)
+        border_width = 75 * mm
+        border_height = 75 * mm
+        canvas.setLineWidth(1.5)
         canvas.setStrokeColor(stamp_color)
         canvas.setFillAlpha(0)
         canvas.rect(-border_width / 2, -border_height / 2, border_width, border_height)
         
-        # Draw inner text with slight distortion effect (multiple layers for ink effect)
-        canvas.setFont("Helvetica-Bold", 24)
+        # Set up text rendering
         canvas.setFillColor(stamp_color)
         canvas.setFillAlpha(fill_alpha)
         
-        # Draw main status text
-        canvas.drawCentredString(0, 8, status_text)
+        # Company name line 1
+        canvas.setFont("Courier-Bold", 7.5)
+        canvas.drawCentredString(0, 20, "HARMONY HEALTH AND")
         
-        # Add company name below status
-        canvas.setFont("Helvetica-Bold", 10)
-        canvas.drawCentredString(0, -8, "HARMONY HEALTH")
+        # Company name line 2
+        canvas.setFont("Courier-Bold", 7.5)
+        canvas.drawCentredString(0, 14, "WELLNESS (PTY) LTD")
         
-        # Add date/time if signed
-        if document.signed_at:
-            signed_date = document.signed_at.strftime("%d %b %Y")
-            canvas.setFont("Helvetica", 9)
-            canvas.drawCentredString(0, -16, signed_date)
+        # Address
+        canvas.setFont("Courier", 6)
+        canvas.drawCentredString(0, 7, "P.O. Box 3516, Mbabane")
+        
+        # Phone
+        canvas.setFont("Courier", 6)
+        canvas.drawCentredString(0, 1, "Tel: +268 3460 1079")
+        
+        # Email
+        canvas.setFont("Courier", 6)
+        canvas.drawCentredString(0, -5, "Email: harmonyhealth@webmail.co.za")
+        
+        # Date
+        canvas.setFont("Courier", 6)
+        canvas.drawCentredString(0, -10, timezone.localtime().strftime("%d %b %Y"))
         
         canvas.restoreState()
 
