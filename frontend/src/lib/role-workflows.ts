@@ -49,7 +49,6 @@ export const navItems: NavItem[] = [
     children: [
       { href: "/patients/new", label: "Add Patient", icon: UserPlus, roles: ["admin", "receptionist"] },
       { href: "/patients", label: "Patient List", icon: Users, roles: ["admin", "clinician", "receptionist"] },
-      { href: "/visits/new", label: "Add Visit", icon: Stethoscope, roles: ["admin", "clinician"] },
       { href: "/check-ins", label: "Check-In", icon: ClipboardCheck, roles: ["admin", "receptionist"] },
       { href: "/patient-flow", label: "Track Patient Flow", icon: ListChecks, roles: ["admin", "clinician", "receptionist"] },
       { href: "/vitals/new", label: "Add Vitals", icon: HeartPulse, roles: ["admin", "clinician"] },

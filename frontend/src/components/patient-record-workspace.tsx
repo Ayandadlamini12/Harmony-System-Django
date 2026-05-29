@@ -81,9 +81,9 @@ export function PatientRecordWorkspace({ patient, canCreateVisit }: { patient: P
       <div className="flex flex-wrap gap-2 border-b border-[var(--hh-border)] bg-white px-4 py-3 sm:px-6">
         {canCreateVisit && (
           <Button asChild>
-            <Link className="!text-white" href={`/visits/new?patient=${patient.id}`}>
+            <Link className="!text-white" href={`/cases/new?patient=${patient.id}`}>
               <ClipboardList size={16} />
-              New visit note
+              New Case
             </Link>
           </Button>
         )}
