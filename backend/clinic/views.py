@@ -142,6 +142,15 @@ def start_journey_for_check_in(check_in, request=None):
             notes="Created from patient check-in.",
         )
         created = True
+        # Auto-create a Visit for this check-in
+        visit = Visit.objects.create(
+            patient=check_in.patient,
+            visit_type=check_in.visit_type,
+            visit_date=service_date,
+            practitioner=None,
+        )
+        journey.visit = visit
+        journey.save(update_fields=["visit"])
     else:
         journey.check_in = check_in
         journey.appointment = appointment
