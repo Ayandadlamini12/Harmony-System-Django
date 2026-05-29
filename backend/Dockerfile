@@ -6,7 +6,15 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends build-essential libpq-dev \
+    && apt-get install -y --no-install-recommends \
+        build-essential \
+        fonts-dejavu-core \
+        libffi-dev \
+        libgdk-pixbuf-2.0-0 \
+        libpango-1.0-0 \
+        libpangoft2-1.0-0 \
+        libpq-dev \
+        shared-mime-info \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

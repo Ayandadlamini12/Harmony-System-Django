@@ -1,8 +1,9 @@
-import Link from "next/link";
+import { ClipboardList, Pencil, UserRound } from "lucide-react";
 import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
-import { Button } from "@/components/ui/button";
+import { PatientRecordWorkspace } from "@/components/patient-record-workspace";
+import { Badge } from "@/components/ui/badge";
 import { getPatient } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
 
@@ -10,101 +11,80 @@ function value(text?: string | null) {
   return text || "--";
 }
 
+function formatDate(text?: string | null) {
+  if (!text) return "--";
+  return new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric" }).format(new Date(text));
+}
+
+function ageFromDate(date?: string | null) {
+  if (!date) return "--";
+  const dob = new Date(date);
+  const today = new Date();
+  let age = today.getFullYear() - dob.getFullYear();
+  const monthDelta = today.getMonth() - dob.getMonth();
+  if (monthDelta < 0 || (monthDelta === 0 && today.getDate() < dob.getDate())) age -= 1;
+  return `${age} years`;
+}
+
 export default async function PatientDetailPage({ params }: { params: Promise<{ id: string }> }) {
-  const { id } = await params;
-  const [patient, session] = await Promise.all([getPatient(id), getSessionUser()]);
+  const [{ id }, session] = await Promise.all([params, getSessionUser()]);
+
+  const patient = await getPatient(id);
   if (!patient) notFound();
 
   const canCreateVisit = session.role === "admin" || session.role === "clinician";
   const clinicalAccessActive = patient.clinical_access === "active";
+  const latestVisit = patient.visits?.[0];
 
   return (
-    <AppShell
-      title={patient.full_name_display}
-      action={
-        <>
-          <Button asChild variant="secondary"><Link href="/patients">Back to directory</Link></Button>
-          <Button asChild variant="secondary"><Link href={`/patients/${patient.id}/edit`}>Edit record</Link></Button>
-          {canCreateVisit && <Button asChild><Link href={`/visits/new?patient=${patient.id}`}>Add visit</Link></Button>}
-        </>
-      }
-    >
-      <section className="grid gap-6 xl:grid-cols-[1fr_360px]">
-        <div className="hh-panel p-5">
-          <h2 className="text-sm font-bold uppercase text-[#66736d]">Personal record</h2>
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            <Info label="Patient code" value={patient.patient_code} />
-            <Info label="National ID" value={value(patient.national_id)} />
-            <Info label="Date of birth" value={value(patient.date_of_birth)} />
-            <Info label="Gender" value={patient.gender.replaceAll("_", " ")} />
-            <Info label="Primary phone" value={value(patient.primary_phone)} />
-            <Info label="Region" value={value(patient.region)} />
-            <Info label="Town / locality" value={value(patient.town_or_locality)} />
-            <Info label="Village" value={value(patient.village)} />
-          </div>
-        </div>
-
-        <div className="hh-panel p-5">
-          <h2 className="text-sm font-bold uppercase text-[#66736d]">Access status</h2>
-          <div className="mt-4 rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4">
-            <div className="font-bold">{clinicalAccessActive ? "Clinical access active" : "Approval required"}</div>
-            <p className="mt-2 text-sm leading-6 text-[#66736d]">
-              {clinicalAccessActive
-                ? "You can view visits, medical history, conditions, and follow-up notes for this patient."
-                : "This role can manage the non-confidential record. Medical details require approved elevated access."}
-            </p>
-          </div>
-          {!clinicalAccessActive && (
-            <Button asChild className="mt-4 w-full"><Link href="/access-requests">Request access</Link></Button>
-          )}
-        </div>
-      </section>
-
-      <section className="mt-6 grid gap-6 xl:grid-cols-2">
-        <div className="hh-panel p-5">
-          <h2 className="font-bold">Clinical profile</h2>
-          {patient.profile ? (
-            <div className="mt-4 grid gap-4">
-              <Info label="HIV status" value={patient.profile.hiv_status.replaceAll("_", " ")} />
-              <Info label="Past medical history" value={value(patient.profile.past_medical_history)} />
-              <Info label="Family medical history" value={value(patient.profile.family_medical_history)} />
-              <Info label="Allopathic medication" value={value(patient.profile.allopathic_medication)} />
-              <Info label="Other important information" value={value(patient.profile.other_important_information)} />
-            </div>
-          ) : (
-            <p className="mt-2 text-sm text-[#66736d]">Clinical profile is hidden until access is approved.</p>
-          )}
-        </div>
-
-        <div className="hh-panel overflow-hidden">
-          <div className="border-b border-[var(--hh-border)] px-5 py-4">
-            <h2 className="font-bold">Visit history</h2>
-          </div>
-          <div className="divide-y divide-[var(--hh-border)]">
-            {patient.visits?.map((visit) => (
-              <div key={visit.id} className="px-5 py-4">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="font-bold">{visit.visit_date}</div>
-                  <span className="rounded-full bg-[#f5edfa] px-2 py-1 text-xs font-bold text-[var(--hh-purple)]">{visit.visit_type.replaceAll("_", " ")}</span>
-                </div>
-                <p className="mt-2 text-sm text-[#66736d]">{visit.main_complaint}</p>
+    <AppShell title={patient.full_name_display}>
+      <section className="overflow-hidden rounded-lg border border-[var(--hh-border)] bg-white shadow-sm">
+        <div className="border-b border-[var(--hh-border)] bg-white px-4 py-5 sm:px-6">
+          <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
+            <div className="flex flex-col gap-4 sm:flex-row">
+              <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-lg bg-[#f7f0fb] text-[var(--hh-purple)]">
+                <UserRound size={42} />
               </div>
-            ))}
-            {(!patient.visits || patient.visits.length === 0) && (
-              <div className="px-5 py-8 text-sm text-[#66736d]">No visit history visible.</div>
-            )}
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl font-bold text-[var(--hh-purple-dark)]">{patient.full_name_display}</h1>
+                  <span className="font-mono text-sm font-bold text-[#66736d]">{patient.patient_code}</span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#53605a]">
+                  <span className="capitalize">{patient.gender.replaceAll("_", " ")}</span>
+                  <span>{ageFromDate(patient.date_of_birth)}</span>
+                  <span>{value(patient.primary_phone)}</span>
+                  <span>{value(patient.town_or_locality || patient.region)}</span>
+                </div>
+                <div className="mt-3 flex flex-wrap gap-2">
+                  <Badge variant="success">{patient.status === "active" ? "Active patient" : patient.status}</Badge>
+                  <Badge variant={clinicalAccessActive ? "harmony" : "default"}>
+                    {clinicalAccessActive ? "Clinician access active" : "Approval required"}
+                  </Badge>
+                  {latestVisit && <Badge variant="warning">Last visit {formatDate(latestVisit.visit_date)}</Badge>}
+                </div>
+              </div>
+            </div>
+
+            <aside className="rounded-lg border border-[var(--hh-border)] bg-[#f7faf8]">
+              <div className="flex items-center justify-between border-b border-[var(--hh-border)] px-4 py-2">
+                <div className="flex items-center gap-2 text-sm font-bold">
+                  <ClipboardList size={17} />
+                  Key notes
+                </div>
+                <button className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#53605a] hover:bg-white" type="button">
+                  <Pencil size={15} />
+                </button>
+              </div>
+              <p className="px-4 py-3 text-sm leading-6 text-[#3f4d47]">
+                {patient.profile?.other_important_information || latestVisit?.main_complaint || "No key notes recorded yet."}
+              </p>
+            </aside>
           </div>
         </div>
+
+        <PatientRecordWorkspace patient={patient} canCreateVisit={canCreateVisit} />
       </section>
     </AppShell>
-  );
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <div className="text-xs font-bold uppercase text-[#66736d]">{label}</div>
-      <div className="mt-1 capitalize">{value}</div>
-    </div>
   );
 }

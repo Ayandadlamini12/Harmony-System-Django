@@ -15,8 +15,9 @@ This repository is a clean redesign of the Laravel + Vue + Inertia Harmony Healt
 - Staff users with `admin`, `clinician`, and `receptionist` roles
 - Patient master records with generated `PAT-YYYY-000001` codes
 - Patient profiles for semi-stable clinical history
-- Patient conditions
+- Confidential patient condition records with yes/no flags
 - Visits and vitals
+- Glucose food type capture in vitals
 - Follow-up evaluations
 - Audit logs
 - Dashboard stats endpoint

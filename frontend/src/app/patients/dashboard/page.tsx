@@ -6,8 +6,10 @@ import { Button } from "@/components/ui/button";
 import { getAccessRequests, getPatients } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
 
-export default async function PatientManagementDashboard() {
-  const [session, patients, accessRequests] = await Promise.all([getSessionUser(), getPatients(), getAccessRequests()]);
+export default async function PatientHubPage() {
+  const session = await getSessionUser();
+
+  const [patients, accessRequests] = await Promise.all([getPatients(), getAccessRequests()]);
   const canSeeClinical = session.role === "admin" || session.role === "clinician";
   const pendingAccessRequests = accessRequests.results.filter((request) => request.status === "pending");
 
@@ -28,9 +30,10 @@ export default async function PatientManagementDashboard() {
     },
     {
       title: "Check-ins",
-      description: "Mark patients as arrived and move them into the waiting list.",
+      description: "Check in patients from reception or launch the mounted tablet view.",
       href: "/check-ins",
-      icon: ClipboardCheck
+      icon: ClipboardCheck,
+      ready: true
     },
     {
       title: "Waiting list",
@@ -117,7 +120,7 @@ export default async function PatientManagementDashboard() {
       <section className="mt-6 grid gap-6 xl:grid-cols-2">
         <div id="waiting-list" className="hh-panel p-5">
           <h2 className="font-bold">Waiting list</h2>
-          <p className="mt-2 text-sm text-[#66736d]">Arrived patients will be listed here once check-in status is added to the backend.</p>
+          <p className="mt-2 text-sm text-[#66736d]">Arrived patients are now backed by check-in records from reception, tablet self check-in, or future API methods.</p>
         </div>
         <div id="approvals" className="hh-panel p-5">
           <h2 className="font-bold">Approvals</h2>

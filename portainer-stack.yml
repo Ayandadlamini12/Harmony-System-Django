@@ -1,0 +1,139 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: harmony-django-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-harmony}
+      POSTGRES_USER: ${DB_USERNAME:-harmony}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-harmony}
+    volumes:
+      - postgres_django_data:/var/lib/postgresql/data
+    ports:
+      - "54325:5432"  # Using non-standard port to avoid conflicts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-harmony} -d ${DB_DATABASE:-harmony}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - harmony-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: harmony-django-redis
+    restart: always
+    ports:
+      - "63795:6379"  # Using non-standard port to avoid conflicts
+    networks:
+      - harmony-net
+
+  backend:
+    build:
+      context: ./backend
+    container_name: harmony-django-backend
+    restart: always
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: "false"
+      DJANGO_ALLOWED_HOSTS: ${APP_URL:-localhost},localhost,127.0.0.1,backend
+      DATABASE_URL: postgres://${DB_USERNAME:-harmony}:${DB_PASSWORD:-harmony}@postgres:5432/${DB_DATABASE:-harmony}
+      POSTGRES_DB: ${DB_DATABASE:-harmony}
+      POSTGRES_USER: ${DB_USERNAME:-harmony}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-harmony}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      HARMONY_WEBHOOK_SECRET: ${HARMONY_WEBHOOK_SECRET}
+      HARMONY_PUBLIC_URL: ${APP_URL}
+    volumes:
+      - backend_django_media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    networks:
+      - harmony-net
+
+  celery:
+    build:
+      context: ./backend
+    container_name: harmony-django-celery
+    restart: always
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: "false"
+      DATABASE_URL: postgres://${DB_USERNAME:-harmony}:${DB_PASSWORD:-harmony}@postgres:5432/${DB_DATABASE:-harmony}
+      POSTGRES_DB: ${DB_DATABASE:-harmony}
+      POSTGRES_USER: ${DB_USERNAME:-harmony}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-harmony}
+      POSTGRES_HOST: postgres
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    command: celery -A config worker -l info
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - harmony-net
+
+  celery-beat:
+    build:
+      context: ./backend
+    container_name: harmony-django-beat
+    restart: always
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: "false"
+      DATABASE_URL: postgres://${DB_USERNAME:-harmony}:${DB_PASSWORD:-harmony}@postgres:5432/${DB_DATABASE:-harmony}
+      POSTGRES_DB: ${DB_DATABASE:-harmony}
+      POSTGRES_USER: ${DB_USERNAME:-harmony}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-harmony}
+      POSTGRES_HOST: postgres
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    command: celery -A config beat -l info
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - harmony-net
+
+  frontend:
+    build:
+      context: ./frontend
+    container_name: harmony-django-frontend
+    restart: always
+    environment:
+      API_BASE_URL: http://backend:8000/api
+      NEXT_PUBLIC_API_BASE_URL: ${APP_URL}/api
+      APP_BASE_URL: ${APP_URL}
+      COOKIE_SECURE: "true"
+    depends_on:
+      - backend
+    networks:
+      - harmony-net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-harmony-django
+    restart: always
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - frontend
+    networks:
+      - harmony-net
+
+volumes:
+  postgres_django_data:
+  backend_django_media:
+
+networks:
+  harmony-net:
+    driver: bridge

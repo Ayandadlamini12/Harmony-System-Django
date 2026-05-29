@@ -1,19 +1,21 @@
-import { CalendarDays, Clock, FileWarning, HeartPulse, LockKeyhole, UserRound } from "lucide-react";
+import { CalendarDays, ClipboardEdit, Clock, FileWarning, HeartPulse, LockKeyhole, UserRound } from "lucide-react";
 import Link from "next/link";
-
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
-import { getDashboardStats, getPatients, getVisits } from "@/lib/api";
-import { allowedForRole, workflowCards } from "@/lib/role-workflows";
+import { getDashboardStats, getFormDrafts, getPatients, getVisits } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
+import { allowedForRole, workflowCards } from "@/lib/role-workflows";
 
-export default async function DashboardPage() {
-  const [session, stats, patients, visits] = await Promise.all([getSessionUser(), getDashboardStats(), getPatients(), getVisits()]);
+export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
+  const session = await getSessionUser();
+
+  const [stats, patients, visits, drafts] = await Promise.all([getDashboardStats(), getPatients(), getVisits(), getFormDrafts()]);
   const workflows = allowedForRole(workflowCards, session.role);
   const statCards = [
     { label: "Total patients", value: stats.total_patients, icon: UserRound, tone: "bg-[#e8d5f3] text-[var(--hh-purple)]" },
-    { label: "Today's visits", value: stats.today_visits, icon: CalendarDays, tone: "bg-[#d1f5de] text-[#0a7a35]" },
+    { label: "Today's visits", value: stats.today_visits, icon: CalendarDays, tone: "bg-[var(--hh-green-light)] text-[var(--hh-green-dark)]" },
     { label: "Access requests", value: stats.pending_drafts, icon: FileWarning, tone: "bg-amber-100 text-amber-700" },
+    { label: "My drafts", value: stats.my_drafts, icon: ClipboardEdit, tone: "bg-[#f5edfa] text-[var(--hh-purple)]" },
     { label: "Follow-ups due", value: stats.follow_ups_due, icon: HeartPulse, tone: "bg-rose-100 text-rose-700" }
   ];
 
@@ -91,6 +93,36 @@ export default async function DashboardPage() {
         </section>
       )}
 
+      <section className="mt-6 hh-panel overflow-hidden">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[var(--hh-border)] px-5 py-4">
+          <div>
+            <h2 className="text-sm font-bold uppercase text-[#66736d]">My unfinished drafts</h2>
+            <p className="mt-1 text-sm text-[#66736d]">Drafts are tied to your account and can be resumed when the related form flow is enabled.</p>
+          </div>
+          <span className="rounded-full bg-[#f5edfa] px-3 py-1 text-xs font-bold text-[var(--hh-purple)]">{drafts.count} open</span>
+        </div>
+        <div className="divide-y divide-[var(--hh-border)]">
+          {drafts.results.slice(0, 5).map((draft) => (
+            <div key={draft.draft_key} className="flex flex-wrap items-center justify-between gap-3 px-5 py-4">
+              <div>
+                <div className="font-bold">{draft.form_type_label || draft.form_type.replaceAll("_", " ")}</div>
+                <div className="mt-1 flex flex-wrap gap-3 text-sm text-[#66736d]">
+                  <span>Stage: {draft.current_stage || "Not set"}</span>
+                  {draft.related_patient_name && <span>Patient: {draft.related_patient_name}</span>}
+                  <span>Saved {new Date(draft.last_saved_at).toLocaleString()}</span>
+                </div>
+              </div>
+              <Button asChild variant="secondary" size="sm">
+                <Link href={`/drafts/${draft.draft_key}`}>Review / finish</Link>
+              </Button>
+            </div>
+          ))}
+          {drafts.results.length === 0 && (
+            <div className="px-5 py-8 text-sm text-[#66736d]">No unfinished drafts assigned to your account.</div>
+          )}
+        </div>
+      </section>
+
       {session.role === "clinician" && (
         <section className="mt-6 grid gap-4 lg:grid-cols-3">
           <div className="hh-panel p-5">
@@ -98,7 +130,7 @@ export default async function DashboardPage() {
               <Clock className="text-[var(--hh-purple)]" size={22} />
               <h2 className="font-bold">Waiting list</h2>
             </div>
-            <p className="mt-3 text-sm text-[#66736d]">Arrived patients will appear here once check-in is configured.</p>
+            <p className="mt-3 text-sm text-[#66736d]">Arrived patients from reception, tablet, and future API check-ins appear here.</p>
           </div>
           <div className="hh-panel p-5">
             <div className="flex items-center gap-3">
@@ -139,7 +171,7 @@ export default async function DashboardPage() {
                     <td className="px-5 py-4 font-mono text-xs text-[var(--hh-purple)]">{patient.patient_code}</td>
                     <td className="px-5 py-4 text-[#66736d]">{patient.primary_phone || "No phone"}</td>
                     <td className="px-5 py-4">
-                      <span className="rounded-full bg-[#d1f5de] px-2 py-1 text-xs font-bold text-[#0a7a35]">{patient.status}</span>
+                      <span className="rounded-full bg-[var(--hh-green-light)] px-2 py-1 text-xs font-bold text-[var(--hh-green-dark)]">{patient.status}</span>
                     </td>
                   </tr>
                 ))}

@@ -1,10 +1,11 @@
 "use client";
 
-import * as Dialog from "@radix-ui/react-dialog";
-import { Activity, Menu, X } from "lucide-react";
+import { ChevronDown, Menu, X } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 
+import { Button } from "@/components/ui/button";
+import { Sheet, SheetClose, SheetContent, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { allowedForRole, navItems } from "@/lib/role-workflows";
 import type { UserRole } from "@/lib/session";
 import { cn } from "@/lib/utils";
@@ -17,7 +18,7 @@ function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRo
     <div className="flex h-full flex-col bg-[var(--hh-purple-dark)] text-white">
       <div className="flex h-16 items-center gap-3 px-5">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/12">
-          <Activity size={22} />
+          <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon-sm.webp" />
         </div>
         <div>
           <div className="font-bold">Harmony Health</div>
@@ -31,7 +32,47 @@ function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRo
       <nav className="grid gap-1 px-3">
         {nav.map((item) => {
           const Icon = item.icon;
-          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+          const children = item.children ? allowedForRole(item.children, role) : [];
+          const hasChildren = children.length > 0;
+          const childActive = children.some((child) => pathname === child.href || pathname.startsWith(`${child.href}/`));
+          const active = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href) || childActive;
+          if (hasChildren) {
+            return (
+              <details key={item.href} className="rounded-lg" open={active}>
+                <summary
+                  className={cn(
+                    "flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-white/82 transition-colors hover:bg-white/10 [&::-webkit-details-marker]:hidden",
+                    active && "bg-white/14 text-white"
+                  )}
+                >
+                  <Icon size={18} />
+                  <span className="flex-1">{item.label}</span>
+                  <ChevronDown size={16} />
+                </summary>
+                <div className="mt-1 grid gap-1 pl-7">
+                  {children.map((child) => {
+                    const ChildIcon = child.icon;
+                    const childCurrent = pathname === child.href || pathname.startsWith(`${child.href}/`);
+                    return (
+                      <Link
+                        key={child.href}
+                        href={child.href}
+                        onClick={onNavigate}
+                        className={cn(
+                          "flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white/75 transition-colors hover:bg-white/10",
+                          childCurrent && "bg-white/14 text-white"
+                        )}
+                      >
+                        <ChildIcon size={15} />
+                        {child.label}
+                        {child.status === "planned" && <span className="ml-auto text-[10px] uppercase text-white/55">Future</span>}
+                      </Link>
+                    );
+                  })}
+                </div>
+              </details>
+            );
+          }
           return (
             <Link
               key={item.href}
@@ -54,34 +95,33 @@ function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRo
 
 export function MobileSidebar({ name, role }: { name: string; role: UserRole }) {
   return (
-    <Dialog.Root>
+    <Sheet>
       <div className="flex h-16 items-center justify-between border-b border-[var(--hh-border)] bg-white px-4 lg:hidden">
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[var(--hh-purple)] text-white">
-            <Activity size={22} />
+            <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon-sm.webp" />
           </div>
           <div>
             <div className="font-bold">Harmony Health</div>
             <div className="text-xs text-[#66736d]">Clinic system</div>
           </div>
         </div>
-        <Dialog.Trigger className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--hh-border)] bg-white text-[var(--hh-text)]">
-          <Menu size={21} />
-          <span className="sr-only">Open menu</span>
-        </Dialog.Trigger>
+        <SheetTrigger asChild>
+          <Button size="icon" type="button" variant="secondary">
+            <Menu size={21} />
+            <span className="sr-only">Open menu</span>
+          </Button>
+        </SheetTrigger>
       </div>
 
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-40 bg-black/45 lg:hidden" />
-        <Dialog.Content className="fixed inset-y-0 left-0 z-50 w-[min(84vw,320px)] shadow-2xl outline-none lg:hidden">
-          <Dialog.Title className="sr-only">Navigation menu</Dialog.Title>
-          <Dialog.Close className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white">
-            <X size={18} />
-            <span className="sr-only">Close menu</span>
-          </Dialog.Close>
-          <SidebarContent name={name} role={role} />
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+      <SheetContent className="lg:hidden">
+        <SheetTitle className="sr-only">Navigation menu</SheetTitle>
+        <SheetClose className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white">
+          <X size={18} />
+          <span className="sr-only">Close menu</span>
+        </SheetClose>
+        <SidebarContent name={name} role={role} />
+      </SheetContent>
+    </Sheet>
   );
 }

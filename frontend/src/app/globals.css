@@ -1,12 +1,24 @@
 @import "tailwindcss";
 
 :root {
-  --hh-purple: #7030a0;
-  --hh-purple-dark: #481d64;
-  --hh-green: #10b950;
-  --hh-text: #2b2f38;
-  --hh-soft: #f7faf8;
-  --hh-border: #d9e3dd;
+  --hh-purple: #7030A0;
+  --hh-purple-dark: #481D64;
+  --hh-green: #50B860;
+  --hh-green-light: #E8F5E9;
+  --hh-green-dark: #2E7D32;
+  --hh-red: #E74C3C;
+  --hh-text: #2B2F38;
+  --hh-soft: #F7FAF8;
+  --hh-border: #BFCFC6;
+}
+
+@keyframes hh-indeterminate {
+  0% {
+    transform: translateX(-120%);
+  }
+  100% {
+    transform: translateX(320%);
+  }
 }
 
 * {
@@ -58,8 +70,17 @@ a {
   padding: 0.65rem 0.95rem;
   font-size: 0.875rem;
   font-weight: 700;
-  color: #fff;
   background: var(--hh-purple);
+  transition: background-color 150ms ease, border-color 150ms ease, color 150ms ease, opacity 150ms ease;
+}
+
+.hh-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
+.hh-button:not(.hh-button-secondary) {
+  color: #fff;
 }
 
 .hh-button-secondary {
@@ -72,5 +93,5 @@ a {
   border: 1px solid var(--hh-border);
   border-radius: 8px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(20, 35, 28, 0.06);
+  box-shadow: 0 1px 2px rgba(20, 35, 28, 0.08), 0 0 0 1px rgba(20, 35, 28, 0.015);
 }

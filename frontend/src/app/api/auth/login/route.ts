@@ -1,27 +1,31 @@
 import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
+const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
-const APP_BASE_URL = process.env.APP_BASE_URL || "http://localhost:3000";
 
 export async function POST(request: Request) {
-  const formData = await request.formData();
-  const username = String(formData.get("username") || "");
-  const password = String(formData.get("password") || "");
+  const body = (await request.json()) as { username?: string; password?: string };
+  const username = body.username || "";
+  const password = body.password || "";
 
-  const response = await fetch(`${API_BASE_URL}/auth/token/`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ username, password })
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${API_BASE_URL}/auth/token/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password })
+    });
+  } catch {
+    return NextResponse.json({ success: false, error: "backend_unavailable" }, { status: 503 });
+  }
 
   if (!response.ok) {
-    return NextResponse.redirect(new URL("/login?error=invalid", APP_BASE_URL), 303);
+    return NextResponse.json({ success: false, error: "invalid" }, { status: 401 });
   }
 
   const tokens = (await response.json()) as { access: string; refresh: string };
-  let userProfile = { role: "receptionist", username, name: username };
+  let userProfile = { role: "receptionist", username, name: username, avatarUrl: null as string | null };
   try {
     const userResponse = await fetch(`${API_BASE_URL}/users/me/`, {
       headers: { Authorization: `Bearer ${tokens.access}` }
@@ -31,11 +35,12 @@ export async function POST(request: Request) {
       userProfile = {
         role: currentUser.role || "receptionist",
         username: currentUser.username || username,
-        name: currentUser.name || currentUser.email || currentUser.username || username
+        name: currentUser.name || currentUser.email || currentUser.username || username,
+        avatarUrl: currentUser.avatar_url || null
       };
     }
   } catch {
-    userProfile = { role: "receptionist", username, name: username };
+    userProfile = { role: "receptionist", username, name: username, avatarUrl: null };
   }
 
   const cookieStore = await cookies();
@@ -74,6 +79,17 @@ export async function POST(request: Request) {
     path: "/",
     maxAge: 60 * 60 * 24 * 7
   });
+  if (userProfile.avatarUrl) {
+    cookieStore.set("harmony_avatar_url", `${userProfile.avatarUrl}?v=${Date.now()}`, {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: COOKIE_SECURE,
+      path: "/",
+      maxAge: 60 * 60 * 24 * 7
+    });
+  } else {
+    cookieStore.delete("harmony_avatar_url");
+  }
 
-  return NextResponse.redirect(new URL("/", APP_BASE_URL), 303);
+  return NextResponse.json({ success: true });
 }

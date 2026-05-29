@@ -1,12 +1,14 @@
-import { AppShell } from "@/components/app-shell";
-import { getVisits } from "@/lib/api";
 import Link from "next/link";
 
-function label(value: string) {
-  return value.replaceAll("_", " ").replace(/\b\w/g, (char) => char.toUpperCase());
+import { AppShell } from "@/components/app-shell";
+import { getVisits } from "@/lib/api";
+
+function label(type: string) {
+  const map: Record<string, string> = { new_consultation: "New consultation", follow_up: "Follow up", review: "Review" };
+  return map[type] || type;
 }
 
-export default async function VisitsPage() {
+export default async function VisitListPage() {
   const visits = await getVisits();
 
   return (
@@ -36,7 +38,7 @@ export default async function VisitsPage() {
                   </td>
                   <td className="max-w-md px-5 py-4 text-[#66736d]">{visit.main_complaint}</td>
                   <td className="px-5 py-4 text-[#66736d]">
-                    BP {visit.vitals?.bp_first_reading || "--"}/{visit.vitals?.bp_second_reading || "--"}, pulse {visit.vitals?.pulse || "--"}
+                    {visit.vitals?.length ? `${visit.vitals.length} record${visit.vitals.length === 1 ? "" : "s"}` : "No vitals"}
                   </td>
                 </tr>
               ))}

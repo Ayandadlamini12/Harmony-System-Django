@@ -142,6 +142,9 @@ STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
+MEDIA_URL = "media/"
+MEDIA_ROOT = BASE_DIR / "media"
+
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.2/ref/settings/#default-auto-field
 
@@ -176,3 +179,4 @@ SIMPLE_JWT = {
 CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
 HARMONY_WEBHOOK_SECRET = os.getenv("HARMONY_WEBHOOK_SECRET", "")
+HARMONY_PUBLIC_URL = os.getenv("HARMONY_PUBLIC_URL", "")

@@ -2,20 +2,20 @@ import {
   Archive,
   CalendarCheck,
   ClipboardCheck,
-  ClipboardList,
-  HeartPulse,
+  ListChecks,
   Inbox,
   LayoutDashboard,
   LockKeyhole,
   MessageSquare,
   Package,
-  Search,
+  FileText,
+  HeartPulse,
   Settings,
   ShieldCheck,
   Stethoscope,
-  UserCog,
-  UserPlus,
   Users,
+  UserRoundCog,
+  UserPlus,
   type LucideIcon
 } from "lucide-react";
 
@@ -27,6 +27,7 @@ export type NavItem = {
   icon: LucideIcon;
   roles: UserRole[];
   status?: "ready" | "planned";
+  children?: NavItem[];
 };
 
 export type WorkflowCard = {
@@ -40,13 +41,40 @@ export type WorkflowCard = {
 
 export const navItems: NavItem[] = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "clinician", "receptionist"] },
-  { href: "/patients/dashboard", label: "Patient Hub", icon: Users, roles: ["admin", "clinician", "receptionist"] },
-  { href: "/patients", label: "Patient Records", icon: Search, roles: ["admin", "clinician", "receptionist"] },
-  { href: "/patients/new", label: "Register Patient", icon: UserPlus, roles: ["admin", "receptionist"] },
-  { href: "/visits", label: "Visit Records", icon: ClipboardList, roles: ["admin", "clinician"] },
-  { href: "/visits/new", label: "Add Visit", icon: HeartPulse, roles: ["admin", "clinician"] },
-  { href: "/staff", label: "Staff", icon: UserCog, roles: ["admin"] },
-  { href: "/account", label: "Account", icon: Settings, roles: ["admin", "clinician", "receptionist"] }
+  {
+    href: "/patients",
+    label: "Patients",
+    icon: Users,
+    roles: ["admin", "clinician", "receptionist"],
+    children: [
+      { href: "/patients/new", label: "Add Patient", icon: UserPlus, roles: ["admin", "receptionist"] },
+      { href: "/patients", label: "Patient List", icon: Users, roles: ["admin", "clinician", "receptionist"] },
+      { href: "/visits/new", label: "Add Visit", icon: Stethoscope, roles: ["admin", "clinician"] },
+      { href: "/check-ins", label: "Check-In", icon: ClipboardCheck, roles: ["admin", "receptionist"] },
+      { href: "/patient-flow", label: "Track Patient Flow", icon: ListChecks, roles: ["admin", "clinician", "receptionist"] },
+      { href: "/vitals/new", label: "Add Vitals", icon: HeartPulse, roles: ["admin", "clinician"] },
+      { href: "/messages", label: "Send Message", icon: MessageSquare, roles: ["admin", "clinician", "receptionist"], status: "planned" }
+    ]
+  },
+  { href: "/appointments", label: "Appointments", icon: CalendarCheck, roles: ["admin", "clinician", "receptionist"] },
+  { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "clinician"] },
+  { href: "/messages", label: "Messages", icon: MessageSquare, roles: ["admin", "clinician", "receptionist"] },
+  { href: "/inventory", label: "Inventory", icon: Package, roles: ["admin", "clinician"] },
+  { href: "/reports", label: "Reports", icon: FileText, roles: ["admin", "clinician"] },
+  {
+    href: "/users",
+    label: "User Management",
+    icon: UserRoundCog,
+    roles: ["admin"],
+    children: [
+      { href: "/employees/enrollment", label: "Employee Enrollment", icon: UserPlus, roles: ["admin"], status: "planned" },
+      { href: "/users/enrol", label: "Enrol User", icon: UserRoundCog, roles: ["admin"] },
+      { href: "/users", label: "Users", icon: Users, roles: ["admin"] },
+      { href: "/roles", label: "Roles", icon: ShieldCheck, roles: ["admin"], status: "planned" },
+      { href: "/teams", label: "Teams", icon: Users, roles: ["admin"], status: "planned" }
+    ]
+  },
+  { href: "/account", label: "Settings", icon: Settings, roles: ["admin", "clinician", "receptionist"] }
 ];
 
 export const workflowCards: WorkflowCard[] = [
@@ -62,8 +90,7 @@ export const workflowCards: WorkflowCard[] = [
     description: "Patients who have arrived and are waiting to be seen by a clinician.",
     href: "/waiting-list",
     icon: Inbox,
-    roles: ["admin", "clinician"],
-    status: "planned"
+    roles: ["admin", "clinician"]
   },
   {
     title: "Approvals",
@@ -121,12 +148,18 @@ export const workflowCards: WorkflowCard[] = [
     status: "planned"
   },
   {
+    title: "Patient flow tracking",
+    description: "Search by phone, patient ID, or identity number to see where a patient is in today's establishment flow.",
+    href: "/patient-flow",
+    icon: ListChecks,
+    roles: ["admin", "clinician", "receptionist"]
+  },
+  {
     title: "Check-in desk",
-    description: "Mark arrivals, update demographic details, and move patients into the waiting list.",
+    description: "Mark arrivals from reception or open the mounted tablet self check-in screen.",
     href: "/check-ins",
     icon: ClipboardCheck,
-    roles: ["admin", "receptionist"],
-    status: "planned"
+    roles: ["admin", "receptionist"]
   }
 ];
 
