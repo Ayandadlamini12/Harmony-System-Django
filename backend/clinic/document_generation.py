@@ -287,18 +287,14 @@ def render_consent_pdf(patient: Patient, document: PatientDocument) -> bytes:
     context = consent_context(patient, document)
     html = render_to_string("clinic/documents/consent_form.html", context)
 
-    try:
-        from weasyprint import HTML
-
-        pdf_bytes = HTML(string=html, base_url=str(settings.BASE_DIR)).write_pdf()
-    except Exception:
-        pdf_bytes = build_reportlab_consent_pdf(
-            patient,
-            document,
-            context["reference"],
-            context["verification_url"],
-            context["signature_data"],
-        )
+    # Use ReportLab directly to ensure stamp rendering
+    pdf_bytes = build_reportlab_consent_pdf(
+        patient,
+        document,
+        context["reference"],
+        context["verification_url"],
+        context["signature_data"],
+    )
     return pdf_bytes
 
 
@@ -354,3 +350,4 @@ def sign_consent_document(document: PatientDocument, *, signer_name: str, signer
     patient.consent_status = Patient.ConsentStatus.SIGNED
     patient.save(update_fields=["consent_status", "updated_at"])
     return document
+
