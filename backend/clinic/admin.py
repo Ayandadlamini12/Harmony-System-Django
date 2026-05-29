@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Appointment, AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 
 
 class PatientProfileInline(admin.StackedInline):
@@ -90,7 +90,6 @@ class PatientDocumentAdmin(admin.ModelAdmin):
 
 
 admin.site.register(Vital)
-admin.site.register(FollowUpEvaluation)
 @admin.register(AuditLog)
 class AuditLogAdmin(admin.ModelAdmin):
     list_display = ("entity_type", "entity_id", "action", "user", "created_at", "ip_address")

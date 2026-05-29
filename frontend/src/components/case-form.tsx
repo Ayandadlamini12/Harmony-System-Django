@@ -72,7 +72,7 @@ export function CaseForm({
     }
     loadPatient();
     return () => controller.abort();
-  }, [selectedPatientId, selectedVisitId]);
+  }, [selectedPatientId]);
 
   async function handleSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();

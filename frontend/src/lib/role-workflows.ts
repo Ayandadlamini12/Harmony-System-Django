@@ -55,6 +55,7 @@ export const navItems: NavItem[] = [
       { href: "/messages", label: "Send Message", icon: MessageSquare, roles: ["admin", "clinician", "receptionist"], status: "planned" }
     ]
   },
+  { href: "/cases", label: "Cases", icon: Stethoscope, roles: ["admin", "clinician"] },
   { href: "/consent-forms", label: "Consent Forms", icon: FileText, roles: ["admin", "clinician", "receptionist"] },
   { href: "/appointments", label: "Appointments", icon: CalendarCheck, roles: ["admin", "clinician", "receptionist"] },
   { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "clinician"] },
@@ -133,8 +134,8 @@ export const workflowCards: WorkflowCard[] = [
   },
   {
     title: "Clinical records",
-    description: "Confidential visits, vitals, diagnosis, remedies, and follow-up evaluations.",
-    href: "/visits",
+    description: "Confidential cases, visits, vitals, diagnosis, remedies, and follow-ups.",
+    href: "/cases",
     icon: Stethoscope,
     roles: ["admin", "clinician"]
   },

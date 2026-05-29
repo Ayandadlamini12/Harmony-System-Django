@@ -1,4 +1,4 @@
-import type { Appointment, ClinicianProfile, DashboardStats, ElevatedAccessRequest, EmployeeEnrollmentRequest, FormDraft, Paginated, Patient, PatientCheckIn, PatientJourney, User, Visit, Vital } from "@/types/clinic";
+import type { Appointment, Case, ClinicianProfile, DashboardStats, ElevatedAccessRequest, EmployeeEnrollmentRequest, FormDraft, Paginated, Patient, PatientCheckIn, PatientJourney, User, Visit, Vital } from "@/types/clinic";
 import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -40,6 +40,16 @@ export function getPatients(search = "") {
 
 export function getPatient(id: string | number) {
   return apiGet<Patient | null>(`/patients/${id}/`, null);
+}
+
+export function getCases(search = "") {
+  const query = search ? `?search=${encodeURIComponent(search)}` : "";
+  return apiGet<Paginated<Case>>(`/cases/${query}`, {
+    count: 0,
+    next: null,
+    previous: null,
+    results: []
+  });
 }
 
 export function getVisits() {

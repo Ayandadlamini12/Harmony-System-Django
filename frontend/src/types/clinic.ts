@@ -112,6 +112,7 @@ export type Case = {
   patient: number;
   patient_name?: string;
   patient_code?: string;
+  patient_public_id?: string;
   visit: number;
   visit_date?: string;
   parent_case?: number | null;

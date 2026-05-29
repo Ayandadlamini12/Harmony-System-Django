@@ -307,7 +307,7 @@ class PatientViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
         if request.method == "GET":
-            visits = patient.visits.prefetch_related("vitals").select_related("follow_up_evaluation")
+            visits = patient.visits.prefetch_related("vitals")
             serializer = VisitSerializer(visits, many=True, context={"request": request})
             return Response(serializer.data)
 
@@ -440,7 +440,7 @@ class PatientDocumentViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class VisitViewSet(viewsets.ModelViewSet):
-    queryset = Visit.objects.select_related("patient", "follow_up_evaluation").prefetch_related("vitals").order_by("-visit_date", "-created_at")
+    queryset = Visit.objects.select_related("patient").prefetch_related("vitals").order_by("-visit_date", "-created_at")
     serializer_class = VisitSerializer
     search_fields = ("patient__full_name_display", "patient__patient_code", "main_complaint", "diagnosis")
     ordering_fields = ("visit_date", "created_at")

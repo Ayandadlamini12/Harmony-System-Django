@@ -584,19 +584,6 @@ class Vital(TimeStampedModel):
         return f"Vitals for visit {self.visit_id}"
 
 
-class FollowUpEvaluation(TimeStampedModel):
-    visit = models.OneToOneField(Visit, on_delete=models.CASCADE, related_name="follow_up_evaluation")
-    previous_consult_symptoms = models.TextField(blank=True)
-    dietary_changes = models.TextField(blank=True)
-    lifestyle_changes = models.TextField(blank=True)
-    exercise_notes = models.TextField(blank=True)
-    energy_notes = models.TextField(blank=True)
-    evaluation_notes = models.TextField(blank=True)
-
-    def __str__(self) -> str:
-        return f"Follow-up for visit {self.visit_id}"
-
-
 class AuditLog(models.Model):
     user = models.ForeignKey(settings.AUTH_USER_MODEL, null=True, blank=True, on_delete=models.SET_NULL)
     entity_type = models.CharField(max_length=80)
