@@ -1,4 +1,3 @@
-from datetime import timedelta
 import re
 import uuid
 
@@ -554,6 +553,47 @@ class CaseViewSet(viewsets.ModelViewSet):
             details="Case record updated.",
         )
 
+    @action(detail=True, methods=["post"])
+    def resolve(self, request, pk=None):
+        """Resolve the case chain from root down."""
+        case = self.get_object()
+        if case.status == Case.Status.RESOLVED:
+            return Response(
+                {"detail": "This case is already resolved."},
+                status=status.HTTP_409_CONFLICT,
+            )
+
+        root = case
+        while root.parent_case:
+            root = root.parent_case
+
+        now = timezone.now()
+        chain_ids = list(
+            Case.objects.filter(
+                Q(id=root.id)
+                | Q(parent_case=root)
+                | Q(parent_case__parent_case=root)
+            ).values_list("id", flat=True)
+        )
+
+        Case.objects.filter(id__in=chain_ids).update(
+            status=Case.Status.RESOLVED, resolved_at=now
+        )
+
+        write_audit_log(
+            request=request,
+            action="resolve_chain",
+            instance=root,
+            entity_type="case",
+            after_data={"root_id": root.id, "resolved_ids": chain_ids},
+            details=f"Case chain resolved: {root.title} ({len(chain_ids)} cases).",
+        )
+
+        serializer = self.get_serializer(root)
+        data = serializer.data
+        data["resolved_ids"] = chain_ids
+        return Response(data)
+
 
 class VitalViewSet(viewsets.ModelViewSet):
     queryset = Vital.objects.select_related("visit", "visit__patient", "recorded_by").order_by("-recorded_at", "-created_at")
@@ -786,7 +826,7 @@ class PatientJourneyViewSet(viewsets.ModelViewSet):
             request.data.get("identifier_type", ""),
         )
         if not patient:
-            return Response({"detail": "No matching registered patient found."}, status=status.HTTP_404_NOT_FOUND)
+              0�   return Response({"detail": "No matching registered patient found."}, status=status.HTTP_404_NOT_FOUND)
         journey = (
             PatientJourney.objects.select_related("patient", "check_in", "appointment", "visit")
             .prefetch_related("events")

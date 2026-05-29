@@ -1,4 +1,3 @@
-from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 
@@ -131,7 +130,6 @@ class VitalSerializer(serializers.ModelSerializer):
 class CaseSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
     patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
-    patient_public_id = serializers.UUIDField(source="patient.public_id", read_only=True)
     visit_date = serializers.DateField(source="visit.visit_date", read_only=True)
     parent_case_title = serializers.CharField(source="parent_case.title", read_only=True)
 
@@ -139,7 +137,6 @@ class CaseSerializer(serializers.ModelSerializer):
         model = Case
         fields = (
             "id", "patient", "patient_name", "patient_code",
-            "patient_public_id",
             "visit", "visit_date",
             "parent_case", "parent_case_title",
             "title", "main_complaint",
@@ -152,8 +149,8 @@ class CaseSerializer(serializers.ModelSerializer):
             "status", "resolved_at", "practitioner",
             "created_at", "updated_at",
         )
-        read_only_fields = ("id", "patient_name", "patient_code", "patient_public_id",
-                           "visit_date", "parent_case_title", "created_at", "updated_at")
+        read_only_fields = ("id", "patient_name", "patient_code", "visit_date",
+                           "parent_case_title", "created_at", "updated_at")
 
     def create(self, validated_data):
         request = self.context.get("request")
