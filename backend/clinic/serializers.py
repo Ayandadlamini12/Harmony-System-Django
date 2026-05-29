@@ -114,6 +114,9 @@ class VitalSerializer(serializers.ModelSerializer):
             "created_at",
         )
         read_only_fields = ("id", "patient", "patient_name", "patient_code", "visit_label", "created_at")
+        extra_kwargs = {
+            "glucose_mmol_l": {"required": False, "allow_null": True},
+        }
 
     def get_visit_label(self, obj):
         return f"{obj.visit.get_visit_type_display()} - {obj.visit.visit_date}"
