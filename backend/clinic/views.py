@@ -1,23 +1,27 @@
 from datetime import timedelta
+import re
+import uuid
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.db import transaction
-from django.http import HttpResponse
+from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
+from django.db.models import Max, Q
 from rest_framework import permissions, status, viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
 from .document_generation import consent_document_reference, generate_consent_pdf, render_consent_html, save_consent_pdf, sign_consent_document
-from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 from .serializers import (
     AuditLogSerializer,
     AppointmentSerializer,
+    CaseSerializer,
     ElevatedAccessRequestSerializer,
     FormDraftSerializer,
     PatientCheckInSerializer,
@@ -497,6 +501,48 @@ class VisitViewSet(viewsets.ModelViewSet):
             entity_id=entity_id,
             before_data=before_data,
             details="Visit record deleted.",
+        )
+
+
+class CaseViewSet(viewsets.ModelViewSet):
+    queryset = Case.objects.select_related("patient", "visit", "parent_case", "practitioner").order_by("-created_at")
+    serializer_class = CaseSerializer
+    search_fields = ("title", "main_complaint", "diagnosis", "patient__full_name_display", "patient__patient_code")
+    filterset_fields = ("patient", "visit", "status", "parent_case")
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if is_clinical_user(self.request.user):
+            return queryset
+        now = timezone.now()
+        return queryset.filter(
+            patient__access_requests__requested_by=self.request.user,
+            patient__access_requests__status=ElevatedAccessRequest.Status.APPROVED,
+            patient__access_requests__expires_at__gt=now,
+        ).distinct()
+
+    def perform_create(self, serializer):
+        case = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=case,
+            entity_type="case",
+            after_data=snapshot_instance(case),
+            details="Case record created.",
+        )
+
+    def perform_update(self, serializer):
+        before_data = snapshot_instance(self.get_object())
+        case = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="update",
+            instance=case,
+            entity_type="case",
+            before_data=before_data,
+            after_data=snapshot_instance(case),
+            details="Case record updated.",
         )
 
 

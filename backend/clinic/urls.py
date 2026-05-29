@@ -1,12 +1,13 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import AppointmentViewSet, AuditLogViewSet, ElevatedAccessRequestViewSet, FormDraftViewSet, PatientCheckInViewSet, PatientDocumentViewSet, PatientJourneyViewSet, PatientViewSet, VisitViewSet, VitalViewSet, dashboard_stats, patient_import_webhook
+from .views import AppointmentViewSet, AuditLogViewSet, CaseViewSet, ElevatedAccessRequestViewSet, FormDraftViewSet, PatientCheckInViewSet, PatientDocumentViewSet, PatientJourneyViewSet, PatientViewSet, VisitViewSet, VitalViewSet, dashboard_stats, patient_import_webhook
 
 router = DefaultRouter()
 router.register("patients", PatientViewSet, basename="patients")
 router.register("patient-documents", PatientDocumentViewSet, basename="patient-documents")
 router.register("visits", VisitViewSet, basename="visits")
+router.register("cases", CaseViewSet, basename="cases")
 router.register("vitals", VitalViewSet, basename="vitals")
 router.register("check-ins", PatientCheckInViewSet, basename="check-ins")
 router.register("appointments", AppointmentViewSet, basename="appointments")

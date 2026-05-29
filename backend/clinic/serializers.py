@@ -3,7 +3,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import Appointment, AuditLog, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -125,6 +125,38 @@ class VitalSerializer(serializers.ModelSerializer):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             validated_data["recorded_by"] = request.user
+        return super().create(validated_data)
+
+
+class CaseSerializer(serializers.ModelSerializer):
+    patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
+    patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
+    visit_date = serializers.DateField(source="visit.visit_date", read_only=True)
+    parent_case_title = serializers.CharField(source="parent_case.title", read_only=True)
+
+    class Meta:
+        model = Case
+        fields = (
+            "id", "patient", "patient_name", "patient_code",
+            "visit", "visit_date",
+            "parent_case", "parent_case_title",
+            "title", "main_complaint",
+            "physical_examination", "diagnosis", "remedy",
+            "reason_for_remedy", "dietary_recommendation",
+            "lifestyle_recommendation",
+            "previous_consult_symptoms", "dietary_changes",
+            "lifestyle_changes", "exercise_notes", "energy_notes",
+            "evaluation_notes", "notes",
+            "status", "resolved_at", "practitioner",
+            "created_at", "updated_at",
+        )
+        read_only_fields = ("id", "patient_name", "patient_code", "visit_date",
+                           "parent_case_title", "created_at", "updated_at")
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        if request and request.user.is_authenticated:
+            validated_data["practitioner"] = request.user
         return super().create(validated_data)
 
 
