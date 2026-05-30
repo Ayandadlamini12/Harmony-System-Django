@@ -7,6 +7,7 @@ from io import BytesIO
 from mimetypes import guess_type
 from pathlib import Path
 
+from .document_branding import draw_reportlab_stamp, stamp_context
 from .models import Patient, PatientDocument
 
 
@@ -86,6 +87,7 @@ def consent_context(patient: Patient, document: PatientDocument) -> dict:
         "qr_svg": make_qr_svg(verification_url),
         "logo_url": file_data_url(logo_path()),
         "signature_data": signature_data,
+        "stamp": stamp_context(),
         "organization_name": "Harmony Health",
         "tagline": "Healthy Choices Today",
     }
@@ -215,57 +217,15 @@ def build_reportlab_consent_pdf(patient: Patient, document: PatientDocument, ref
         story += [Spacer(1, 10)]
     story += [verification]
 
-    def draw_stamp(canvas):
-        """Draw company rubber stamp with details on the PDF."""
-        stamp_color = colors.HexColor("#1a4d7a")  # Navy blue
-        fill_alpha = 0.55
-        
-        canvas.saveState()
-        
-        # Position stamp in signature area (right column, lower area)
-        canvas.translate(A4[0] * 0.65, A4[1] * 0.35)
-        canvas.rotate(25)
-        
-        # Draw outer border rectangle (stamp frame)
-        border_width = 75 * mm
-        border_height = 75 * mm
-        canvas.setLineWidth(1.5)
-        canvas.setStrokeColor(stamp_color)
-        canvas.setFillAlpha(0)
-        canvas.rect(-border_width / 2, -border_height / 2, border_width, border_height)
-        
-        # Set up text rendering
-        canvas.setFillColor(stamp_color)
-        canvas.setFillAlpha(fill_alpha)
-        
-        # Company name line 1
-        canvas.setFont("Courier-Bold", 7.5)
-        canvas.drawCentredString(0, 20, "HARMONY HEALTH AND")
-        
-        # Company name line 2
-        canvas.setFont("Courier-Bold", 7.5)
-        canvas.drawCentredString(0, 14, "WELLNESS (PTY) LTD")
-        
-        # Address
-        canvas.setFont("Courier", 6)
-        canvas.drawCentredString(0, 7, "P.O. Box 3516, Mbabane")
-        
-        # Phone
-        canvas.setFont("Courier", 6)
-        canvas.drawCentredString(0, 1, "Tel: +268 3460 1079")
-        
-        # Email
-        canvas.setFont("Courier", 6)
-        canvas.drawCentredString(0, -5, "Email: harmonyhealth@webmail.co.za")
-        
-        # Date
-        canvas.setFont("Courier", 6)
-        canvas.drawCentredString(0, -10, timezone.localtime().strftime("%d %b %Y"))
-        
-        canvas.restoreState()
-
     def footer(canvas, _doc):
-        draw_stamp(canvas)
+        draw_reportlab_stamp(
+            canvas,
+            x=A4[0] * 0.73,
+            y=A4[1] * 0.34,
+            width=62 * mm,
+            height=36 * mm,
+            rotation=8,
+        )
         canvas.saveState()
         canvas.setFont("Helvetica", 7)
         canvas.setFillColor(colors.HexColor("#53605a"))
