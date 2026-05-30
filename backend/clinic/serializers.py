@@ -1,8 +1,9 @@
+from django.db import transaction
 from django.utils import timezone
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FollowUpEvaluation, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -159,8 +160,23 @@ class CaseSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class FollowUpEvaluationSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = FollowUpEvaluation
+        fields = (
+            "id",
+            "previous_consult_symptoms",
+            "dietary_changes",
+            "lifestyle_changes",
+            "exercise_notes",
+            "energy_notes",
+            "evaluation_notes",
+        )
+
+
 class VisitSerializer(serializers.ModelSerializer):
     vitals = VitalSerializer(many=True, read_only=True)
+    follow_up_evaluation = FollowUpEvaluationSerializer(required=False)
     patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
     patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
 
@@ -183,16 +199,20 @@ class VisitSerializer(serializers.ModelSerializer):
             "dietary_recommendation",
             "lifestyle_recommendation",
             "vitals",
+            "follow_up_evaluation",
             "created_at",
         )
         read_only_fields = ("created_at",)
 
     @transaction.atomic
     def create(self, validated_data):
+        follow_up_data = validated_data.pop("follow_up_evaluation", None)
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             validated_data["practitioner"] = request.user
         visit = Visit.objects.create(**validated_data)
+        if follow_up_data:
+            FollowUpEvaluation.objects.create(visit=visit, **follow_up_data)
         return visit
 
 
