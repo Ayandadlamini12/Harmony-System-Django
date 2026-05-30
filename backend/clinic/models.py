@@ -249,7 +249,7 @@ class Visit(TimeStampedModel):
     visit_type = models.CharField(max_length=40, choices=VisitType.choices, default=VisitType.NEW_CONSULTATION)
     visit_date = models.DateField()
     visit_time = models.TimeField(null=True, blank=True)
-    main_complaint = models.TextField()
+    main_complaint = models.TextField(blank=True, default="")
     initial_complaints = models.TextField(blank=True)
     physical_examination = models.TextField(blank=True)
     diagnosis = models.TextField(blank=True)
@@ -270,6 +270,49 @@ class Visit(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.patient.full_name_display} - {self.visit_date}"
+
+
+class Case(TimeStampedModel):
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        RESOLVED = "resolved", "Resolved"
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="cases")
+    visit = models.ForeignKey(Visit, on_delete=models.CASCADE, related_name="cases")
+    parent_case = models.ForeignKey("self", null=True, blank=True, on_delete=models.SET_NULL, related_name="follow_ups")
+    title = models.CharField(max_length=255)
+    main_complaint = models.TextField(blank=True)
+    physical_examination = models.TextField(blank=True)
+    diagnosis = models.TextField(blank=True)
+    remedy = models.TextField(blank=True)
+    reason_for_remedy = models.TextField(blank=True)
+    dietary_recommendation = models.TextField(blank=True)
+    lifestyle_recommendation = models.TextField(blank=True)
+    previous_consult_symptoms = models.TextField(blank=True)
+    dietary_changes = models.TextField(blank=True)
+    lifestyle_changes = models.TextField(blank=True)
+    exercise_notes = models.TextField(blank=True)
+    energy_notes = models.TextField(blank=True)
+    evaluation_notes = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    practitioner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True, blank=True,
+        on_delete=models.SET_NULL,
+        related_name="cases",
+    )
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["patient", "status"]),
+            models.Index(fields=["visit"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.title} - {self.patient.patient_code} ({self.get_status_display()})"
 
 
 class PatientCheckIn(TimeStampedModel):
@@ -539,19 +582,6 @@ class Vital(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"Vitals for visit {self.visit_id}"
-
-
-class FollowUpEvaluation(TimeStampedModel):
-    visit = models.OneToOneField(Visit, on_delete=models.CASCADE, related_name="follow_up_evaluation")
-    previous_consult_symptoms = models.TextField(blank=True)
-    dietary_changes = models.TextField(blank=True)
-    lifestyle_changes = models.TextField(blank=True)
-    exercise_notes = models.TextField(blank=True)
-    energy_notes = models.TextField(blank=True)
-    evaluation_notes = models.TextField(blank=True)
-
-    def __str__(self) -> str:
-        return f"Follow-up for visit {self.visit_id}"
 
 
 class AuditLog(models.Model):
