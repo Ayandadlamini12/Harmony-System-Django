@@ -1,13 +1,10 @@
 import { AppShell } from "@/components/app-shell";
 import { PatientRegistrationForm } from "@/components/patient-registration-form";
-import { getSessionUser } from "@/lib/session";
 
-export default async function RegisterPatientPage() {
-  const session = await getSessionUser();
-
+export default function RegisterPatientPage() {
   return (
     <AppShell title="Register patient">
-      <PatientRegistrationForm role={session.role} />
+      <PatientRegistrationForm />
     </AppShell>
   );
 }

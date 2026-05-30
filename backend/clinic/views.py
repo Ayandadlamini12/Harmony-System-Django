@@ -142,6 +142,15 @@ def start_journey_for_check_in(check_in, request=None):
             notes="Created from patient check-in.",
         )
         created = True
+        # Auto-create a Visit for this check-in
+        visit = Visit.objects.create(
+            patient=check_in.patient,
+            visit_type=check_in.visit_type,
+            visit_date=service_date,
+            practitioner=None,
+        )
+        journey.visit = visit
+        journey.save(update_fields=["visit"])
     else:
         journey.check_in = check_in
         journey.appointment = appointment
@@ -298,7 +307,7 @@ class PatientViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN,
             )
         if request.method == "GET":
-            visits = patient.visits.prefetch_related("vitals").select_related("follow_up_evaluation")
+            visits = patient.visits.prefetch_related("vitals")
             serializer = VisitSerializer(visits, many=True, context={"request": request})
             return Response(serializer.data)
 
@@ -431,7 +440,7 @@ class PatientDocumentViewSet(viewsets.ReadOnlyModelViewSet):
 
 
 class VisitViewSet(viewsets.ModelViewSet):
-    queryset = Visit.objects.select_related("patient", "follow_up_evaluation").prefetch_related("vitals").order_by("-visit_date", "-created_at")
+    queryset = Visit.objects.select_related("patient").prefetch_related("vitals").order_by("-visit_date", "-created_at")
     serializer_class = VisitSerializer
     search_fields = ("patient__full_name_display", "patient__patient_code", "main_complaint", "diagnosis")
     ordering_fields = ("visit_date", "created_at")
@@ -545,6 +554,31 @@ class CaseViewSet(viewsets.ModelViewSet):
             details="Case record updated.",
         )
 
+
+    @action(detail=True, methods=["post"])
+    def resolve(self, request, pk=None):
+        case = self.get_object()
+        root = case
+        while root.parent_case:
+            root = root.parent_case
+        chain = [root]
+        for follow_up in root.follow_ups.filter(status="open").order_by("created_at"):
+            chain.append(follow_up)
+        now = timezone.now()
+        resolved_ids = []
+        for c in chain:
+            c.status = Case.Status.RESOLVED
+            c.resolved_at = now
+            c.save(update_fields=["status", "resolved_at", "updated_at"])
+            resolved_ids.append(c.id)
+        write_audit_log(
+            request=request,
+            action="resolve",
+            instance=root,
+            entity_type="case",
+            details=f"Resolved case chain: {resolved_ids}",
+        )
+        return Response({"resolved_ids": resolved_ids})
 
 class VitalViewSet(viewsets.ModelViewSet):
     queryset = Vital.objects.select_related("visit", "visit__patient", "recorded_by").order_by("-recorded_at", "-created_at")

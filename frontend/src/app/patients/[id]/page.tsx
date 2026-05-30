@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { PatientRecordWorkspace } from "@/components/patient-record-workspace";
 import { Badge } from "@/components/ui/badge";
-import { getPatient } from "@/lib/api";
+import { getCases, getPatient } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
 
 function value(text?: string | null) {
@@ -31,6 +31,8 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
 
   const patient = await getPatient(id);
   if (!patient) notFound();
+
+  const cases = await getCases(`patient=${patient.id}`);
 
   const canCreateVisit = session.role === "admin" || session.role === "clinician";
   const clinicalAccessActive = patient.clinical_access === "active";
@@ -83,7 +85,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
 
-        <PatientRecordWorkspace patient={patient} canCreateVisit={canCreateVisit} />
+        <PatientRecordWorkspace patient={patient} canCreateVisit={canCreateVisit} initialCases={cases.results} />
       </section>
     </AppShell>
   );

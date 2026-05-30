@@ -18,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
 import { cn } from "@/lib/utils";
 import { RELATIONSHIP_OPTIONS } from "@/lib/relationships";
-import type { UserRole } from "@/lib/session";
+
 
 type RegionOption = {
   name: string;
@@ -137,9 +137,8 @@ function StepSidebar({
   );
 }
 
-export function PatientRegistrationForm({ role }: { role: UserRole }) {
+export function PatientRegistrationForm() {
   const router = useRouter();
-  const isReceptionist = role === "receptionist";
   const [activeIndex, setActiveIndex] = useState(0);
   const [regions, setRegions] = useState<RegionOption[]>([]);
   const [towns, setTowns] = useState<string[]>([]);
@@ -241,7 +240,7 @@ export function PatientRegistrationForm({ role }: { role: UserRole }) {
       fields: [] as const
     }
   ];
-  const steps = isReceptionist ? allSteps.slice(0, 3) : allSteps;
+  const steps = allSteps.slice(0, 3);
   const activeStep = steps[activeIndex];
   const isFirst = activeIndex === 0;
   const isLast = activeIndex === steps.length - 1;
@@ -254,7 +253,6 @@ export function PatientRegistrationForm({ role }: { role: UserRole }) {
 
   async function onSubmit(values: PatientRegistrationValues) {
     setSaving(true);
-    const childrenCount = text(values.children_count);
     const body: Record<string, unknown> = {
       first_name: text(values.first_name),
       middle_name: text(values.middle_name),
@@ -275,24 +273,6 @@ export function PatientRegistrationForm({ role }: { role: UserRole }) {
       village: text(values.village)
     };
 
-    if (!isReceptionist) {
-      body.profile = {
-        hiv_status: values.hiv_status,
-        children_count: childrenCount ? Number(childrenCount) : null,
-        past_medical_history: text(values.past_medical_history),
-        family_medical_history: text(values.family_medical_history),
-        allopathic_medication: text(values.allopathic_medication),
-        other_important_information: text(values.other_important_information)
-      };
-      body.conditions = CONFIDENTIAL_CONDITIONS.map((condition) => ({
-        condition_code: condition.code,
-        condition_label: condition.label,
-        present: values.conditions[condition.code] === "yes",
-        is_confidential: true,
-        status: "active"
-      }));
-    }
-
     try {
       const response = await fetch("/api/patients/create", {
         method: "POST",
@@ -304,7 +284,7 @@ export function PatientRegistrationForm({ role }: { role: UserRole }) {
         toast.error(data.detail || "The patient record could not be saved.");
         return;
       }
-      toast.success(isReceptionist ? "Patient created. Consent signing is the next step." : "Patient saved");
+      toast.success("Patient created. Consent signing is the next step.");
       router.push(data.public_id ? `/patients/${data.public_id}` : "/patients");
       router.refresh();
     } finally {
@@ -479,7 +459,7 @@ export function PatientRegistrationForm({ role }: { role: UserRole }) {
           </Button>
           {isLast ? (
             <LoadingButton type="submit" variant="success" loading={saving} loadingText="Saving patient...">
-              {isReceptionist ? "Create patient" : "Save patient"}
+              Create patient
             </LoadingButton>
           ) : (
             <Button type="button" onClick={continueToNextStep}>
