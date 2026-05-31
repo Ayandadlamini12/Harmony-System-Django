@@ -37,12 +37,17 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
   );
 
   async function refreshThreads(preferredId?: number) {
-    const res = await fetch("/api/message-threads", { cache: "no-store" });
-    const data = await res.json().catch(() => ({ results: [] }));
-    const nextThreads = data.results || [];
-    setThreads(nextThreads);
-    if (preferredId) setSelectedThreadId(preferredId);
-    if (!preferredId && nextThreads.length && !selectedThreadId) setSelectedThreadId(nextThreads[0].id);
+    try {
+      const res = await fetch("/api/message-threads", { cache: "no-store" });
+      if (!res.ok) return;
+      const data = await res.json().catch(() => ({ results: [] }));
+      const nextThreads = data.results || [];
+      setThreads(nextThreads);
+      if (preferredId) setSelectedThreadId(preferredId);
+      if (!preferredId && nextThreads.length && !selectedThreadId) setSelectedThreadId(nextThreads[0].id);
+    } catch {
+      // The UI already has the submitted thread/message; background refresh can fail silently.
+    }
   }
 
   async function handleCreateThread(event: FormEvent<HTMLFormElement>) {
@@ -58,26 +63,33 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       setIsSubmitting(false);
       return;
     }
-    const res = await fetch("/api/message-threads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        subject,
-        thread_type: "direct",
-        participant_ids: [recipientId],
-        initial_message: initialMessage,
-      }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(data.detail || "Could not create the message thread.");
+    try {
+      const res = await fetch("/api/message-threads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          subject,
+          thread_type: "direct",
+          participant_ids: [recipientId],
+          initial_message: initialMessage,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.detail || "Could not create the message thread.");
+        return;
+      }
+      const createdThread = data as MessageThread;
+      event.currentTarget.reset();
+      setThreads((currentThreads) => [createdThread, ...currentThreads.filter((thread) => thread.id !== createdThread.id)]);
+      setSelectedThreadId(createdThread.id);
+      setIsCreating(false);
+      void refreshThreads(createdThread.id);
+    } catch {
+      setError("Could not create the message thread. Please try again.");
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-    event.currentTarget.reset();
-    setIsCreating(false);
-    setIsSubmitting(false);
-    await refreshThreads(data.id);
   }
 
   async function handleSendMessage(event: FormEvent<HTMLFormElement>) {
@@ -93,20 +105,36 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       setIsSubmitting(false);
       return;
     }
-    const res = await fetch(`/api/message-threads/${selectedThread.id}/messages`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ body }),
-    });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setError(data.detail || data.body?.[0] || "Could not send the message.");
+    try {
+      const res = await fetch(`/api/message-threads/${selectedThread.id}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ body }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.detail || data.body?.[0] || "Could not send the message.");
+        return;
+      }
+      form.reset();
+      setThreads((currentThreads) =>
+        currentThreads.map((thread) =>
+          thread.id === selectedThread.id
+            ? {
+                ...thread,
+                messages: [...thread.messages, data],
+                latest_message: data,
+                last_message_at: data.sent_at || thread.last_message_at,
+              }
+            : thread
+        )
+      );
+      void refreshThreads(selectedThread.id);
+    } catch {
+      setError("Could not send the message. Please try again.");
+    } finally {
       setIsSubmitting(false);
-      return;
     }
-    form.reset();
-    setIsSubmitting(false);
-    await refreshThreads(selectedThread.id);
   }
 
   return (
