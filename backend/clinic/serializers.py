@@ -1,9 +1,12 @@
 from django.db import transaction
+from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+
+User = get_user_model()
 
 
 class PatientProfileSerializer(serializers.ModelSerializer):
@@ -382,6 +385,200 @@ class FormDraftSerializer(serializers.ModelSerializer):
         if value not in {FormDraft.Status.DRAFT, FormDraft.Status.ABANDONED}:
             raise serializers.ValidationError("Use submit action to mark a draft as submitted.")
         return value
+
+
+class MessageRecipientSerializer(serializers.ModelSerializer):
+    name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = User
+        fields = ("id", "username", "email", "first_name", "last_name", "name", "role", "is_active")
+
+    def get_name(self, obj):
+        return obj.get_full_name() or obj.username
+
+
+class MessageParticipantSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    user_role = serializers.CharField(source="user.role", read_only=True)
+
+    class Meta:
+        model = MessageParticipant
+        fields = ("id", "user", "user_name", "user_role", "role", "last_read_at", "is_muted", "created_at")
+        read_only_fields = ("id", "user_name", "user_role", "created_at")
+
+    def get_user_name(self, obj):
+        return obj.user.get_full_name() or obj.user.username
+
+
+class MessageDeliverySerializer(serializers.ModelSerializer):
+    recipient_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MessageDelivery
+        fields = (
+            "id",
+            "message",
+            "channel",
+            "status",
+            "recipient_user",
+            "recipient_name",
+            "destination",
+            "provider",
+            "provider_message_id",
+            "error",
+            "sent_at",
+            "delivered_at",
+            "read_at",
+            "created_at",
+        )
+        read_only_fields = ("id", "recipient_name", "created_at")
+
+    def get_recipient_name(self, obj):
+        if not obj.recipient_user:
+            return ""
+        return obj.recipient_user.get_full_name() or obj.recipient_user.username
+
+
+class MessageSerializer(serializers.ModelSerializer):
+    sender_name = serializers.SerializerMethodField()
+    sender_role = serializers.CharField(source="sender.role", read_only=True)
+    deliveries = MessageDeliverySerializer(many=True, read_only=True)
+
+    class Meta:
+        model = Message
+        fields = (
+            "id",
+            "thread",
+            "sender",
+            "sender_name",
+            "sender_role",
+            "body",
+            "message_type",
+            "external_channel",
+            "external_message_id",
+            "metadata",
+            "sent_at",
+            "created_at",
+            "deliveries",
+        )
+        read_only_fields = (
+            "id",
+            "sender",
+            "sender_name",
+            "sender_role",
+            "message_type",
+            "external_channel",
+            "external_message_id",
+            "metadata",
+            "sent_at",
+            "created_at",
+            "deliveries",
+        )
+
+    def get_sender_name(self, obj):
+        if not obj.sender:
+            return "System"
+        return obj.sender.get_full_name() or obj.sender.username
+
+
+class MessageThreadSerializer(serializers.ModelSerializer):
+    participant_ids = serializers.ListField(child=serializers.IntegerField(), write_only=True, required=False)
+    initial_message = serializers.CharField(write_only=True, required=False, allow_blank=True, trim_whitespace=True)
+    created_by_name = serializers.SerializerMethodField()
+    patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
+    patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
+    appointment_label = serializers.SerializerMethodField()
+    participants = MessageParticipantSerializer(many=True, read_only=True)
+    messages = MessageSerializer(many=True, read_only=True)
+    latest_message = serializers.SerializerMethodField()
+    unread_count = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MessageThread
+        fields = (
+            "id",
+            "subject",
+            "thread_type",
+            "patient",
+            "patient_name",
+            "patient_code",
+            "appointment",
+            "appointment_label",
+            "visit",
+            "clinical_case",
+            "document",
+            "created_by",
+            "created_by_name",
+            "last_message_at",
+            "is_closed",
+            "external_reference",
+            "metadata",
+            "participants",
+            "messages",
+            "latest_message",
+            "unread_count",
+            "participant_ids",
+            "initial_message",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "created_by",
+            "created_by_name",
+            "patient_name",
+            "patient_code",
+            "appointment_label",
+            "last_message_at",
+            "external_reference",
+            "metadata",
+            "participants",
+            "messages",
+            "latest_message",
+            "unread_count",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_created_by_name(self, obj):
+        if not obj.created_by:
+            return ""
+        return obj.created_by.get_full_name() or obj.created_by.username
+
+    def get_appointment_label(self, obj):
+        if not obj.appointment:
+            return ""
+        return f"{obj.appointment.get_appointment_type_display()} on {obj.appointment.appointment_date}"
+
+    def get_latest_message(self, obj):
+        message = obj.messages.order_by("-sent_at", "-created_at").first()
+        if not message:
+            return None
+        return MessageSerializer(message, context=self.context).data
+
+    def get_unread_count(self, obj):
+        request = self.context.get("request")
+        user = request.user if request else None
+        if not user or not user.is_authenticated:
+            return 0
+        participant = obj.participants.filter(user=user).first()
+        if not participant:
+            return 0
+        messages = obj.messages.exclude(sender=user)
+        if participant.last_read_at:
+            messages = messages.filter(sent_at__gt=participant.last_read_at)
+        return messages.count()
+
+    def create(self, validated_data):
+        validated_data.pop("participant_ids", None)
+        validated_data.pop("initial_message", None)
+        return super().create(validated_data)
+
+    def update(self, instance, validated_data):
+        validated_data.pop("participant_ids", None)
+        validated_data.pop("initial_message", None)
+        return super().update(instance, validated_data)
 
 
 class PatientListSerializer(serializers.ModelSerializer):

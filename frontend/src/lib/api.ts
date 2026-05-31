@@ -1,4 +1,4 @@
-import type { Appointment, Case, ClinicianProfile, DashboardStats, ElevatedAccessRequest, EmployeeEnrollmentRequest, FormDraft, Paginated, Patient, PatientCheckIn, PatientJourney, User, Visit, Vital } from "@/types/clinic";
+import type { Appointment, Case, ClinicianProfile, DashboardStats, ElevatedAccessRequest, EmployeeEnrollmentRequest, FormDraft, MessageRecipient, MessageThread, Paginated, Patient, PatientCheckIn, PatientJourney, User, Visit, Vital } from "@/types/clinic";
 import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -119,6 +119,20 @@ export function getAccessRequests() {
     previous: null,
     results: []
   });
+}
+
+export function getMessageThreads(filter = "") {
+  const query = filter ? `?${filter}` : "";
+  return apiGet<Paginated<MessageThread>>(`/message-threads/${query}`, {
+    count: 0,
+    next: null,
+    previous: null,
+    results: []
+  });
+}
+
+export function getMessageRecipients() {
+  return apiGet<MessageRecipient[]>("/message-threads/recipients/", []);
 }
 
 export function getFormDrafts(status = "draft") {

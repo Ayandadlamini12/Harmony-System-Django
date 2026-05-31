@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 
 
 class PatientProfileInline(admin.StackedInline):
@@ -29,6 +29,14 @@ class VisitAdmin(admin.ModelAdmin):
     list_display = ("patient", "visit_type", "visit_date", "practitioner")
     search_fields = ("patient__full_name_display", "patient__patient_code", "main_complaint")
     list_filter = ("visit_type", "visit_date")
+
+
+@admin.register(Case)
+class CaseAdmin(admin.ModelAdmin):
+    list_display = ("title", "patient", "visit", "status", "practitioner", "created_at")
+    search_fields = ("title", "patient__full_name_display", "patient__patient_code", "main_complaint", "diagnosis")
+    list_filter = ("status", "created_at", "resolved_at")
+    autocomplete_fields = ("patient", "visit", "parent_case", "practitioner")
 
 
 @admin.register(PatientCheckIn)
@@ -72,6 +80,37 @@ class ElevatedAccessRequestAdmin(admin.ModelAdmin):
     list_display = ("patient", "requested_by", "status", "reviewed_by", "expires_at", "created_at")
     search_fields = ("patient__full_name_display", "patient__patient_code", "requested_by__username")
     list_filter = ("status", "scope", "created_at", "expires_at")
+
+
+class MessageParticipantInline(admin.TabularInline):
+    model = MessageParticipant
+    extra = 0
+    autocomplete_fields = ("user",)
+
+
+@admin.register(MessageThread)
+class MessageThreadAdmin(admin.ModelAdmin):
+    inlines = [MessageParticipantInline]
+    list_display = ("subject", "thread_type", "patient", "appointment", "created_by", "last_message_at", "is_closed")
+    search_fields = ("subject", "patient__full_name_display", "patient__patient_code", "messages__body")
+    list_filter = ("thread_type", "is_closed", "created_at", "last_message_at")
+    autocomplete_fields = ("patient", "appointment", "visit", "clinical_case", "document", "created_by")
+
+
+@admin.register(Message)
+class MessageAdmin(admin.ModelAdmin):
+    list_display = ("thread", "sender", "message_type", "external_channel", "sent_at")
+    search_fields = ("thread__subject", "sender__username", "body")
+    list_filter = ("message_type", "external_channel", "sent_at")
+    autocomplete_fields = ("thread", "sender")
+
+
+@admin.register(MessageDelivery)
+class MessageDeliveryAdmin(admin.ModelAdmin):
+    list_display = ("message", "channel", "status", "recipient_user", "created_at")
+    search_fields = ("message__thread__subject", "recipient_user__username", "destination", "provider_message_id")
+    list_filter = ("channel", "status", "created_at")
+    autocomplete_fields = ("message", "recipient_user")
 
 
 @admin.register(PatientCondition)

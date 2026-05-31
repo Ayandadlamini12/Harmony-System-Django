@@ -539,6 +539,151 @@ class FormDraft(TimeStampedModel):
         return f"{self.get_form_type_display()} draft for {self.owner_user}"
 
 
+class MessageThread(TimeStampedModel):
+    class ThreadType(models.TextChoices):
+        DIRECT = "direct", "Direct"
+        GROUP = "group", "Group"
+        PATIENT = "patient", "Patient"
+        APPOINTMENT = "appointment", "Appointment"
+        SYSTEM = "system", "System"
+
+    subject = models.CharField(max_length=220)
+    thread_type = models.CharField(max_length=40, choices=ThreadType.choices, default=ThreadType.DIRECT)
+    patient = models.ForeignKey(Patient, null=True, blank=True, on_delete=models.SET_NULL, related_name="message_threads")
+    appointment = models.ForeignKey(Appointment, null=True, blank=True, on_delete=models.SET_NULL, related_name="message_threads")
+    visit = models.ForeignKey(Visit, null=True, blank=True, on_delete=models.SET_NULL, related_name="message_threads")
+    clinical_case = models.ForeignKey(Case, null=True, blank=True, on_delete=models.SET_NULL, related_name="message_threads")
+    document = models.ForeignKey(PatientDocument, null=True, blank=True, on_delete=models.SET_NULL, related_name="message_threads")
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_message_threads",
+    )
+    last_message_at = models.DateTimeField(null=True, blank=True)
+    is_closed = models.BooleanField(default=False)
+    external_reference = models.CharField(max_length=180, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-last_message_at", "-updated_at")
+        indexes = [
+            models.Index(fields=["thread_type", "last_message_at"]),
+            models.Index(fields=["patient", "last_message_at"]),
+            models.Index(fields=["appointment", "last_message_at"]),
+            models.Index(fields=["created_by", "last_message_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return self.subject
+
+
+class MessageParticipant(TimeStampedModel):
+    class Role(models.TextChoices):
+        OWNER = "owner", "Owner"
+        MEMBER = "member", "Member"
+        OBSERVER = "observer", "Observer"
+
+    thread = models.ForeignKey(MessageThread, on_delete=models.CASCADE, related_name="participants")
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="message_participations")
+    role = models.CharField(max_length=30, choices=Role.choices, default=Role.MEMBER)
+    last_read_at = models.DateTimeField(null=True, blank=True)
+    is_muted = models.BooleanField(default=False)
+
+    class Meta:
+        unique_together = ("thread", "user")
+        ordering = ("created_at",)
+        indexes = [
+            models.Index(fields=["user", "last_read_at"]),
+            models.Index(fields=["thread", "user"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user} in {self.thread}"
+
+
+class Message(TimeStampedModel):
+    class MessageType(models.TextChoices):
+        USER = "user", "User"
+        SYSTEM = "system", "System"
+        HANDOFF = "handoff", "Handoff"
+        EXTERNAL = "external", "External"
+
+    class Channel(models.TextChoices):
+        INTERNAL = "internal", "Internal"
+        EMAIL = "email", "Email"
+        TELEGRAM = "telegram", "Telegram"
+        WHATSAPP = "whatsapp", "WhatsApp"
+        API = "api", "API"
+
+    thread = models.ForeignKey(MessageThread, on_delete=models.CASCADE, related_name="messages")
+    sender = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="sent_messages",
+    )
+    body = models.TextField()
+    message_type = models.CharField(max_length=30, choices=MessageType.choices, default=MessageType.USER)
+    external_channel = models.CharField(max_length=30, choices=Channel.choices, default=Channel.INTERNAL)
+    external_message_id = models.CharField(max_length=180, blank=True)
+    sent_at = models.DateTimeField(default=timezone.now)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("sent_at", "created_at")
+        indexes = [
+            models.Index(fields=["thread", "sent_at"]),
+            models.Index(fields=["sender", "sent_at"]),
+            models.Index(fields=["external_channel", "external_message_id"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.thread} - {self.sent_at:%Y-%m-%d %H:%M}"
+
+
+class MessageDelivery(TimeStampedModel):
+    class Status(models.TextChoices):
+        QUEUED = "queued", "Queued"
+        SENT = "sent", "Sent"
+        DELIVERED = "delivered", "Delivered"
+        READ = "read", "Read"
+        FAILED = "failed", "Failed"
+        SKIPPED = "skipped", "Skipped"
+
+    message = models.ForeignKey(Message, on_delete=models.CASCADE, related_name="deliveries")
+    channel = models.CharField(max_length=30, choices=Message.Channel.choices, default=Message.Channel.INTERNAL)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.DELIVERED)
+    recipient_user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="message_deliveries",
+    )
+    destination = models.CharField(max_length=255, blank=True)
+    provider = models.CharField(max_length=80, blank=True)
+    provider_message_id = models.CharField(max_length=180, blank=True)
+    error = models.TextField(blank=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+    delivered_at = models.DateTimeField(null=True, blank=True)
+    read_at = models.DateTimeField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["channel", "status", "created_at"]),
+            models.Index(fields=["message", "channel"]),
+            models.Index(fields=["recipient_user", "status"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.channel} {self.status} for message {self.message_id}"
+
+
 class Vital(TimeStampedModel):
     class GlucoseContext(models.TextChoices):
         FASTING = "fasting", "Fasting"

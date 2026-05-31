@@ -245,6 +245,7 @@ def has_patient_clinical_access(user, patient_id) -> bool:
 | `/account` | Profile display + password change | All roles |
 | `/access-requests` | Request elevated access | Receptionist |
 | `/approvals` | Approve/reject access requests | Admin, Clinician |
+| `/messages` | Internal user messaging | Staff conversations with extensible patient, appointment, visit, case, and document references |
 
 ### Planned (Placeholder)
 | Route | Status | Notes |
@@ -253,7 +254,6 @@ def has_patient_clinical_access(user, patient_id) -> bool:
 | `/check-ins` | Placeholder | Shows all patients; no arrival status tracking |
 | `/appointments` | Placeholder | No appointment booking model exists |
 | `/reports` | Partial | Shows dashboard stats; export filters not implemented |
-| `/messages` | Placeholder | Cards for internal chat, email, WhatsApp/Telegram |
 | `/inventory` | Placeholder | Cards for stock items, reorder alerts, stock movement |
 | `/staff` | Static | Role description cards only |
 
@@ -612,7 +612,7 @@ docker run --rm -v postgres_django_data:/data -v $(pwd):/backup alpine tar czf /
 | **Waiting List** | High | Real-time patient arrival tracking, check-in flow, status updates |
 | **Check-ins** | High | Mark arrivals, update demographics on arrival, move to waiting list |
 | **Appointments** | Medium | Appointment booking, calendar view, reminders, rescheduling |
-| **Messages** | Medium | Internal chat, email integration, WhatsApp/Telegram actions |
+| **Messages** | Medium | Internal messaging foundation is active; next work is notification counts, attachments, and n8n delivery connectors for email, WhatsApp, and Telegram |
 | **Inventory** | Medium | Stock items, reorder alerts, stock movement tracking, supplier management |
 | **Reports** | Medium | Operational reporting, exports, patient activity, visit trends, inventory reports |
 | **Staff Page** | Low | Convert from static to dynamic staff directory |

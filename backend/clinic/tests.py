@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientProfile, Visit, Vital
 
 User = get_user_model()
 
@@ -441,6 +441,80 @@ class AppointmentApiTests(APITestCase):
         self.assertEqual(appointment.created_by, self.admin)
         self.assertEqual(appointment.status, Appointment.Status.SCHEDULED)
         self.assertTrue(AuditLog.objects.filter(entity_type="appointment", action="create").exists())
+
+
+class MessageThreadApiTests(APITestCase):
+    def setUp(self):
+        self.clinician = User.objects.create_user(
+            username="doctor_messages",
+            password="password123",
+            role="clinician",
+            first_name="Doctor",
+            last_name="Messages",
+        )
+        self.receptionist = User.objects.create_user(
+            username="reception_messages",
+            password="password123",
+            role="receptionist",
+            first_name="Reception",
+            last_name="Messages",
+        )
+        self.outsider = User.objects.create_user(username="other_messages", password="password123", role="receptionist")
+        self.patient = Patient.objects.create(first_name="Message", last_name="Patient", gender="female")
+        self.client.force_authenticate(self.clinician)
+
+    def test_user_can_create_thread_with_internal_delivery(self):
+        response = self.client.post(
+            "/api/message-threads/",
+            {
+                "subject": "Patient handoff",
+                "thread_type": "patient",
+                "patient": self.patient.id,
+                "participant_ids": [self.receptionist.id],
+                "initial_message": "Please confirm the consent form before consultation.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        thread = MessageThread.objects.get()
+        self.assertEqual(thread.patient, self.patient)
+        self.assertEqual(thread.participants.count(), 2)
+        self.assertEqual(Message.objects.filter(thread=thread).count(), 1)
+        self.assertEqual(MessageDelivery.objects.get().recipient_user, self.receptionist)
+        self.assertTrue(AuditLog.objects.filter(entity_type="message_thread", action="create").exists())
+
+    def test_only_thread_participants_can_list_messages(self):
+        thread = MessageThread.objects.create(subject="Private thread", created_by=self.clinician)
+        MessageParticipant.objects.create(thread=thread, user=self.clinician, role=MessageParticipant.Role.OWNER)
+        MessageParticipant.objects.create(thread=thread, user=self.receptionist)
+
+        self.client.force_authenticate(self.receptionist)
+        allowed_response = self.client.get("/api/message-threads/")
+        self.assertEqual(allowed_response.status_code, 200)
+        self.assertEqual(allowed_response.data["count"], 1)
+
+        self.client.force_authenticate(self.outsider)
+        denied_response = self.client.get("/api/message-threads/")
+        self.assertEqual(denied_response.status_code, 200)
+        self.assertEqual(denied_response.data["count"], 0)
+
+    def test_participant_can_reply_to_thread(self):
+        thread = MessageThread.objects.create(subject="Reply thread", created_by=self.clinician)
+        MessageParticipant.objects.create(thread=thread, user=self.clinician, role=MessageParticipant.Role.OWNER)
+        MessageParticipant.objects.create(thread=thread, user=self.receptionist)
+
+        self.client.force_authenticate(self.receptionist)
+        response = self.client.post(
+            f"/api/message-threads/{thread.id}/messages/",
+            {"body": "I have checked the document."},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        thread.refresh_from_db()
+        self.assertIsNotNone(thread.last_message_at)
+        self.assertEqual(Message.objects.get().sender, self.receptionist)
 
 
 class ClinicalAccessTests(APITestCase):

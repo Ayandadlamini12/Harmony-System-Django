@@ -17,13 +17,16 @@ from rest_framework.response import Response
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
 from .document_generation import consent_document_reference, generate_consent_pdf, render_consent_html, save_consent_pdf, sign_consent_document
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
 from .serializers import (
     AuditLogSerializer,
     AppointmentSerializer,
     CaseSerializer,
     ElevatedAccessRequestSerializer,
     FormDraftSerializer,
+    MessageRecipientSerializer,
+    MessageSerializer,
+    MessageThreadSerializer,
     PatientCheckInSerializer,
     PatientDocumentSerializer,
     PatientJourneySerializer,
@@ -939,6 +942,137 @@ class FormDraftViewSet(viewsets.ModelViewSet):
             details="Form draft abandoned.",
         )
         return Response(self.get_serializer(draft).data)
+
+
+def create_internal_deliveries(message):
+    now = timezone.now()
+    deliveries = []
+    for participant in message.thread.participants.select_related("user").exclude(user=message.sender):
+        deliveries.append(
+            MessageDelivery(
+                message=message,
+                channel=Message.Channel.INTERNAL,
+                status=MessageDelivery.Status.DELIVERED,
+                recipient_user=participant.user,
+                delivered_at=now,
+            )
+        )
+    if deliveries:
+        MessageDelivery.objects.bulk_create(deliveries)
+
+
+class MessageThreadViewSet(viewsets.ModelViewSet):
+    serializer_class = MessageThreadSerializer
+    permission_classes = [IsAuthenticated]
+    search_fields = (
+        "subject",
+        "messages__body",
+        "patient__full_name_display",
+        "patient__patient_code",
+        "appointment__notes",
+    )
+    ordering_fields = ("last_message_at", "updated_at", "created_at")
+    filterset_fields = ("thread_type", "patient", "appointment", "visit", "clinical_case", "document", "is_closed")
+
+    def get_queryset(self):
+        queryset = (
+            MessageThread.objects.select_related("patient", "appointment", "visit", "clinical_case", "document", "created_by")
+            .prefetch_related("participants__user", "messages__sender", "messages__deliveries")
+            .distinct()
+        )
+        if getattr(self.request.user, "role", "") == "admin":
+            return queryset
+        return queryset.filter(participants__user=self.request.user)
+
+    def _participant_ids(self):
+        participant_ids = self.request.data.get("participant_ids", [])
+        if isinstance(participant_ids, str):
+            participant_ids = [participant_ids]
+        return {int(user_id) for user_id in participant_ids if str(user_id).isdigit()}
+
+    def _ensure_participants(self, thread, participant_ids):
+        MessageParticipant.objects.get_or_create(
+            thread=thread,
+            user=self.request.user,
+            defaults={"role": MessageParticipant.Role.OWNER, "last_read_at": timezone.now()},
+        )
+        users = User.objects.filter(id__in=participant_ids, is_active=True)
+        for user in users:
+            if user == self.request.user:
+                continue
+            MessageParticipant.objects.get_or_create(
+                thread=thread,
+                user=user,
+                defaults={"role": MessageParticipant.Role.MEMBER},
+            )
+
+    def _user_can_access_thread(self, thread):
+        if getattr(self.request.user, "role", "") == "admin":
+            return True
+        return thread.participants.filter(user=self.request.user).exists()
+
+    @transaction.atomic
+    def perform_create(self, serializer):
+        participant_ids = self._participant_ids()
+        initial_message = (self.request.data.get("initial_message") or "").strip()
+        thread = serializer.save(created_by=self.request.user)
+        self._ensure_participants(thread, participant_ids)
+        if initial_message:
+            message = Message.objects.create(thread=thread, sender=self.request.user, body=initial_message)
+            thread.last_message_at = message.sent_at
+            thread.save(update_fields=["last_message_at", "updated_at"])
+            create_internal_deliveries(message)
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=thread,
+            entity_type="message_thread",
+            after_data=snapshot_instance(thread),
+            details="Message thread created.",
+        )
+
+    @action(detail=False, methods=["get"])
+    def recipients(self, request):
+        users = User.objects.filter(is_active=True).order_by("first_name", "last_name", "username")
+        return Response(MessageRecipientSerializer(users, many=True).data)
+
+    @action(detail=True, methods=["post"])
+    def messages(self, request, pk=None):
+        thread = self.get_object()
+        if not self._user_can_access_thread(thread):
+            return Response({"detail": "You do not have access to this message thread."}, status=status.HTTP_403_FORBIDDEN)
+        if thread.is_closed:
+            return Response({"detail": "This message thread is closed."}, status=status.HTTP_400_BAD_REQUEST)
+        body = (request.data.get("body") or "").strip()
+        if not body:
+            return Response({"body": ["Message text is required."]}, status=status.HTTP_400_BAD_REQUEST)
+        if not thread.participants.filter(user=request.user).exists():
+            MessageParticipant.objects.create(thread=thread, user=request.user, role=MessageParticipant.Role.MEMBER)
+        message = Message.objects.create(thread=thread, sender=request.user, body=body)
+        thread.last_message_at = message.sent_at
+        thread.save(update_fields=["last_message_at", "updated_at"])
+        create_internal_deliveries(message)
+        write_audit_log(
+            request=request,
+            action="create",
+            instance=message,
+            entity_type="message",
+            after_data=snapshot_instance(message),
+            details="Message created.",
+        )
+        return Response(MessageSerializer(message, context={"request": request}).data, status=status.HTTP_201_CREATED)
+
+    @action(detail=True, methods=["post"], url_path="mark-read")
+    def mark_read(self, request, pk=None):
+        thread = self.get_object()
+        participant, _ = MessageParticipant.objects.get_or_create(
+            thread=thread,
+            user=request.user,
+            defaults={"role": MessageParticipant.Role.MEMBER},
+        )
+        participant.last_read_at = timezone.now()
+        participant.save(update_fields=["last_read_at", "updated_at"])
+        return Response(self.get_serializer(thread).data)
 
 
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):

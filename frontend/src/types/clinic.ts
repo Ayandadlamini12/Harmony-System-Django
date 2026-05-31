@@ -335,6 +335,70 @@ export type EmployeeEnrollmentRequest = {
   updated_at: string;
 };
 
+export type MessageRecipient = Pick<User, "id" | "username" | "email" | "first_name" | "last_name" | "name" | "role" | "is_active">;
+
+export type MessageParticipant = {
+  id: number;
+  user: number;
+  user_name: string;
+  user_role: User["role"];
+  role: "owner" | "member" | "observer";
+  last_read_at?: string | null;
+  is_muted: boolean;
+  created_at: string;
+};
+
+export type MessageDelivery = {
+  id: number;
+  message: number;
+  channel: "internal" | "email" | "telegram" | "whatsapp" | "api";
+  status: "queued" | "sent" | "delivered" | "read" | "failed" | "skipped";
+  recipient_user?: number | null;
+  recipient_name?: string;
+  destination?: string;
+  provider?: string;
+  error?: string;
+  created_at: string;
+};
+
+export type Message = {
+  id: number;
+  thread: number;
+  sender?: number | null;
+  sender_name: string;
+  sender_role?: User["role"];
+  body: string;
+  message_type: "user" | "system" | "handoff" | "external";
+  external_channel: "internal" | "email" | "telegram" | "whatsapp" | "api";
+  sent_at: string;
+  created_at: string;
+  deliveries?: MessageDelivery[];
+};
+
+export type MessageThread = {
+  id: number;
+  subject: string;
+  thread_type: "direct" | "group" | "patient" | "appointment" | "system";
+  patient?: number | null;
+  patient_name?: string;
+  patient_code?: string;
+  appointment?: number | null;
+  appointment_label?: string;
+  visit?: number | null;
+  clinical_case?: number | null;
+  document?: number | null;
+  created_by?: number | null;
+  created_by_name?: string;
+  last_message_at?: string | null;
+  is_closed: boolean;
+  participants: MessageParticipant[];
+  messages: Message[];
+  latest_message?: Message | null;
+  unread_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
 export type Paginated<T> = {
   count: number;
   next: string | null;

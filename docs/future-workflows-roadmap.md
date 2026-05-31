@@ -93,3 +93,24 @@ Initial n8n access should be narrow:
 - Allow `messages:send`.
 - Do not allow broad patient browsing.
 - Do not allow `clinical_records:read`, `diagnosis:read`, or `confidential_records:read` unless a specific approved workflow requires it.
+
+## Messaging And Communication Hub
+
+Implemented foundation:
+
+- Internal staff message threads are now stored in Harmony.
+- Threads can reference patients, appointments, visits, cases, and generated documents.
+- Participants are explicit users, so visibility can be controlled per conversation.
+- Message delivery records already separate the internal message from the delivery channel.
+
+Recommended next steps:
+
+- Add context actions from patient and appointment screens, for example "Message assigned clinician" or "Discuss appointment".
+- Add attachments after document storage rules are finalized.
+- Add n8n delivery workers for Telegram, WhatsApp, and email using the `MessageDelivery` queue/status records.
+- Add read receipts and notification counts in the top navigation.
+- Add templates for common operational messages such as appointment reminders, follow-up reminders, consent form pending, and patient waiting.
+
+Important rule:
+
+- Harmony should remain the source of truth for the conversation and clinical context. n8n or provider APIs should only deliver or receive channel-specific messages and then call back into Harmony.
