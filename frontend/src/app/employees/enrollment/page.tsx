@@ -25,15 +25,15 @@ export default async function EmployeeEnrollmentPage() {
             <div>
               <div className="flex items-center gap-3">
                 <UserPlus className="text-[var(--hh-purple)]" size={22} />
-                <h2 className="font-bold">Employee Enrollment</h2>
+                <h2 className="font-bold">Employee onboarding</h2>
               </div>
               <p className="mt-2 max-w-3xl text-sm leading-6 text-[#66736d]">
-                Telegram onboarding requests land here as pending records. Admins can review the employee details before creating a live system account.
+                Telegram and internal onboarding requests land here as pending employee records. Admins review the details before the employee is prepared for Keycloak-based system access.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
               <Button asChild>
-                <Link href="/users/enrol">Enrol system user</Link>
+                <Link href="/users/enrol">Create login account</Link>
               </Button>
               <span className="inline-flex items-center gap-2 rounded-full border border-[#d9e3dd] bg-white px-3 py-1 text-xs font-bold uppercase text-[#52635b]">
                 <Clock size={14} />

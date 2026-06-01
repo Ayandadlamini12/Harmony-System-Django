@@ -13,17 +13,17 @@ export default async function AdministrationSettingsPage({
   const [emailSettings, logs, params] = await Promise.all([getSystemEmailSettings(), getEmailDeliveryLogs(), searchParams]);
 
   return (
-    <AppShell title="Administration settings">
+    <AppShell title="Email & Notifications">
       <div className="grid gap-5">
         <section className="hh-panel p-5">
           <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="max-w-3xl">
               <div className="flex items-center gap-3">
                 <Settings2 className="text-[var(--hh-purple)]" size={22} />
-                <h2 className="font-bold">System administration</h2>
+                <h2 className="font-bold">Email & Notifications</h2>
               </div>
               <p className="mt-2 text-sm leading-6 text-[#66736d]">
-                Configure shared system services used by user onboarding, password flows, notifications, and future workflow automations.
+                Configure shared email services used by employee onboarding, password flows, notifications, and workflow automations.
               </p>
             </div>
             <span className="inline-flex items-center gap-2 rounded-full border border-[#d9e3dd] bg-white px-3 py-1 text-xs font-bold uppercase text-[#52635b]">
@@ -55,7 +55,7 @@ export default async function AdministrationSettingsPage({
             <div className="flex items-center gap-3">
               <MailCheck className="text-[var(--hh-purple)]" size={20} />
               <div>
-                <h3 className="font-bold">Transactional email SMTP</h3>
+                <h3 className="font-bold">Transactional email provider</h3>
                 <p className="mt-1 text-sm text-[#66736d]">
                   Brevo API is the preferred production provider. SMTP remains available as a fallback for providers that do not expose a transactional API.
                 </p>

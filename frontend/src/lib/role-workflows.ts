@@ -1,21 +1,28 @@
 import {
+  Activity,
   Archive,
   CalendarCheck,
   ClipboardCheck,
+  DatabaseBackup,
+  KeyRound,
   ListChecks,
   Inbox,
   LayoutDashboard,
   LockKeyhole,
+  MapPinned,
   MessageSquare,
   Package,
   FileText,
   HeartPulse,
+  Plug,
   Settings,
   ShieldCheck,
+  ShieldAlert,
   Stethoscope,
   Users,
   UserRoundCog,
   UserPlus,
+  Wrench,
   type LucideIcon
 } from "lucide-react";
 
@@ -67,12 +74,31 @@ export const navItems: NavItem[] = [
     icon: UserRoundCog,
     roles: ["admin"],
     children: [
-      { href: "/employees/enrollment", label: "Employee Enrollment", icon: UserPlus, roles: ["admin"], status: "planned" },
-      { href: "/users/enrol", label: "Enrol User", icon: UserRoundCog, roles: ["admin"] },
-      { href: "/users", label: "Users", icon: Users, roles: ["admin"] },
-      { href: "/roles", label: "Roles", icon: ShieldCheck, roles: ["admin"], status: "planned" },
-      { href: "/teams", label: "Teams", icon: Users, roles: ["admin"], status: "planned" },
-      { href: "/administration/settings", label: "Administration Settings", icon: Settings, roles: ["admin"] }
+      { href: "/employees/enrollment", label: "Employee Onboarding", icon: UserPlus, roles: ["admin"] },
+      { href: "/users/enrol", label: "Create Login Account", icon: UserRoundCog, roles: ["admin"] },
+      { href: "/users", label: "User Directory", icon: Users, roles: ["admin"] },
+      { href: "/roles", label: "Roles & Permissions", icon: ShieldCheck, roles: ["admin"] },
+      { href: "/teams", label: "Teams & Departments", icon: Users, roles: ["admin"] }
+    ]
+  },
+  {
+    href: "/administration/settings",
+    label: "System Settings",
+    icon: Settings,
+    roles: ["admin"],
+    children: [
+      { href: "/administration/settings", label: "Email & Notifications", icon: MessageSquare, roles: ["admin"] },
+      { href: "/administration/locations", label: "Location Settings", icon: MapPinned, roles: ["admin"] },
+      { href: "/administration/devices", label: "Devices & Accessibility", icon: Activity, roles: ["admin"] },
+      { href: "/administration/maintenance", label: "Maintenance Mode", icon: Wrench, roles: ["admin"] },
+      { href: "/administration/api-tokens", label: "API / Tokens", icon: KeyRound, roles: ["admin"] },
+      { href: "/administration/security", label: "Security & Sessions", icon: ShieldAlert, roles: ["admin"] },
+      { href: "/administration/audit-logs", label: "Audit Logs", icon: FileText, roles: ["admin"] },
+      { href: "/administration/integrations", label: "Integrations", icon: Plug, roles: ["admin"] },
+      { href: "/administration/backup", label: "Backup & Restore", icon: DatabaseBackup, roles: ["admin"] },
+      { href: "/administration/data-retention", label: "Data Retention", icon: Archive, roles: ["admin"] },
+      { href: "/administration/branding", label: "Branding", icon: Settings, roles: ["admin"] },
+      { href: "/administration/system-health", label: "System Health", icon: Activity, roles: ["admin"] }
     ]
   },
   { href: "/account", label: "Settings", icon: Settings, roles: ["admin", "clinician", "receptionist"] }

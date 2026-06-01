@@ -9,7 +9,7 @@ export default async function EnrolUserPage({ searchParams }: { searchParams: Pr
   const params = await searchParams;
 
   return (
-    <AppShell title="Enrol user">
+    <AppShell title="Create login account">
       {params.error === "create_failed" && (
         <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
           Failed to enrol user. Check the details and try again.
@@ -21,8 +21,8 @@ export default async function EnrolUserPage({ searchParams }: { searchParams: Pr
           <div className="mb-5 flex items-center gap-3">
             <UserRoundCog className="text-[var(--hh-purple)]" size={22} />
             <div>
-              <h2 className="font-bold">Create system user</h2>
-              <p className="mt-1 text-sm text-[#66736d]">Create login access and assign the correct system role.</p>
+              <h2 className="font-bold">Create login account</h2>
+              <p className="mt-1 text-sm text-[#66736d]">Create temporary Harmony MIS login access while Keycloak identity provisioning is being connected.</p>
             </div>
           </div>
 
@@ -58,7 +58,7 @@ export default async function EnrolUserPage({ searchParams }: { searchParams: Pr
               <input className="hh-input" name="password" type="password" autoComplete="new-password" minLength={8} required />
             </label>
             <div className="flex flex-wrap gap-3">
-              <Button type="submit">Enrol user</Button>
+              <Button type="submit">Create account</Button>
               <Button asChild type="button" variant="secondary">
                 <Link href="/users">Cancel</Link>
               </Button>
@@ -67,9 +67,9 @@ export default async function EnrolUserPage({ searchParams }: { searchParams: Pr
         </div>
 
         <div className="hh-panel p-5">
-          <h3 className="font-bold">User enrolment</h3>
+          <h3 className="font-bold">Identity direction</h3>
           <p className="mt-2 text-sm leading-6 text-[#66736d]">
-            Use this for system login accounts. Employee HR onboarding will be separated under Employee Enrollment.
+            Employee onboarding is reviewed first. The long-term login source will be Keycloak, using Harmony employee IDs as usernames and email addresses for verification and recovery.
           </p>
         </div>
       </section>
