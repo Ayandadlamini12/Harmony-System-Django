@@ -71,7 +71,8 @@ export const navItems: NavItem[] = [
       { href: "/users/enrol", label: "Enrol User", icon: UserRoundCog, roles: ["admin"] },
       { href: "/users", label: "Users", icon: Users, roles: ["admin"] },
       { href: "/roles", label: "Roles", icon: ShieldCheck, roles: ["admin"], status: "planned" },
-      { href: "/teams", label: "Teams", icon: Users, roles: ["admin"], status: "planned" }
+      { href: "/teams", label: "Teams", icon: Users, roles: ["admin"], status: "planned" },
+      { href: "/administration/settings", label: "Administration Settings", icon: Settings, roles: ["admin"] }
     ]
   },
   { href: "/account", label: "Settings", icon: Settings, roles: ["admin", "clinician", "receptionist"] }

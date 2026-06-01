@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientProfile, Visit, VisitSymptomProblem, Vital
 
 User = get_user_model()
 
@@ -93,6 +93,48 @@ class PatientApiTests(APITestCase):
         visit = Visit.objects.get()
         self.assertEqual(visit.patient, patient)
         self.assertEqual(visit.vitals.count(), 0)
+
+    def test_follow_up_carries_symptom_problems_and_resolves_items(self):
+        patient = Patient.objects.create(first_name="Zahara", last_name="Dlamini", gender="female")
+        first_response = self.client.post(
+            "/api/visits/",
+            {
+                "patient": patient.id,
+                "visit_type": "new_consultation",
+                "visit_date": "2026-05-16",
+                "main_complaint": "Headache",
+                "symptom_problem_updates": [
+                    {"description": "Headache", "note": "Worse in the morning", "status": "open"},
+                    {"description": "Sinus pressure", "note": "Blocked nose", "status": "open"},
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(first_response.status_code, 201)
+        headache = VisitSymptomProblem.objects.get(description="Headache")
+        self.assertEqual(headache.status, VisitSymptomProblem.Status.OPEN)
+
+        follow_up_response = self.client.post(
+            "/api/visits/",
+            {
+                "patient": patient.id,
+                "visit_type": "follow_up",
+                "visit_date": "2026-05-25",
+                "main_complaint": "Headache",
+                "symptom_problem_updates": [
+                    {"id": headache.id, "description": "Headache", "note": "Resolved after remedy", "status": "resolved"},
+                    {"description": "Fatigue", "note": "New problem reported today", "status": "open"},
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(follow_up_response.status_code, 201)
+        headache.refresh_from_db()
+        self.assertEqual(headache.status, VisitSymptomProblem.Status.RESOLVED)
+        self.assertIsNotNone(headache.resolved_visit)
+        self.assertTrue(VisitSymptomProblem.objects.filter(patient=patient, description="Fatigue", status="open").exists())
 
     def test_clinician_can_create_multiple_vitals_for_one_visit(self):
         patient = Patient.objects.create(first_name="John", last_name="Nkosi", gender="male")

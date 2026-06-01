@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, VisitSymptomProblem, Vital
 
 
 class PatientProfileInline(admin.StackedInline):
@@ -29,6 +29,14 @@ class VisitAdmin(admin.ModelAdmin):
     list_display = ("patient", "visit_type", "visit_date", "practitioner")
     search_fields = ("patient__full_name_display", "patient__patient_code", "main_complaint")
     list_filter = ("visit_type", "visit_date")
+
+
+@admin.register(VisitSymptomProblem)
+class VisitSymptomProblemAdmin(admin.ModelAdmin):
+    list_display = ("description", "patient", "status", "opened_visit", "resolved_visit", "resolved_at")
+    search_fields = ("description", "note", "patient__full_name_display", "patient__patient_code")
+    list_filter = ("status", "created_at", "resolved_at")
+    autocomplete_fields = ("patient", "opened_visit", "resolved_visit")
 
 
 @admin.register(Case)

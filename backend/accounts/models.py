@@ -22,6 +22,102 @@ class User(AbstractUser):
         return self.get_full_name() or self.username or self.email
 
 
+class RoleModulePermission(models.Model):
+    role = models.CharField(max_length=30, choices=User.Role.choices)
+    module_key = models.CharField(max_length=80)
+    enabled = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("role", "module_key")
+        constraints = [
+            models.UniqueConstraint(fields=["role", "module_key"], name="unique_role_module_permission"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.role}: {self.module_key} = {self.enabled}"
+
+
+class SystemEmailSettings(models.Model):
+    class Provider(models.TextChoices):
+        BREVO_API = "brevo_api", "Brevo API"
+        SMTP = "smtp", "SMTP fallback"
+
+    class Encryption(models.TextChoices):
+        STARTTLS = "starttls", "STARTTLS"
+        SSL = "ssl", "SSL/TLS"
+        NONE = "none", "None"
+
+    name = models.CharField(max_length=80, default="default", unique=True)
+    is_enabled = models.BooleanField(default=False)
+    provider = models.CharField(max_length=30, choices=Provider.choices, default=Provider.BREVO_API)
+    brevo_api_key = models.CharField(max_length=500, blank=True)
+    smtp_host = models.CharField(max_length=180, blank=True)
+    smtp_port = models.PositiveIntegerField(default=587)
+    encryption = models.CharField(max_length=20, choices=Encryption.choices, default=Encryption.STARTTLS)
+    username = models.CharField(max_length=180, blank=True)
+    password = models.CharField(max_length=500, blank=True)
+    from_email = models.EmailField(blank=True)
+    from_name = models.CharField(max_length=160, blank=True)
+    reply_to_email = models.EmailField(blank=True)
+    reply_to_name = models.CharField(max_length=160, blank=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "System email settings"
+        verbose_name_plural = "System email settings"
+
+    def __str__(self) -> str:
+        return f"{self.from_email or 'System email'} via {self.smtp_host or 'unconfigured SMTP'}"
+
+    @classmethod
+    def get_default(cls):
+        settings, _ = cls.objects.get_or_create(name="default")
+        return settings
+
+    @property
+    def password_is_set(self) -> bool:
+        return bool(self.password)
+
+    @property
+    def brevo_api_key_is_set(self) -> bool:
+        return bool(self.brevo_api_key)
+
+
+class EmailDeliveryLog(models.Model):
+    class Provider(models.TextChoices):
+        BREVO_API = "brevo_api", "Brevo API"
+        SMTP = "smtp", "SMTP"
+
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        SENT = "sent", "Sent"
+        FAILED = "failed", "Failed"
+
+    template_key = models.CharField(max_length=120)
+    provider = models.CharField(max_length=30, choices=Provider.choices)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
+    subject = models.CharField(max_length=255)
+    to = models.JSONField(default=list, blank=True)
+    from_email = models.EmailField(blank=True)
+    message_id = models.CharField(max_length=255, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    error = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["template_key", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        recipients = ", ".join(self.to[:2]) if isinstance(self.to, list) else ""
+        return f"{self.template_key} to {recipients} - {self.status}"
+
+
 class ClinicianProfile(models.Model):
     SECTION_KEYS = ("personal_details", "education", "career_details", "awards_certifications", "affiliations")
 
@@ -112,6 +208,8 @@ class EmployeeEnrollmentRequest(models.Model):
     status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING)
     notes = models.TextField(blank=True)
     raw_payload = models.JSONField(default=dict, blank=True)
+    review_email_sent_at = models.DateTimeField(null=True, blank=True)
+    review_email_error = models.TextField(blank=True)
     reviewed_by = models.ForeignKey(
         User,
         null=True,

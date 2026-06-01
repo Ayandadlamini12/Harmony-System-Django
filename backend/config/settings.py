@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.staticfiles",
     "corsheaders",
     "django_filters",
+    "anymail",
     "rest_framework",
     "rest_framework_simplejwt",
     "accounts",
@@ -180,3 +181,7 @@ CELERY_BROKER_URL = os.getenv("CELERY_BROKER_URL", "redis://redis:6379/0")
 CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1")
 HARMONY_WEBHOOK_SECRET = os.getenv("HARMONY_WEBHOOK_SECRET", "")
 HARMONY_PUBLIC_URL = os.getenv("HARMONY_PUBLIC_URL", "")
+
+ANYMAIL = {
+    "BREVO_API_KEY": os.getenv("BREVO_API_KEY", ""),
+}

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
 const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
-const protectedPaths = ["/", "/patients", "/patient-flow", "/visits", "/vitals", "/drafts", "/check-ins", "/waiting-list", "/appointments", "/messages", "/account", "/users", "/employees", "/roles", "/teams", "/approvals", "/access-requests"];
+const protectedPaths = ["/", "/patients", "/patient-flow", "/visits", "/vitals", "/drafts", "/check-ins", "/waiting-list", "/appointments", "/messages", "/account", "/users", "/employees", "/roles", "/teams", "/administration", "/approvals", "/access-requests"];
 
 function isProtected(pathname: string) {
   return protectedPaths.some((p) => pathname === p || pathname.startsWith(`${p}/`));

@@ -1,0 +1,129 @@
+ROLE_CHOICES = ("admin", "clinician", "receptionist")
+
+ROLE_MODULES = [
+    {
+        "key": "dashboard",
+        "label": "Dashboard",
+        "category": "Workspace",
+        "description": "Main role dashboard and daily workspace overview.",
+        "default_roles": ["admin", "clinician", "receptionist"],
+    },
+    {
+        "key": "patient_register",
+        "label": "Register patient",
+        "category": "Patient workflow",
+        "description": "Create a new patient demographic record.",
+        "default_roles": ["admin", "receptionist"],
+    },
+    {
+        "key": "patient_list",
+        "label": "Patient list",
+        "category": "Patient workflow",
+        "description": "Search and open patient workspaces.",
+        "default_roles": ["admin", "clinician", "receptionist"],
+    },
+    {
+        "key": "consent_forms",
+        "label": "Consent forms",
+        "category": "Patient workflow",
+        "description": "Generate, review, and capture patient consent signatures.",
+        "default_roles": ["admin", "clinician", "receptionist"],
+    },
+    {
+        "key": "check_in",
+        "label": "Check-in / Queue",
+        "category": "Patient workflow",
+        "description": "Check patients in and place walk-ins into the queue.",
+        "default_roles": ["admin", "receptionist"],
+    },
+    {
+        "key": "patient_flow",
+        "label": "Track patient flow",
+        "category": "Patient workflow",
+        "description": "View the patient's current process stage and next action.",
+        "default_roles": ["admin", "clinician", "receptionist"],
+    },
+    {
+        "key": "medical_history",
+        "label": "Medical / family history",
+        "category": "Clinical workflow",
+        "description": "Record or update medical and family history after consent.",
+        "default_roles": ["admin", "clinician"],
+    },
+    {
+        "key": "confidential_records",
+        "label": "Confidential clinical records",
+        "category": "Clinical workflow",
+        "description": "Record protected clinical conditions and confidential notes.",
+        "default_roles": ["admin", "clinician"],
+    },
+    {
+        "key": "vitals",
+        "label": "Vitals",
+        "category": "Clinical workflow",
+        "description": "Record visit-linked vitals after consent.",
+        "default_roles": ["admin", "clinician"],
+    },
+    {
+        "key": "visits",
+        "label": "Visits / Follow-ups",
+        "category": "Clinical workflow",
+        "description": "Create new consultations, reviews, and follow-up visits.",
+        "default_roles": ["admin", "clinician"],
+    },
+    {
+        "key": "access_requests",
+        "label": "Access requests",
+        "category": "Clinical workflow",
+        "description": "Request or review elevated access to protected patient data.",
+        "default_roles": ["admin", "clinician", "receptionist"],
+    },
+    {
+        "key": "appointments",
+        "label": "Appointments",
+        "category": "Operations",
+        "description": "Book and manage appointments and appointment check-ins.",
+        "default_roles": ["admin", "clinician", "receptionist"],
+    },
+    {
+        "key": "messages",
+        "label": "Messages",
+        "category": "Operations",
+        "description": "Use internal staff messaging and future channel integrations.",
+        "default_roles": ["admin", "clinician", "receptionist"],
+    },
+    {
+        "key": "inventory",
+        "label": "Inventory",
+        "category": "Operations",
+        "description": "Access inventory management for remedies and supplies.",
+        "default_roles": ["admin", "clinician"],
+    },
+    {
+        "key": "reports",
+        "label": "Reports",
+        "category": "Operations",
+        "description": "View operational, patient, clinical, and stock reports.",
+        "default_roles": ["admin", "clinician"],
+    },
+    {
+        "key": "user_management",
+        "label": "User management",
+        "category": "Administration",
+        "description": "Manage users, employee enrollment, roles, and teams.",
+        "default_roles": ["admin"],
+        "locked_admin": True,
+    },
+    {
+        "key": "system_settings",
+        "label": "System settings",
+        "category": "Administration",
+        "description": "Manage transactional email, identity integration, and shared administration settings.",
+        "default_roles": ["admin"],
+        "locked_admin": True,
+    },
+]
+
+
+def module_definition_map():
+    return {module["key"]: module for module in ROLE_MODULES}

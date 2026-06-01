@@ -27,7 +27,10 @@ export async function updatePatient(id: string, formData: FormData) {
     condition_label: condition.label,
     present: optionalText(formData, `condition_${condition.code}`) === "yes",
     is_confidential: true,
-    status: "active"
+    status: "active",
+    notes: optionalText(formData, `condition_${condition.code}`) === "yes"
+      ? optionalText(formData, `condition_${condition.code}_notes`)
+      : ""
   }));
   const body = {
     first_name: optionalText(formData, "first_name"),

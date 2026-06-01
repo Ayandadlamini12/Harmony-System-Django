@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Check, ClipboardList, Download, Eye, FileText, HeartPulse, ListChecks, LockKeyhole, PenLine, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
 import SignaturePad from "signature_pad";
+import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -17,7 +18,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
 import { relationshipLabel } from "@/lib/relationships";
-import type { Case, Patient, PatientDocument, PatientProfile, Visit, Vital } from "@/types/clinic";
+import type { Case, Patient, PatientDocument, PatientProfile, PatientWorkflowAction, Visit, Vital } from "@/types/clinic";
 
 const recordTabs = [
   { key: "overview", label: "Overview" },
@@ -53,6 +54,15 @@ function allVitals(patient: Patient) {
     .sort((a, b) => new Date(b.recorded_at || b.created_at || "").getTime() - new Date(a.recorded_at || a.created_at || "").getTime());
 }
 
+function disabledWorkflowButton(action: PatientWorkflowAction | undefined, icon: ReactNode, label: string) {
+  return (
+    <Button variant="secondary" type="button" disabled title={action?.reason || "This action is not available yet."}>
+      {icon}
+      {label}
+    </Button>
+  );
+}
+
 export function PatientRecordWorkspace({ patient, canCreateVisit, initialCases }: { patient: Patient; canCreateVisit: boolean; initialCases: Case[] }) {
   const [activeTab, setActiveTab] = useState<RecordTab>("overview");
   const [profile, setProfile] = useState(patient.profile);
@@ -60,6 +70,15 @@ export function PatientRecordWorkspace({ patient, canCreateVisit, initialCases }
   const latestVisit = patient.visits?.[0];
   const latestVitals = allVitals(patient)[0];
   const consentSigned = documents.some((d) => d.document_type === "consent_form" && (d.status === "signed" || d.status === "verified"));
+  const workflowActions = patient.patient_actions || [];
+  const actionFor = (key: PatientWorkflowAction["key"]) => workflowActions.find((action) => action.key === key);
+  const consentAction = actionFor("consent_forms");
+  const checkInAction = actionFor("check_in");
+  const historyAction = actionFor("medical_history");
+  const confidentialAction = actionFor("confidential_records");
+  const vitalsAction = actionFor("vitals");
+  const visitAction = actionFor("visits");
+  const nextAction = workflowActions.find((action) => action.next);
 
   return (
     <>
@@ -83,22 +102,60 @@ export function PatientRecordWorkspace({ patient, canCreateVisit, initialCases }
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-[var(--hh-border)] bg-white px-4 py-3 sm:px-6">
-        {canCreateVisit && !consentSigned && (
+        {nextAction && (
+          <div className="flex w-full items-center gap-2 rounded-lg border border-[#d9e3dd] bg-[#f7faf8] px-4 py-2 text-sm text-[#475951]">
+            <ListChecks size={16} className="text-[var(--hh-purple)]" />
+            Next step: <span className="font-semibold text-[var(--hh-purple-dark)]">{nextAction.label}</span>
+          </div>
+        )}
+        {!consentSigned && (
           <div className="flex w-full items-center gap-2 rounded-lg border border-[#fef3c7] bg-[#fffbeb] px-4 py-2 text-sm text-[#92400e]">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
             Complete consent form before clinical work
           </div>
         )}
-        {canCreateVisit && consentSigned && (
-          <Button asChild>
-            <Link className="!text-white" href={`/cases/new?patient=${patient.id}`}>
-              <ClipboardList size={16} />
-              New Case
+        {consentAction?.enabled ? (
+          <Button variant="secondary" type="button" onClick={() => setActiveTab("documents")}>
+            <FileText size={16} />
+            {consentAction.completed ? "Consent form" : "Sign consent"}
+          </Button>
+        ) : (
+          disabledWorkflowButton(consentAction, <FileText size={16} />, "Consent form")
+        )}
+        {checkInAction?.enabled ? (
+          <Button asChild variant="secondary">
+            <Link href={checkInAction.href || "/check-ins"}>
+              <ListChecks size={16} />
+              {checkInAction.completed ? "Patient checked in" : "Check in / queue"}
             </Link>
           </Button>
+        ) : (
+          disabledWorkflowButton(checkInAction, <ListChecks size={16} />, "Check in / queue")
         )}
-        {canCreateVisit && consentSigned && <PatientMedicalHistoryDialog patient={{ ...patient, profile }} onSaved={(p) => setProfile(p)} />}
-        {canCreateVisit && <PatientVitalsDialog patient={patient} />}
+        {canCreateVisit && visitAction?.enabled ? (
+          <Button asChild>
+            <Link className="!text-white" href={`/visits/new?patient=${patient.id}`}>
+              <ClipboardList size={16} />
+              New visit
+            </Link>
+          </Button>
+        ) : (
+          disabledWorkflowButton(visitAction, <ClipboardList size={16} />, "New visit")
+        )}
+        {canCreateVisit && historyAction?.enabled ? (
+          <PatientMedicalHistoryDialog patient={{ ...patient, profile }} onSaved={(p) => setProfile(p)} />
+        ) : (
+          disabledWorkflowButton(historyAction, <HeartPulse size={16} />, "Medical history")
+        )}
+        {canCreateVisit && confidentialAction?.enabled ? (
+          <Button variant="secondary" type="button" onClick={() => setActiveTab("overview")}>
+            <ShieldCheck size={16} />
+            Confidential records
+          </Button>
+        ) : (
+          disabledWorkflowButton(confidentialAction, <ShieldCheck size={16} />, "Confidential records")
+        )}
+        {canCreateVisit && vitalsAction?.enabled ? <PatientVitalsDialog patient={patient} /> : disabledWorkflowButton(vitalsAction, <HeartPulse size={16} />, "Add vitals")}
         <Button variant="secondary" type="button">
           <Printer size={16} />
           Print summary
@@ -296,7 +353,7 @@ function CasesTab({ patientId, initialCases }: { patientId: number; initialCases
                     {caseItem.status === "open" && (
                       <>
                         <Button asChild variant="secondary" size="sm">
-                          <Link href={`/cases/new?patient=${patientId}&parent=${caseItem.id}`}>
+                          <Link href={`/visits/new?patient=${patientId}&type=follow_up`}>
                             Follow-up
                           </Link>
                         </Button>
@@ -948,18 +1005,22 @@ function ConfidentialRecords({ patient, profile }: { patient: Patient; profile?:
 }
 
 function ConditionSummary({ conditions }: { conditions: Patient["conditions"] }) {
-  const conditionMap = new Map((conditions || []).map((condition) => [condition.condition_code, condition.present]));
+  const conditionMap = new Map((conditions || []).map((condition) => [condition.condition_code, condition]));
 
   return (
     <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
       {CONFIDENTIAL_CONDITIONS.map((condition) => {
-        const present = conditionMap.get(condition.code) ?? false;
+        const record = conditionMap.get(condition.code);
+        const present = record?.present ?? false;
         return (
-          <div key={condition.code} className="flex items-center justify-between gap-3 rounded-lg border border-[var(--hh-border)] bg-white px-3 py-2">
-            <span className="text-sm font-semibold">{condition.label}</span>
-            <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${present ? "bg-[var(--hh-green)] text-white" : "bg-slate-100 text-slate-600"}`} aria-label={present ? "Yes" : "No"}>
-              {present ? <Check size={17} /> : <X size={17} />}
-            </span>
+          <div key={condition.code} className="rounded-lg border border-[var(--hh-border)] bg-white px-3 py-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-sm font-semibold">{condition.label}</span>
+              <span className={`inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${present ? "bg-[var(--hh-green)] text-white" : "bg-slate-100 text-slate-600"}`} aria-label={present ? "Yes" : "No"}>
+                {present ? <Check size={17} /> : <X size={17} />}
+              </span>
+            </div>
+            {present && record?.notes && <p className="mt-2 text-xs leading-5 text-[#53605a]">{record.notes}</p>}
           </div>
         );
       })}

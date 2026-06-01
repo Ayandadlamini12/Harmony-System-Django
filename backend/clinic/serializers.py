@@ -1,10 +1,11 @@
-from django.db import transaction
+from django.db import models, transaction
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, VisitSymptomProblem, Vital
+from .workflow import build_patient_workflow_actions
 
 User = get_user_model()
 
@@ -165,10 +166,46 @@ class CaseSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class VisitSymptomProblemSerializer(serializers.ModelSerializer):
+    opened_visit_date = serializers.DateField(source="opened_visit.visit_date", read_only=True)
+    resolved_visit_date = serializers.DateField(source="resolved_visit.visit_date", read_only=True)
+
+    class Meta:
+        model = VisitSymptomProblem
+        fields = (
+            "id",
+            "patient",
+            "opened_visit",
+            "opened_visit_date",
+            "resolved_visit",
+            "resolved_visit_date",
+            "description",
+            "note",
+            "status",
+            "resolved_at",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "patient",
+            "opened_visit",
+            "opened_visit_date",
+            "resolved_visit",
+            "resolved_visit_date",
+            "resolved_at",
+            "created_at",
+            "updated_at",
+        )
+
+
 class VisitSerializer(serializers.ModelSerializer):
     vitals = VitalSerializer(many=True, read_only=True)
     patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
     patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
+    symptom_problems = serializers.SerializerMethodField()
+    symptom_problem_updates = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
+    follow_up_evaluation = serializers.DictField(write_only=True, required=False)
 
     class Meta:
         model = Visit
@@ -188,18 +225,72 @@ class VisitSerializer(serializers.ModelSerializer):
             "reason_for_remedy",
             "dietary_recommendation",
             "lifestyle_recommendation",
+            "digestive_review",
+            "general_review",
+            "reproductive_review",
+            "sleep_mental_review",
+            "follow_up_review",
+            "symptom_problems",
+            "symptom_problem_updates",
+            "follow_up_evaluation",
             "vitals",
             "created_at",
         )
         read_only_fields = ("created_at",)
 
+    def get_symptom_problems(self, obj):
+        problems = obj.patient.symptom_problems.filter(
+            models.Q(status=VisitSymptomProblem.Status.OPEN) | models.Q(opened_visit=obj) | models.Q(resolved_visit=obj)
+        ).order_by("status", "created_at")
+        return VisitSymptomProblemSerializer(problems, many=True).data
+
     @transaction.atomic
     def create(self, validated_data):
+        symptom_updates = validated_data.pop("symptom_problem_updates", [])
+        follow_up_evaluation = validated_data.pop("follow_up_evaluation", {})
+        if follow_up_evaluation:
+            validated_data["initial_complaints"] = follow_up_evaluation.get("previous_consult_symptoms", validated_data.get("initial_complaints", ""))
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             validated_data["practitioner"] = request.user
         visit = Visit.objects.create(**validated_data)
+        self._apply_symptom_problem_updates(visit, symptom_updates)
         return visit
+
+    def _apply_symptom_problem_updates(self, visit, symptom_updates):
+        for item in symptom_updates:
+            description = str(item.get("description") or "").strip()
+            note = str(item.get("note") or "").strip()
+            status_value = str(item.get("status") or VisitSymptomProblem.Status.OPEN).strip()
+            problem_id = item.get("id")
+
+            if problem_id:
+                problem = VisitSymptomProblem.objects.filter(id=problem_id, patient=visit.patient).first()
+                if not problem:
+                    continue
+                if description:
+                    problem.description = description
+                problem.note = note
+                if status_value == VisitSymptomProblem.Status.RESOLVED:
+                    problem.status = VisitSymptomProblem.Status.RESOLVED
+                    problem.resolved_at = timezone.now()
+                    problem.resolved_visit = visit
+                else:
+                    problem.status = VisitSymptomProblem.Status.OPEN
+                    problem.resolved_at = None
+                    problem.resolved_visit = None
+                problem.save(update_fields=["description", "note", "status", "resolved_at", "resolved_visit", "updated_at"])
+                continue
+
+            if not description:
+                continue
+            VisitSymptomProblem.objects.create(
+                patient=visit.patient,
+                opened_visit=visit,
+                description=description,
+                note=note,
+                status=VisitSymptomProblem.Status.OPEN,
+            )
 
 
 class PatientCheckInSerializer(serializers.ModelSerializer):
@@ -600,6 +691,14 @@ class PatientListSerializer(serializers.ModelSerializer):
             "full_name_display",
             "date_of_birth",
             "gender",
+            "marital_status",
+            "occupation",
+            "allergies",
+            "smoking_status",
+            "smoking_details",
+            "smoking_years",
+            "alcohol_status",
+            "alcohol_details",
             "region",
             "town_or_locality",
             "village",
@@ -640,9 +739,15 @@ class PatientDetailSerializer(PatientListSerializer):
     conditions = PatientConditionSerializer(many=True, required=False)
     documents = PatientDocumentSerializer(many=True, read_only=True)
     visits = VisitSerializer(many=True, read_only=True)
+    patient_actions = serializers.SerializerMethodField()
 
     class Meta(PatientListSerializer.Meta):
-        fields = PatientListSerializer.Meta.fields + ("profile", "conditions", "documents", "visits")
+        fields = PatientListSerializer.Meta.fields + ("profile", "conditions", "documents", "visits", "patient_actions")
+
+    def get_patient_actions(self, obj):
+        request = self.context.get("request")
+        user = request.user if request else None
+        return build_patient_workflow_actions(obj, user)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)

@@ -2,7 +2,8 @@ from django.contrib.auth import get_user_model, password_validation
 from django.core.exceptions import ValidationError
 from rest_framework import serializers
 
-from .models import ClinicianProfile, EmployeeEnrollmentRequest
+from .models import ClinicianProfile, EmailDeliveryLog, EmployeeEnrollmentRequest, RoleModulePermission, SystemEmailSettings
+from .role_modules import ROLE_CHOICES, ROLE_MODULES
 
 User = get_user_model()
 
@@ -42,6 +43,38 @@ class UserSerializer(serializers.ModelSerializer):
         user.save()
         return user
 
+
+class RoleModulePermissionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoleModulePermission
+        fields = ("id", "role", "module_key", "enabled", "updated_at")
+        read_only_fields = ("id", "updated_at")
+
+
+class RoleModuleMatrixSerializer(serializers.Serializer):
+    roles = serializers.ListField(child=serializers.CharField(), read_only=True)
+    modules = serializers.ListField(child=serializers.DictField(), read_only=True)
+    permissions = serializers.DictField(read_only=True)
+
+
+def build_role_module_matrix():
+    permissions = {
+        role: {
+            module["key"]: role in module["default_roles"]
+            for module in ROLE_MODULES
+        }
+        for role in ROLE_CHOICES
+    }
+    for permission in RoleModulePermission.objects.all():
+        if permission.role in permissions and permission.module_key in permissions[permission.role]:
+            permissions[permission.role][permission.module_key] = permission.enabled
+
+    return {
+        "roles": list(ROLE_CHOICES),
+        "modules": ROLE_MODULES,
+        "permissions": permissions,
+    }
+
     def update(self, instance, validated_data):
         password = validated_data.pop("password", None)
         for field, value in validated_data.items():
@@ -50,6 +83,67 @@ class UserSerializer(serializers.ModelSerializer):
             instance.set_password(password)
         instance.save()
         return instance
+
+
+class SystemEmailSettingsSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(write_only=True, required=False, allow_blank=True, trim_whitespace=False)
+    brevo_api_key = serializers.CharField(write_only=True, required=False, allow_blank=True, trim_whitespace=False)
+    password_is_set = serializers.BooleanField(read_only=True)
+    brevo_api_key_is_set = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = SystemEmailSettings
+        fields = (
+            "id",
+            "is_enabled",
+            "provider",
+            "brevo_api_key",
+            "brevo_api_key_is_set",
+            "smtp_host",
+            "smtp_port",
+            "encryption",
+            "username",
+            "password",
+            "password_is_set",
+            "from_email",
+            "from_name",
+            "reply_to_email",
+            "reply_to_name",
+            "updated_at",
+        )
+        read_only_fields = ("id", "password_is_set", "brevo_api_key_is_set", "updated_at")
+
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", None)
+        brevo_api_key = validated_data.pop("brevo_api_key", None)
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        if password:
+            instance.password = password
+        if brevo_api_key:
+            instance.brevo_api_key = brevo_api_key
+        instance.save()
+        return instance
+
+
+class EmailDeliveryLogSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = EmailDeliveryLog
+        fields = (
+            "id",
+            "template_key",
+            "provider",
+            "status",
+            "subject",
+            "to",
+            "from_email",
+            "message_id",
+            "metadata",
+            "error",
+            "created_at",
+            "sent_at",
+        )
+        read_only_fields = fields
 
 
 class ClinicianProfileSerializer(serializers.ModelSerializer):
@@ -181,6 +275,8 @@ class EmployeeEnrollmentRequestSerializer(serializers.ModelSerializer):
             "status",
             "notes",
             "raw_payload",
+            "review_email_sent_at",
+            "review_email_error",
             "reviewed_by",
             "reviewed_by_name",
             "reviewed_at",
@@ -190,6 +286,8 @@ class EmployeeEnrollmentRequestSerializer(serializers.ModelSerializer):
         read_only_fields = (
             "id",
             "status",
+            "review_email_sent_at",
+            "review_email_error",
             "reviewed_by",
             "reviewed_by_name",
             "reviewed_at",

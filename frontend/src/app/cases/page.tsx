@@ -12,7 +12,7 @@ export default async function CasesListPage({ searchParams }: { searchParams: Pr
   return (
     <AppShell
       title="Cases"
-      action={<Link className="hh-button" href="/cases/new">New case</Link>}
+      action={<Link className="hh-button" href="/visits/new">Add visit</Link>}
     >
       <form className="mb-5 max-w-md">
         <input className="hh-input" name="search" defaultValue={params.search || ""} placeholder="Search by title, complaint, diagnosis, or patient name" />

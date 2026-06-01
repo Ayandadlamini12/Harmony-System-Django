@@ -1,4 +1,4 @@
-import { Clock, MessageCircle, UserPlus } from "lucide-react";
+import { Clock, MailCheck, MailWarning, MessageCircle, UserPlus } from "lucide-react";
 import Link from "next/link";
 
 import { AppShell } from "@/components/app-shell";
@@ -62,6 +62,17 @@ export default async function EmployeeEnrollmentPage() {
                       <span>{request.email || "No email"}</span>
                       <span>{request.phone_number || "No phone"}</span>
                       {request.telegram_username ? <span>@{request.telegram_username}</span> : null}
+                      {request.review_email_sent_at ? (
+                        <span className="inline-flex items-center gap-1 text-[var(--hh-green-dark)]">
+                          <MailCheck size={14} />
+                          Under-review email sent
+                        </span>
+                      ) : request.email ? (
+                        <span className="inline-flex items-center gap-1 text-[#875400]">
+                          <MailWarning size={14} />
+                          Review email pending
+                        </span>
+                      ) : null}
                     </div>
                   </div>
                   <div className="grid gap-1 text-sm">

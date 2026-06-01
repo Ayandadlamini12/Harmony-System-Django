@@ -1,29 +1,11 @@
-import { AppShell } from "@/components/app-shell";
-import { CaseForm } from "@/components/case-form";
-import { getCase, getPatient, getPatients } from "@/lib/api";
+import { redirect } from "next/navigation";
 
 export default async function NewCasePage({ searchParams }: { searchParams: Promise<{ patient?: string; parent?: string }> }) {
-  const [params, patients] = await Promise.all([searchParams, getPatients()]);
+  const params = await searchParams;
+  const query = new URLSearchParams();
 
-  let parentCase = null;
-  if (params.parent) {
-    parentCase = await getCase(params.parent);
-  }
+  if (params.patient) query.set("patient", params.patient);
+  if (params.parent) query.set("type", "follow_up");
 
-  let selectedPatient = null;
-  if (params.patient) {
-    const patient = await getPatient(params.patient);
-    if (patient) selectedPatient = patient;
-  }
-
-  return (
-    <AppShell title={params.parent ? "New follow-up case" : "New case"}>
-      <CaseForm
-        patients={patients.results}
-        patientId={params.patient}
-        parentCase={parentCase}
-        selectedPatient={selectedPatient}
-      />
-    </AppShell>
-  );
+  redirect(`/visits/new${query.toString() ? `?${query.toString()}` : ""}`);
 }

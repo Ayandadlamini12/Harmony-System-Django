@@ -43,6 +43,14 @@ class Patient(TimeStampedModel):
     full_name_display = models.CharField(max_length=255, db_index=True, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=30, choices=Gender.choices, default=Gender.PREFER_NOT_TO_SAY)
+    marital_status = models.CharField(max_length=80, blank=True)
+    occupation = models.CharField(max_length=160, blank=True)
+    allergies = models.TextField(blank=True)
+    smoking_status = models.CharField(max_length=30, blank=True)
+    smoking_details = models.TextField(blank=True)
+    smoking_years = models.PositiveIntegerField(null=True, blank=True)
+    alcohol_status = models.CharField(max_length=30, blank=True)
+    alcohol_details = models.TextField(blank=True)
     region = models.CharField(max_length=120, blank=True)
     town_or_locality = models.CharField(max_length=120, blank=True)
     village = models.CharField(max_length=120, blank=True)
@@ -257,6 +265,11 @@ class Visit(TimeStampedModel):
     reason_for_remedy = models.TextField(blank=True)
     dietary_recommendation = models.TextField(blank=True)
     lifestyle_recommendation = models.TextField(blank=True)
+    digestive_review = models.JSONField(default=dict, blank=True)
+    general_review = models.JSONField(default=dict, blank=True)
+    reproductive_review = models.JSONField(default=dict, blank=True)
+    sleep_mental_review = models.JSONField(default=dict, blank=True)
+    follow_up_review = models.JSONField(default=dict, blank=True)
     practitioner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -270,6 +283,46 @@ class Visit(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.patient.full_name_display} - {self.visit_date}"
+
+
+class VisitSymptomProblem(TimeStampedModel):
+    class Status(models.TextChoices):
+        OPEN = "open", "Open"
+        RESOLVED = "resolved", "Resolved"
+
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="symptom_problems")
+    opened_visit = models.ForeignKey(Visit, on_delete=models.CASCADE, related_name="opened_symptom_problems")
+    resolved_visit = models.ForeignKey(
+        Visit,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="resolved_symptom_problems",
+    )
+    description = models.CharField(max_length=255)
+    note = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=Status.choices, default=Status.OPEN)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("status", "created_at")
+        indexes = [
+            models.Index(fields=["patient", "status"]),
+            models.Index(fields=["opened_visit"]),
+            models.Index(fields=["resolved_visit"]),
+        ]
+
+    def mark_resolved(self, visit: Visit | None = None, note: str | None = None) -> None:
+        self.status = self.Status.RESOLVED
+        self.resolved_at = timezone.now()
+        if visit:
+            self.resolved_visit = visit
+        if note is not None:
+            self.note = note
+        self.save(update_fields=["status", "resolved_at", "resolved_visit", "note", "updated_at"])
+
+    def __str__(self) -> str:
+        return f"{self.description} - {self.patient.patient_code} ({self.get_status_display()})"
 
 
 class Case(TimeStampedModel):

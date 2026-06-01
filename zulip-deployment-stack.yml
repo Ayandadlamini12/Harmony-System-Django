@@ -1,0 +1,148 @@
+services:
+  database:
+    image: zulip/zulip-postgresql:14
+    container_name: harmony-zulip-db
+    restart: unless-stopped
+    secrets:
+      - zulip__postgres_password
+    environment:
+      POSTGRES_DB: zulip
+      POSTGRES_USER: zulip
+      POSTGRES_PASSWORD_FILE: /run/secrets/zulip__postgres_password
+    volumes:
+      - zulip_postgresql_14:/var/lib/postgresql/data:rw
+    networks:
+      - zulip-net
+
+  memcached:
+    image: memcached:alpine
+    container_name: harmony-zulip-memcached
+    restart: unless-stopped
+    command:
+      - sh
+      - -euc
+      - |
+        echo 'mech_list: plain' > "$$SASL_CONF_PATH"
+        echo "zulip@$$HOSTNAME:$$(cat $$MEMCACHED_PASSWORD_FILE)" > "$$MEMCACHED_SASL_PWDB"
+        echo "zulip@localhost:$$(cat $$MEMCACHED_PASSWORD_FILE)" >> "$$MEMCACHED_SASL_PWDB"
+        exec memcached -S
+    secrets:
+      - zulip__memcached_password
+    environment:
+      SASL_CONF_PATH: /home/memcache/memcached.conf
+      MEMCACHED_SASL_PWDB: /home/memcache/memcached-sasl-db
+      MEMCACHED_PASSWORD_FILE: /run/secrets/zulip__memcached_password
+    networks:
+      - zulip-net
+
+  rabbitmq:
+    image: rabbitmq:4.2
+    container_name: harmony-zulip-rabbitmq
+    restart: unless-stopped
+    command:
+      - sh
+      - -euc
+      - |
+        export RABBITMQ_DEFAULT_PASS="$$(cat $$RABBITMQ_PASSWORD_FILE)"
+        echo "default_user = $$RABBITMQ_DEFAULT_USER" >> /etc/rabbitmq/rabbitmq.conf
+        echo "default_pass = $$RABBITMQ_DEFAULT_PASS" >> /etc/rabbitmq/rabbitmq.conf
+        exec docker-entrypoint.sh rabbitmq-server
+    secrets:
+      - zulip__rabbitmq_password
+    environment:
+      RABBITMQ_DEFAULT_USER: zulip
+      RABBITMQ_PASSWORD_FILE: /run/secrets/zulip__rabbitmq_password
+    volumes:
+      - zulip_rabbitmq:/var/lib/rabbitmq:rw
+    networks:
+      - zulip-net
+
+  redis:
+    image: redis:alpine
+    container_name: harmony-zulip-redis
+    restart: unless-stopped
+    command:
+      - sh
+      - -euc
+      - /usr/local/bin/docker-entrypoint.sh --requirepass "$$(cat $$REDIS_PASSWORD_FILE)"
+    secrets:
+      - zulip__redis_password
+    environment:
+      REDIS_PASSWORD_FILE: /run/secrets/zulip__redis_password
+    volumes:
+      - zulip_redis:/data:rw
+    networks:
+      - zulip-net
+
+  zulip:
+    image: ghcr.io/zulip/zulip-server:12.0-1
+    container_name: harmony-zulip-app
+    restart: unless-stopped
+    depends_on:
+      - database
+      - memcached
+      - rabbitmq
+      - redis
+    secrets:
+      - zulip__postgres_password
+      - zulip__memcached_password
+      - zulip__rabbitmq_password
+      - zulip__redis_password
+      - zulip__secret_key
+      - zulip__email_password
+    environment:
+      SETTING_EXTERNAL_HOST: chat.harmonyhealthsz.com
+      SETTING_ZULIP_ADMINISTRATOR: admin@harmonyhealthsz.com
+      SETTING_REMOTE_POSTGRES_HOST: database
+      SETTING_MEMCACHED_LOCATION: memcached:11211
+      SETTING_RABBITMQ_HOST: rabbitmq
+      SETTING_REDIS_HOST: redis
+      TRUST_GATEWAY_IP: "True"
+      LOADBALANCER_IPS: 172.16.0.0/12,10.0.0.0/8,192.168.0.0/16
+      DISABLE_HTTPS: "True"
+      SETTING_EMAIL_HOST: ""
+      SETTING_EMAIL_PORT: "587"
+      SETTING_EMAIL_USE_TLS: "True"
+      SETTING_NOREPLY_EMAIL_ADDRESS: noreply@harmonyhealthsz.com
+    volumes:
+      - zulip_data:/data:rw
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1048576
+    networks:
+      - zulip-net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-harmony-zulip
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${TUNNEL_TOKEN}
+    depends_on:
+      - zulip
+    networks:
+      - zulip-net
+
+secrets:
+  zulip__postgres_password:
+    environment: ZULIP__POSTGRES_PASSWORD
+  zulip__memcached_password:
+    environment: ZULIP__MEMCACHED_PASSWORD
+  zulip__rabbitmq_password:
+    environment: ZULIP__RABBITMQ_PASSWORD
+  zulip__redis_password:
+    environment: ZULIP__REDIS_PASSWORD
+  zulip__secret_key:
+    environment: ZULIP__SECRET_KEY
+  zulip__email_password:
+    environment: ZULIP__EMAIL_PASSWORD
+
+volumes:
+  zulip_data:
+  zulip_postgresql_14:
+  zulip_rabbitmq:
+  zulip_redis:
+
+networks:
+  zulip-net:
+    driver: bridge

@@ -20,6 +20,14 @@ export type Patient = {
   full_name_display: string;
   date_of_birth?: string | null;
   gender: string;
+  marital_status?: string;
+  occupation?: string;
+  allergies?: string;
+  smoking_status?: string;
+  smoking_details?: string;
+  smoking_years?: number | null;
+  alcohol_status?: string;
+  alcohol_details?: string;
   region?: string;
   town_or_locality?: string;
   village?: string;
@@ -37,6 +45,19 @@ export type Patient = {
   visits?: Visit[];
   clinical_access?: "active" | "approval_required";
   current_journey?: PatientJourneySummary | null;
+  patient_actions?: PatientWorkflowAction[];
+};
+
+export type PatientWorkflowAction = {
+  key: "consent_forms" | "check_in" | "medical_history" | "confidential_records" | "vitals" | "visits";
+  label: string;
+  module_key: string;
+  enabled: boolean;
+  completed: boolean;
+  reason: string;
+  href: string;
+  presentation: "dialog" | "page" | "tab";
+  next?: boolean;
 };
 
 export type PatientProfile = {
@@ -93,8 +114,29 @@ export type Visit = {
   reason_for_remedy?: string;
   dietary_recommendation?: string;
   lifestyle_recommendation?: string;
+  digestive_review?: Record<string, unknown>;
+  general_review?: Record<string, unknown>;
+  reproductive_review?: Record<string, unknown>;
+  sleep_mental_review?: Record<string, unknown>;
+  follow_up_review?: Record<string, unknown>;
   vitals?: Vital[];
   follow_up_evaluation?: FollowUpEvaluation;
+  symptom_problems?: VisitSymptomProblem[];
+};
+
+export type VisitSymptomProblem = {
+  id: number;
+  patient: number;
+  opened_visit: number;
+  opened_visit_date?: string;
+  resolved_visit?: number | null;
+  resolved_visit_date?: string | null;
+  description: string;
+  note?: string;
+  status: "open" | "resolved";
+  resolved_at?: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type FollowUpEvaluation = {
@@ -328,6 +370,8 @@ export type EmployeeEnrollmentRequest = {
   source: "telegram" | "whatsapp" | "internal" | "api";
   status: "pending" | "approved" | "rejected" | "cancelled";
   notes?: string;
+  review_email_sent_at?: string | null;
+  review_email_error?: string;
   reviewed_by?: number | null;
   reviewed_by_name?: string | null;
   reviewed_at?: string | null;
@@ -336,6 +380,53 @@ export type EmployeeEnrollmentRequest = {
 };
 
 export type MessageRecipient = Pick<User, "id" | "username" | "email" | "first_name" | "last_name" | "name" | "role" | "is_active">;
+
+export type RoleModuleDefinition = {
+  key: string;
+  label: string;
+  category: string;
+  description: string;
+  default_roles: User["role"][];
+  locked_admin?: boolean;
+};
+
+export type RoleModuleMatrix = {
+  roles: User["role"][];
+  modules: RoleModuleDefinition[];
+  permissions: Record<User["role"], Record<string, boolean>>;
+};
+
+export type SystemEmailSettings = {
+  id: number;
+  is_enabled: boolean;
+  provider: "brevo_api" | "smtp";
+  brevo_api_key_is_set: boolean;
+  smtp_host: string;
+  smtp_port: number;
+  encryption: "starttls" | "ssl" | "none";
+  username: string;
+  password_is_set: boolean;
+  from_email: string;
+  from_name: string;
+  reply_to_email: string;
+  reply_to_name: string;
+  updated_at: string;
+};
+
+export type EmailDeliveryLog = {
+  id: number;
+  template_key: string;
+  provider: "brevo_api" | "smtp";
+  status: "pending" | "sent" | "failed";
+  subject: string;
+  to: string[];
+  from_email: string;
+  message_id: string;
+  metadata: Record<string, unknown>;
+  error: string;
+  created_at: string;
+  sent_at?: string | null;
+};
 
 export type MessageParticipant = {
   id: number;

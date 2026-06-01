@@ -1,0 +1,69 @@
+services:
+  mattermost-db:
+    image: postgres:15-alpine
+    container_name: harmony-mattermost-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${MM_DB_NAME:-mattermost}
+      POSTGRES_USER: ${MM_DB_USER:-mmuser}
+      POSTGRES_PASSWORD: ${MM_DB_PASSWORD}
+    volumes:
+      - mattermost_db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MM_DB_USER:-mmuser} -d ${MM_DB_NAME:-mattermost}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    networks:
+      - mattermost-net
+
+  mattermost:
+    image: mattermost/mattermost-team-edition:latest
+    container_name: harmony-mattermost-app
+    restart: always
+    depends_on:
+      mattermost-db:
+        condition: service_healthy
+    environment:
+      MM_SQLSETTINGS_DRIVERNAME: postgres
+      MM_SQLSETTINGS_DATASOURCE: postgres://${MM_DB_USER:-mmuser}:${MM_DB_PASSWORD}@mattermost-db:5432/${MM_DB_NAME:-mattermost}?sslmode=disable&connect_timeout=10
+      MM_SERVICESETTINGS_SITEURL: ${MM_SITE_URL}
+      MM_SERVICESETTINGS_LISTENADDRESS: ":8065"
+      MM_SUPPORTSETTINGS_SUPPORTEMAIL: ${MM_SUPPORT_EMAIL}
+      MM_FILESETTINGS_MAXFILESIZE: "52428800"
+      MM_PLUGINSETTINGS_ENABLEUPLOADS: "true"
+      MM_TEAMSETTINGS_SITENAME: "Harmony Health Chat"
+    volumes:
+      - mattermost_config:/mattermost/config
+      - mattermost_data:/mattermost/data
+      - mattermost_logs:/mattermost/logs
+      - mattermost_plugins:/mattermost/plugins
+      - mattermost_client_plugins:/mattermost/client/plugins
+      - mattermost_bleve_indexes:/mattermost/bleve-indexes
+    networks:
+      - mattermost-net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-harmony-mattermost
+    restart: always
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - mattermost
+    networks:
+      - mattermost-net
+
+volumes:
+  mattermost_db_data:
+  mattermost_config:
+  mattermost_data:
+  mattermost_logs:
+  mattermost_plugins:
+  mattermost_client_plugins:
+  mattermost_bleve_indexes:
+
+networks:
+  mattermost-net:
+    driver: bridge

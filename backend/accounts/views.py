@@ -11,11 +11,17 @@ from rest_framework.response import Response
 
 from clinic.audit import write_audit_log
 
-from .models import ClinicianProfile, EmployeeEnrollmentRequest
+from .emailing import send_enrollment_under_review_email, send_system_email
+from .models import ClinicianProfile, EmailDeliveryLog, EmployeeEnrollmentRequest, RoleModulePermission, SystemEmailSettings
+from .role_modules import ROLE_CHOICES, module_definition_map
 from .serializers import (
     ChangePasswordSerializer,
     ClinicianProfileSerializer,
     EmployeeEnrollmentRequestSerializer,
+    EmailDeliveryLogSerializer,
+    RoleModulePermissionSerializer,
+    SystemEmailSettingsSerializer,
+    build_role_module_matrix,
     RegisterSerializer,
     UserSerializer,
 )
@@ -127,6 +133,86 @@ class UserViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(user).data)
 
 
+class RoleModulePermissionViewSet(viewsets.ModelViewSet):
+    queryset = RoleModulePermission.objects.order_by("role", "module_key")
+    serializer_class = RoleModulePermissionSerializer
+    permission_classes = [IsAdminUserRole]
+
+    @action(detail=False, methods=["get", "post"], url_path="matrix")
+    def matrix(self, request):
+        if request.method == "GET":
+            return Response(build_role_module_matrix())
+
+        module_map = module_definition_map()
+        permissions = request.data.get("permissions", {})
+        if not isinstance(permissions, dict):
+            return Response({"detail": "permissions must be an object."}, status=status.HTTP_400_BAD_REQUEST)
+
+        for role, module_values in permissions.items():
+            if role not in ROLE_CHOICES or not isinstance(module_values, dict):
+                continue
+            for module_key, enabled in module_values.items():
+                module = module_map.get(module_key)
+                if not module:
+                    continue
+                value = bool(enabled)
+                if module.get("locked_admin") and role == "admin":
+                    value = True
+                RoleModulePermission.objects.update_or_create(
+                    role=role,
+                    module_key=module_key,
+                    defaults={"enabled": value},
+                )
+
+        return Response(build_role_module_matrix())
+
+
+class SystemEmailSettingsView(generics.GenericAPIView):
+    serializer_class = SystemEmailSettingsSerializer
+    permission_classes = [IsAdminUserRole]
+
+    def get_object(self):
+        return SystemEmailSettings.get_default()
+
+    def get(self, request, *args, **kwargs):
+        return Response(self.get_serializer(self.get_object()).data)
+
+    def patch(self, request, *args, **kwargs):
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(serializer.data)
+
+    def post(self, request, *args, **kwargs):
+        recipient = request.data.get("recipient") or request.user.email
+        if not recipient:
+            return Response(
+                {"detail": "Provide a test recipient or set an email address on your account."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        try:
+            send_system_email(
+                subject="Harmony Health MIS email test",
+                body=(
+                    "This is a test email from Harmony Health MIS.\n\n"
+                    "If you received this message, SMTP is configured correctly."
+                ),
+                to=[recipient],
+            )
+        except Exception as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"detail": f"Test email sent to {recipient}."})
+
+
+class EmailDeliveryLogViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = EmailDeliveryLog.objects.order_by("-created_at")
+    serializer_class = EmailDeliveryLogSerializer
+    permission_classes = [IsAdminUserRole]
+    filterset_fields = ("status", "provider", "template_key")
+    search_fields = ("subject", "from_email", "message_id", "error")
+
+
 class RegisterView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = RegisterSerializer
@@ -180,6 +266,7 @@ class EmployeeEnrollmentRequestViewSet(viewsets.ModelViewSet):
             source=serializer.validated_data.get("source") or EmployeeEnrollmentRequest.Source.API,
             raw_payload=self.request.data,
         )
+        send_enrollment_under_review_email(request_obj)
         write_audit_log(
             request=self.request,
             action="create",

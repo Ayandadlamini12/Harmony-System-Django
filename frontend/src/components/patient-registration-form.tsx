@@ -1,13 +1,14 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Check, ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
 
+import { FormStepWheel } from "@/components/form-step-wheel";
 import { LoadingButton } from "@/components/harmony-loading";
 import { countryCodeOptions, resolveCountryFromDialCode } from "@/components/phone-number-input";
 import { Button } from "@/components/ui/button";
@@ -46,6 +47,14 @@ const patientRegistrationSchema = z.object({
   national_id: z.string().trim().regex(/^[A-Za-z0-9 -]*$/, "National / Passport ID must be alphanumeric"),
   date_of_birth: z.string().optional(),
   gender: z.enum(["female", "male", "other", "prefer_not_to_say"]),
+  marital_status: z.string().trim(),
+  occupation: z.string().trim(),
+  allergies: z.string().trim(),
+  smoking_status: z.enum(["", "yes", "no", "former"]),
+  smoking_details: z.string().trim(),
+  smoking_years: z.string().trim(),
+  alcohol_status: z.enum(["", "yes", "no", "former"]),
+  alcohol_details: z.string().trim(),
   primary_phone: phoneSchema,
   secondary_phone: optionalPhoneSchema,
   email: z.string().trim().email("Use a valid email").or(z.literal("")),
@@ -63,7 +72,10 @@ const patientRegistrationSchema = z.object({
   family_medical_history: z.string().trim(),
   allopathic_medication: z.string().trim(),
   other_important_information: z.string().trim(),
-  conditions: z.record(z.string(), z.enum(["yes", "no"]))
+  conditions: z.record(z.string(), z.object({
+    status: z.enum(["yes", "no"]),
+    note: z.string().trim()
+  }))
 });
 
 type PatientRegistrationValues = z.infer<typeof patientRegistrationSchema>;
@@ -90,53 +102,6 @@ function FieldError({ message }: { message?: string }) {
   );
 }
 
-function StepSidebar({
-  steps,
-  activeIndex,
-  setActiveIndex
-}: {
-  steps: { id: string; title: string; description: string }[];
-  activeIndex: number;
-  setActiveIndex: (index: number) => void;
-}) {
-  return (
-    <aside className="rounded-lg border border-[var(--hh-border)] bg-white p-3 xl:sticky xl:top-6 xl:self-start">
-      <div className="grid gap-1">
-        {steps.map((step, index) => {
-          const isActive = index === activeIndex;
-          const isComplete = index < activeIndex;
-          return (
-            <button
-              key={step.id}
-              type="button"
-              onClick={() => setActiveIndex(index)}
-              className={cn(
-                "flex min-h-16 items-center gap-3 rounded-lg px-3 py-2 text-left transition-colors",
-                isActive ? "bg-[#f5edfa] text-[var(--hh-purple)]" : "hover:bg-[#f7faf8]"
-              )}
-            >
-              <span
-                className={cn(
-                  "flex h-8 w-8 shrink-0 items-center justify-center rounded-full border text-xs font-bold",
-                  isActive && "border-[var(--hh-purple)] bg-[var(--hh-purple)] text-white",
-                  isComplete && "border-[var(--hh-green)] bg-[var(--hh-green)] text-white",
-                  !isActive && !isComplete && "border-[var(--hh-border)] text-[#66736d]"
-                )}
-              >
-                {isComplete ? <Check size={15} /> : index + 1}
-              </span>
-              <span>
-                <span className="block text-sm font-bold">{step.title}</span>
-                <span className="block text-xs text-[#66736d]">{step.description}</span>
-              </span>
-            </button>
-          );
-        })}
-      </div>
-    </aside>
-  );
-}
-
 export function PatientRegistrationForm() {
   const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
@@ -153,6 +118,14 @@ export function PatientRegistrationForm() {
       national_id: "",
       date_of_birth: "",
       gender: "female",
+      marital_status: "",
+      occupation: "",
+      allergies: "",
+      smoking_status: "",
+      smoking_details: "",
+      smoking_years: "",
+      alcohol_status: "",
+      alcohol_details: "",
       primary_phone: { country_code: "+268", number: "" },
       secondary_phone: { country_code: "+268", number: "" },
       email: "",
@@ -170,13 +143,14 @@ export function PatientRegistrationForm() {
       family_medical_history: "",
       allopathic_medication: "",
       other_important_information: "",
-      conditions: Object.fromEntries(CONFIDENTIAL_CONDITIONS.map((condition) => [condition.code, "no"]))
+      conditions: Object.fromEntries(CONFIDENTIAL_CONDITIONS.map((condition) => [condition.code, { status: "no", note: "" }]))
     }
   });
 
   const primaryDialCode = form.watch("primary_phone.country_code");
   const selectedRegion = form.watch("region");
   const relationship = form.watch("next_of_kin_relationship");
+  const conditionValues = form.watch("conditions");
   const selectedCountry = useMemo(() => resolveCountryFromDialCode(primaryDialCode || "+268"), [primaryDialCode]);
   const selectedRegionIsoCode = regions.find((region) => region.name === selectedRegion)?.isoCode || "";
 
@@ -207,7 +181,7 @@ export function PatientRegistrationForm() {
       id: "identity",
       title: "Identity",
       description: "Name, ID, date of birth, and gender.",
-      fields: ["first_name", "last_name", "national_id", "date_of_birth", "gender"] as const
+      fields: ["first_name", "last_name", "national_id", "date_of_birth", "gender", "marital_status", "occupation", "allergies", "smoking_status", "smoking_details", "smoking_years", "alcohol_status", "alcohol_details"] as const
     },
     {
       id: "contact",
@@ -223,13 +197,13 @@ export function PatientRegistrationForm() {
     },
     {
       id: "clinical",
-      title: "Clinical profile",
+      title: "Medical history",
       description: "Semi-stable medical history and important patient notes.",
       fields: ["hiv_status", "children_count", "past_medical_history", "family_medical_history", "allopathic_medication", "other_important_information"] as const
     },
     {
       id: "conditions",
-      title: "Confidential records",
+      title: "Confidential medical records",
       description: "Sickness record flags. Yes uses a tick; No uses an X.",
       fields: ["conditions"] as const
     },
@@ -240,7 +214,7 @@ export function PatientRegistrationForm() {
       fields: [] as const
     }
   ];
-  const steps = allSteps.slice(0, 3);
+  const steps = allSteps;
   const activeStep = steps[activeIndex];
   const isFirst = activeIndex === 0;
   const isLast = activeIndex === steps.length - 1;
@@ -261,6 +235,14 @@ export function PatientRegistrationForm() {
       email: text(values.email),
       date_of_birth: text(values.date_of_birth) || null,
       gender: values.gender,
+      marital_status: text(values.marital_status),
+      occupation: text(values.occupation),
+      allergies: text(values.allergies),
+      smoking_status: text(values.smoking_status),
+      smoking_details: text(values.smoking_details),
+      smoking_years: text(values.smoking_years) ? Number(text(values.smoking_years)) : null,
+      alcohol_status: text(values.alcohol_status),
+      alcohol_details: text(values.alcohol_details),
       primary_phone: phoneValue(values.primary_phone),
       secondary_phone: phoneValue(values.secondary_phone),
       next_of_kin_full_name: text(values.next_of_kin_full_name),
@@ -270,7 +252,27 @@ export function PatientRegistrationForm() {
       next_of_kin_relationship_other: text(values.next_of_kin_relationship_other),
       region: text(values.region),
       town_or_locality: text(values.town_or_locality),
-      village: text(values.village)
+      village: text(values.village),
+      profile: {
+        hiv_status: values.hiv_status,
+        children_count: text(values.children_count) ? Number(text(values.children_count)) : null,
+        past_medical_history: text(values.past_medical_history),
+        family_medical_history: text(values.family_medical_history),
+        allopathic_medication: text(values.allopathic_medication),
+        other_important_information: text(values.other_important_information)
+      },
+      conditions: CONFIDENTIAL_CONDITIONS.map((condition) => {
+        const value = values.conditions[condition.code] || { status: "no", note: "" };
+        const present = value.status === "yes";
+        return {
+          condition_code: condition.code,
+          condition_label: condition.label,
+          present,
+          is_confidential: true,
+          status: "active",
+          notes: present ? text(value.note) : ""
+        };
+      })
     };
 
     try {
@@ -293,8 +295,8 @@ export function PatientRegistrationForm() {
   }
 
   return (
-    <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6 xl:grid-cols-[300px_1fr]">
-      <StepSidebar steps={steps} activeIndex={activeIndex} setActiveIndex={setActiveIndex} />
+    <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6">
+      <FormStepWheel steps={steps} activeIndex={activeIndex} setActiveIndex={setActiveIndex} />
       <section className="grid gap-5">
         <div className="rounded-lg border border-[var(--hh-border)] bg-white">
           <div className="border-b border-[var(--hh-border)] px-5 py-4">
@@ -320,6 +322,44 @@ export function PatientRegistrationForm() {
                   </Select>
                   <FieldError />
                 </label>
+                <label className={fieldClass}>
+                  <Label>Marital status</Label>
+                  <Select {...form.register("marital_status")}>
+                    <option value="">Select marital status</option>
+                    <option value="single">Single</option>
+                    <option value="married">Married</option>
+                    <option value="divorced">Divorced</option>
+                    <option value="widowed">Widowed</option>
+                    <option value="separated">Separated</option>
+                    <option value="prefer_not_to_say">Prefer not to say</option>
+                  </Select>
+                  <FieldError />
+                </label>
+                <label className={fieldClass}><Label>Occupation</Label><Input {...form.register("occupation")} /><FieldError /></label>
+                <label className={fieldClass}><Label>Allergies</Label><Input placeholder="Known allergies or none" {...form.register("allergies")} /><FieldError /></label>
+                <label className={fieldClass}>
+                  <Label>Smoking</Label>
+                  <Select {...form.register("smoking_status")}>
+                    <option value="">Select smoking status</option>
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                    <option value="former">Former smoker</option>
+                  </Select>
+                  <FieldError />
+                </label>
+                <label className={fieldClass}><Label>Smoking type / brand and cigarettes per day</Label><Input {...form.register("smoking_details")} /><FieldError /></label>
+                <label className={fieldClass}><Label>Number of smoking years</Label><Input type="number" min="0" {...form.register("smoking_years")} /><FieldError /></label>
+                <label className={fieldClass}>
+                  <Label>Alcohol</Label>
+                  <Select {...form.register("alcohol_status")}>
+                    <option value="">Select alcohol status</option>
+                    <option value="no">No</option>
+                    <option value="yes">Yes</option>
+                    <option value="former">Former alcohol use</option>
+                  </Select>
+                  <FieldError />
+                </label>
+                <label className={fieldClass}><Label>Alcohol type / brand</Label><Input placeholder="e.g. ciders, spirits" {...form.register("alcohol_details")} /><FieldError /></label>
               </div>
             </div>
 
@@ -423,21 +463,41 @@ export function PatientRegistrationForm() {
                   <p className="mt-1 text-sm leading-6 text-[#66736d]">These records are treated as confidential clinical information and should require elevated access when viewed later.</p>
                 </div>
                 <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {CONFIDENTIAL_CONDITIONS.map((condition) => (
+                  {CONFIDENTIAL_CONDITIONS.map((condition) => {
+                    const isPresent = conditionValues?.[condition.code]?.status === "yes";
+                    return (
                     <div key={condition.code} className="rounded-lg border border-[var(--hh-border)] bg-white p-3">
                       <div className="text-sm font-bold text-[var(--hh-text)]">{condition.label}</div>
                       <div className="mt-3 flex overflow-hidden rounded-lg border border-[var(--hh-border)]">
                         <label className="flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-1.5 border-r border-[var(--hh-border)] text-sm font-bold has-[:checked]:bg-[var(--hh-green-light)] has-[:checked]:text-[var(--hh-green-dark)]">
-                          <input className="sr-only" type="radio" value="yes" {...form.register(`conditions.${condition.code}`)} />
+                          <input className="sr-only" type="radio" value="yes" {...form.register(`conditions.${condition.code}.status`)} />
                           Yes
                         </label>
                         <label className="flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-1.5 text-sm font-bold has-[:checked]:bg-slate-100 has-[:checked]:text-slate-700">
-                          <input className="sr-only" type="radio" value="no" {...form.register(`conditions.${condition.code}`)} />
+                          <input
+                            className="sr-only"
+                            type="radio"
+                            value="no"
+                            {...form.register(`conditions.${condition.code}.status`, {
+                              onChange: () => form.setValue(`conditions.${condition.code}.note`, "")
+                            })}
+                          />
                           No
                         </label>
                       </div>
+                      {isPresent && (
+                        <label className="mt-3 block">
+                          <span className="hh-label">Confidential note</span>
+                          <Textarea
+                            className="min-h-20"
+                            placeholder={`Add ${condition.label.toLowerCase()} details, history, status, or relevant clinical context`}
+                            {...form.register(`conditions.${condition.code}.note`)}
+                          />
+                        </label>
+                      )}
                     </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
             </div>
