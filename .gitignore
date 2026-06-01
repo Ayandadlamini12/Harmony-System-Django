@@ -20,3 +20,7 @@ npm-debug.log*
 
 .DS_Store
 Thumbs.db
+
+# Local agent/worktree scratch folders should never be committed.
+/Harmony-System-Django
+/Harmony-System-Django.worktrees/
