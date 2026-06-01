@@ -196,7 +196,7 @@ class SystemEmailSettingsView(generics.GenericAPIView):
                 subject="Harmony Health MIS email test",
                 body=(
                     "This is a test email from Harmony Health MIS.\n\n"
-                    "If you received this message, SMTP is configured correctly."
+                    "If you received this message, system email is configured correctly."
                 ),
                 to=[recipient],
             )

@@ -28,11 +28,8 @@ def build_email_backend(settings: SystemEmailSettings) -> EmailBackend:
 def build_brevo_backend(settings: SystemEmailSettings):
     from anymail.backends.brevo import EmailBackend as BrevoEmailBackend
 
-    brevo_settings = {
-        **getattr(django_settings, "ANYMAIL", {}),
-        "BREVO_API_KEY": settings.brevo_api_key or getattr(django_settings, "ANYMAIL", {}).get("BREVO_API_KEY", ""),
-    }
-    return BrevoEmailBackend(anymail_settings=brevo_settings)
+    api_key = settings.brevo_api_key or getattr(django_settings, "ANYMAIL", {}).get("BREVO_API_KEY", "")
+    return BrevoEmailBackend(api_key=api_key)
 
 
 def send_system_email(

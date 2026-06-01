@@ -5,6 +5,16 @@ import { redirect } from "next/navigation";
 
 import { API_BASE_URL } from "@/lib/api";
 
+async function responseDetail(response: Response) {
+  try {
+    const data = await response.json();
+    if (typeof data?.detail === "string") return data.detail;
+  } catch {
+    // Fall through to the generic message below.
+  }
+  return "The email service returned an unexpected error.";
+}
+
 function authHeaders(accessToken: string) {
   return {
     Authorization: `Bearer ${accessToken}`,
@@ -37,7 +47,10 @@ export async function updateSystemEmailSettings(formData: FormData) {
     body: JSON.stringify(payload)
   });
 
-  if (!response.ok) redirect("/administration/settings?error=email_save_failed");
+  if (!response.ok) {
+    const detail = encodeURIComponent(await responseDetail(response));
+    redirect(`/administration/settings?error=email_save_failed&detail=${detail}`);
+  }
   redirect("/administration/settings?saved=email");
 }
 
@@ -51,6 +64,9 @@ export async function sendSystemEmailTest(formData: FormData) {
     body: JSON.stringify({ recipient: String(formData.get("recipient") || "") })
   });
 
-  if (!response.ok) redirect("/administration/settings?error=email_test_failed");
+  if (!response.ok) {
+    const detail = encodeURIComponent(await responseDetail(response));
+    redirect(`/administration/settings?error=email_test_failed&detail=${detail}`);
+  }
   redirect("/administration/settings?tested=email");
 }

@@ -8,7 +8,7 @@ import { getEmailDeliveryLogs, getSystemEmailSettings } from "@/lib/api";
 export default async function AdministrationSettingsPage({
   searchParams
 }: {
-  searchParams: Promise<{ saved?: string; tested?: string; error?: string }>;
+  searchParams: Promise<{ saved?: string; tested?: string; error?: string; detail?: string }>;
 }) {
   const [emailSettings, logs, params] = await Promise.all([getSystemEmailSettings(), getEmailDeliveryLogs(), searchParams]);
 
@@ -44,7 +44,8 @@ export default async function AdministrationSettingsPage({
           )}
           {params.error && (
             <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-              {params.error === "email_test_failed" ? "The test email could not be sent." : "The settings could not be saved."}
+              <p>{params.error === "email_test_failed" ? "The test email could not be sent." : "The settings could not be saved."}</p>
+              {params.detail ? <p className="mt-2 font-medium">{params.detail}</p> : null}
             </div>
           )}
         </section>
