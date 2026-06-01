@@ -38,6 +38,7 @@ def keycloak_password_login(user_id: str, password: str) -> dict:
         "client_id": settings.KEYCLOAK_CLIENT_ID,
         "username": user_id,
         "password": password,
+        "scope": "openid profile email",
     }
     if settings.KEYCLOAK_CLIENT_SECRET:
         data["client_secret"] = settings.KEYCLOAK_CLIENT_SECRET
