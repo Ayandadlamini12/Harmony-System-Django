@@ -20,7 +20,7 @@ function RegisterForm() {
 
     const form = new FormData(e.currentTarget);
     const body = {
-      username: String(form.get("username") || ""),
+      user_id: String(form.get("user_id") || ""),
       email: String(form.get("email") || ""),
       first_name: String(form.get("first_name") || ""),
       last_name: String(form.get("last_name") || ""),
@@ -58,7 +58,7 @@ function RegisterForm() {
 
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
-            {error === "exists" && "A user with that username already exists."}
+            {error === "exists" && "A user with that User ID already exists."}
             {error === "mismatch" && "Passwords do not match."}
             {error === "weak" && "Password is too weak. Minimum 8 characters required."}
             {error === "unknown" && "Registration failed. Please try again."}
@@ -77,8 +77,8 @@ function RegisterForm() {
             </label>
           </div>
           <label>
-            <span className="hh-label">Username</span>
-            <input className="hh-input" name="username" autoComplete="username" required />
+            <span className="hh-label">User ID</span>
+            <input className="hh-input" name="user_id" autoComplete="username" placeholder="Example: HH2005110" required />
           </label>
           <label>
             <span className="hh-label">Email</span>

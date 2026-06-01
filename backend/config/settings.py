@@ -182,6 +182,13 @@ CELERY_RESULT_BACKEND = os.getenv("CELERY_RESULT_BACKEND", "redis://redis:6379/1
 HARMONY_WEBHOOK_SECRET = os.getenv("HARMONY_WEBHOOK_SECRET", "")
 HARMONY_PUBLIC_URL = os.getenv("HARMONY_PUBLIC_URL", "")
 
+KEYCLOAK_ENABLED = os.getenv("KEYCLOAK_ENABLED", "false").lower() == "true"
+KEYCLOAK_SERVER_URL = os.getenv("KEYCLOAK_SERVER_URL", "")
+KEYCLOAK_REALM = os.getenv("KEYCLOAK_REALM", "harmony-health")
+KEYCLOAK_CLIENT_ID = os.getenv("KEYCLOAK_CLIENT_ID", "harmony-mis")
+KEYCLOAK_CLIENT_SECRET = os.getenv("KEYCLOAK_CLIENT_SECRET", "")
+KEYCLOAK_ALLOW_LOCAL_FALLBACK = os.getenv("KEYCLOAK_ALLOW_LOCAL_FALLBACK", "true").lower() == "true"
+
 ANYMAIL = {
     "BREVO_API_KEY": os.getenv("BREVO_API_KEY", ""),
 }

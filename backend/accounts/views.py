@@ -8,10 +8,12 @@ from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from clinic.audit import write_audit_log
 
 from .emailing import send_enrollment_under_review_email, send_system_email
+from .keycloak import HarmonyTokenSerializer
 from .models import ClinicianProfile, EmailDeliveryLog, EmployeeEnrollmentRequest, RoleModulePermission, SystemEmailSettings
 from .role_modules import ROLE_CHOICES, module_definition_map
 from .serializers import (
@@ -39,6 +41,15 @@ class HasHarmonyWebhookSecret(permissions.BasePermission):
         expected_secret = getattr(settings, "HARMONY_WEBHOOK_SECRET", "")
         provided_secret = request.headers.get("X-Harmony-Webhook-Secret", "")
         return bool(expected_secret and provided_secret and provided_secret == expected_secret)
+
+
+class HarmonyTokenView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = HarmonyTokenSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        return Response(serializer.validated_data)
 
 
 class UserViewSet(viewsets.ModelViewSet):

@@ -43,6 +43,15 @@ class UserSerializer(serializers.ModelSerializer):
         user.save()
         return user
 
+    def update(self, instance, validated_data):
+        password = validated_data.pop("password", None)
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        if password:
+            instance.set_password(password)
+        instance.save()
+        return instance
+
 
 class RoleModulePermissionSerializer(serializers.ModelSerializer):
     class Meta:
@@ -74,16 +83,6 @@ def build_role_module_matrix():
         "modules": ROLE_MODULES,
         "permissions": permissions,
     }
-
-    def update(self, instance, validated_data):
-        password = validated_data.pop("password", None)
-        for field, value in validated_data.items():
-            setattr(instance, field, value)
-        if password:
-            instance.set_password(password)
-        instance.save()
-        return instance
-
 
 class SystemEmailSettingsSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False, allow_blank=True, trim_whitespace=False)
@@ -207,12 +206,15 @@ class ClinicianProfileSerializer(serializers.ModelSerializer):
 
 
 class RegisterSerializer(serializers.ModelSerializer):
+    user_id = serializers.CharField(write_only=True, required=False, allow_blank=True)
+    username = serializers.CharField(required=False, allow_blank=True)
     password = serializers.CharField(write_only=True, min_length=8)
     confirm_password = serializers.CharField(write_only=True, min_length=8)
 
     class Meta:
         model = User
         fields = (
+            "user_id",
             "username",
             "email",
             "first_name",
@@ -222,11 +224,19 @@ class RegisterSerializer(serializers.ModelSerializer):
         )
 
     def validate_username(self, value):
+        if not value:
+            return value
         if User.objects.filter(username=value).exists():
-            raise serializers.ValidationError("A user with this username already exists.")
+            raise serializers.ValidationError("A user with this User ID already exists.")
         return value
 
     def validate(self, attrs):
+        user_id = (attrs.pop("user_id", "") or attrs.get("username") or "").strip()
+        if not user_id:
+            raise serializers.ValidationError({"user_id": "User ID is required."})
+        if User.objects.filter(username=user_id).exists():
+            raise serializers.ValidationError({"user_id": "A user with this User ID already exists."})
+        attrs["username"] = user_id
         if attrs["password"] != attrs.pop("confirm_password"):
             raise serializers.ValidationError({"confirm_password": "Passwords do not match."})
         try:

@@ -4,6 +4,7 @@ const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BAS
 
 export async function POST(request: Request) {
   const body = (await request.json()) as {
+    user_id?: string;
     username?: string;
     email?: string;
     first_name?: string;
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
     const data = (await response.json()) as Record<string, unknown>;
     if (typeof data === "object" && data !== null) {
       const msgs = JSON.stringify(data).toLowerCase();
-      if (msgs.includes("already exists") || msgs.includes("username")) error = "exists";
+      if (msgs.includes("already exists") || msgs.includes("username") || msgs.includes("user id")) error = "exists";
       else if (msgs.includes("do not match")) error = "mismatch";
       else if (msgs.includes("password") && (msgs.includes("weak") || msgs.includes("minimum") || msgs.includes("common") || msgs.includes("numeric"))) error = "weak";
     }

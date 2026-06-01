@@ -25,7 +25,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
       )}
 
       <form className="mb-5 max-w-md">
-        <input className="hh-input" name="search" defaultValue={selectedUser ? "" : params.search || ""} placeholder="Search by name, username, or email" />
+        <input className="hh-input" name="search" defaultValue={selectedUser ? "" : params.search || ""} placeholder="Search by name, User ID, or email" />
       </form>
 
       {selectedUser && (
@@ -46,8 +46,8 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               </label>
             </div>
             <label>
-              <span className="hh-label">Username</span>
-              <input className="hh-input" name="username" defaultValue={selectedUser.username} required />
+              <span className="hh-label">User ID</span>
+              <input className="hh-input" name="user_id" defaultValue={selectedUser.username} required />
             </label>
             <label>
               <span className="hh-label">Email</span>
@@ -79,7 +79,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
             <thead className="bg-[#f7faf8] text-xs uppercase text-[#66736d]">
               <tr>
                 <th className="px-5 py-3">User</th>
-                <th className="px-5 py-3">Username</th>
+                <th className="px-5 py-3">User ID</th>
                 <th className="px-5 py-3">Role</th>
                 <th className="px-5 py-3">Status</th>
                 <th className="px-5 py-3 text-right">Actions</th>

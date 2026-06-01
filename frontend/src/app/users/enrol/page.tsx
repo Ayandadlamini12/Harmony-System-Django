@@ -22,7 +22,7 @@ export default async function EnrolUserPage({ searchParams }: { searchParams: Pr
             <UserRoundCog className="text-[var(--hh-purple)]" size={22} />
             <div>
               <h2 className="font-bold">Create login account</h2>
-              <p className="mt-1 text-sm text-[#66736d]">Create temporary Harmony MIS login access while Keycloak identity provisioning is being connected.</p>
+              <p className="mt-1 text-sm text-[#66736d]">Create Harmony MIS access using the employee User ID that will also be used in Keycloak.</p>
             </div>
           </div>
 
@@ -38,8 +38,8 @@ export default async function EnrolUserPage({ searchParams }: { searchParams: Pr
               </label>
             </div>
             <label>
-              <span className="hh-label">Username</span>
-              <input className="hh-input" name="username" required />
+              <span className="hh-label">User ID</span>
+              <input className="hh-input" name="user_id" placeholder="Example: HH2005110" required />
             </label>
             <label>
               <span className="hh-label">Email</span>
@@ -69,7 +69,7 @@ export default async function EnrolUserPage({ searchParams }: { searchParams: Pr
         <div className="hh-panel p-5">
           <h3 className="font-bold">Identity direction</h3>
           <p className="mt-2 text-sm leading-6 text-[#66736d]">
-            Employee onboarding is reviewed first. The long-term login source will be Keycloak, using Harmony employee IDs as usernames and email addresses for verification and recovery.
+            Employee onboarding is reviewed first. The long-term login source is Keycloak, using Harmony employee IDs as User IDs and email addresses for verification and recovery.
           </p>
         </div>
       </section>

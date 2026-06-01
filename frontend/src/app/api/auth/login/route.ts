@@ -5,10 +5,10 @@ const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BAS
 const COOKIE_SECURE = process.env.COOKIE_SECURE === "true";
 
 export async function POST(request: Request) {
-  let username = "", password = "";
+  let userId = "", password = "";
   try {
-    const body = (await request.json()) as { username?: string; password?: string };
-    username = body.username || "";
+    const body = (await request.json()) as { user_id?: string; username?: string; password?: string };
+    userId = body.user_id || body.username || "";
     password = body.password || "";
   } catch {
     return NextResponse.json({ success: false, error: "invalid" }, { status: 401 });
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     response = await fetch(`${API_BASE_URL}/auth/token/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password })
+      body: JSON.stringify({ user_id: userId, password })
     });
   } catch {
     return NextResponse.json({ success: false, error: "backend_unavailable" }, { status: 503 });
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
   }
 
   const tokens = (await response.json()) as { access: string; refresh: string };
-  let userProfile = { role: "receptionist", username, name: username, avatarUrl: null as string | null };
+  let userProfile = { role: "receptionist", username: userId, name: userId, avatarUrl: null as string | null };
   try {
     const userResponse = await fetch(`${API_BASE_URL}/users/me/`, {
       headers: { Authorization: `Bearer ${tokens.access}` }
@@ -39,13 +39,13 @@ export async function POST(request: Request) {
       const currentUser = await userResponse.json();
       userProfile = {
         role: currentUser.role || "receptionist",
-        username: currentUser.username || username,
-        name: currentUser.name || currentUser.email || currentUser.username || username,
+        username: currentUser.username || userId,
+        name: currentUser.name || currentUser.email || currentUser.username || userId,
         avatarUrl: currentUser.avatar_url || null
       };
     }
   } catch {
-    userProfile = { role: "receptionist", username, name: username, avatarUrl: null };
+    userProfile = { role: "receptionist", username: userId, name: userId, avatarUrl: null };
   }
 
   let cookieStore;

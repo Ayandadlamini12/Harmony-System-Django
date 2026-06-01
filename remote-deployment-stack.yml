@@ -46,6 +46,12 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       HARMONY_WEBHOOK_SECRET: ${HARMONY_WEBHOOK_SECRET}
       HARMONY_PUBLIC_URL: ${APP_URL}
+      KEYCLOAK_ENABLED: ${KEYCLOAK_ENABLED:-false}
+      KEYCLOAK_SERVER_URL: ${KEYCLOAK_SERVER_URL:-}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-harmony-health}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-harmony-mis}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-}
+      KEYCLOAK_ALLOW_LOCAL_FALLBACK: ${KEYCLOAK_ALLOW_LOCAL_FALLBACK:-true}
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
