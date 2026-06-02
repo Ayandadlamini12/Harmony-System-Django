@@ -8,10 +8,38 @@ from .role_modules import ROLE_CHOICES, ROLE_MODULES
 User = get_user_model()
 
 
+IDENTITY_TYPE_PREFIXES = {
+    "employee": "HH200",
+    "supplier": "HH300",
+    "external_partner": "HH400",
+}
+IDENTITY_SEQUENCE_START = 5110
+IDENTITY_SEQUENCE_STEP = 77
+
+
+def generate_harmony_user_id(identity_type: str) -> str:
+    prefix = IDENTITY_TYPE_PREFIXES.get(identity_type, IDENTITY_TYPE_PREFIXES["employee"])
+    existing_ids = User.objects.filter(username__startswith=prefix).values_list("username", flat=True)
+    highest = 0
+    for user_id in existing_ids:
+        suffix = user_id.removeprefix(prefix)
+        if suffix.isdigit():
+            highest = max(highest, int(suffix))
+
+    next_number = IDENTITY_SEQUENCE_START if highest < IDENTITY_SEQUENCE_START else highest + IDENTITY_SEQUENCE_STEP
+    return f"{prefix}{next_number}"
+
+
 class UserSerializer(serializers.ModelSerializer):
     name = serializers.CharField(source="get_full_name", read_only=True)
     password = serializers.CharField(write_only=True, required=False, min_length=8)
     avatar_url = serializers.SerializerMethodField()
+    identity_type = serializers.ChoiceField(
+        choices=tuple((key, key.replace("_", " ").title()) for key in IDENTITY_TYPE_PREFIXES),
+        write_only=True,
+        required=False,
+        default="employee",
+    )
 
     class Meta:
         model = User
@@ -26,6 +54,7 @@ class UserSerializer(serializers.ModelSerializer):
             "is_active",
             "avatar_url",
             "password",
+            "identity_type",
         )
 
     def get_avatar_url(self, obj):
@@ -34,7 +63,10 @@ class UserSerializer(serializers.ModelSerializer):
         return "/api/account/avatar"
 
     def create(self, validated_data):
+        identity_type = validated_data.pop("identity_type", "employee")
         password = validated_data.pop("password", None)
+        if not validated_data.get("username"):
+            validated_data["username"] = generate_harmony_user_id(identity_type)
         user = User(**validated_data)
         if password:
             user.set_password(password)

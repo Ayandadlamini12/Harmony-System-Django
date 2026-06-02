@@ -16,13 +16,12 @@ async function authHeaders() {
 }
 
 export async function createUser(formData: FormData) {
-  const userId = String(formData.get("user_id") || formData.get("username") || "");
   const body = {
-    username: userId,
     email: String(formData.get("email") || ""),
     first_name: String(formData.get("first_name") || ""),
     last_name: String(formData.get("last_name") || ""),
     role: String(formData.get("role") || "receptionist"),
+    identity_type: String(formData.get("identity_type") || "employee"),
     password: String(formData.get("password") || ""),
   };
 
@@ -42,12 +41,12 @@ export async function createUser(formData: FormData) {
 export async function updateUser(id: number, formData: FormData) {
   const userId = String(formData.get("user_id") || formData.get("username") || "");
   const body: Record<string, unknown> = {
-    username: userId,
     email: String(formData.get("email") || ""),
     first_name: String(formData.get("first_name") || ""),
     last_name: String(formData.get("last_name") || ""),
     role: String(formData.get("role") || "receptionist"),
   };
+  if (userId) body.username = userId;
   const password = String(formData.get("password") || "");
   if (password) body.password = password;
 
