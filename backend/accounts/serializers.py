@@ -73,17 +73,21 @@ class UserSerializer(serializers.ModelSerializer):
             return None
         return "/api/account/avatar"
 
+    def validate(self, attrs):
+        identity_type = attrs.get("identity_type", "employee")
+        role = attrs.get("role") or IDENTITY_TYPE_DEFAULT_ROLE[identity_type]
+        if role not in IDENTITY_TYPE_ROLES[identity_type]:
+            raise serializers.ValidationError(
+                {"role": f"Role is not valid for {identity_type.replace('_', ' ')} accounts."}
+            )
+        attrs["role"] = role
+        return attrs
+
     def create(self, validated_data):
         identity_type = validated_data.pop("identity_type", "employee")
         password = validated_data.pop("password", None)
         if not validated_data.get("username"):
             validated_data["username"] = generate_harmony_user_id(identity_type)
-        role = validated_data.get("role") or IDENTITY_TYPE_DEFAULT_ROLE[identity_type]
-        if role not in IDENTITY_TYPE_ROLES[identity_type]:
-            raise serializers.ValidationError(
-                {"role": f"Role is not valid for {identity_type.replace('_', ' ')} accounts."}
-            )
-        validated_data["role"] = role
         user = User(**validated_data)
         if password:
             user.set_password(password)
