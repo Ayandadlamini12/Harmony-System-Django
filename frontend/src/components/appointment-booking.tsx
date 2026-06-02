@@ -11,6 +11,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
+import { showActionError } from "@/lib/action-error";
 import type { Patient } from "@/types/clinic";
 
 function today() {
@@ -45,7 +46,10 @@ export function AppointmentBooking({
       notes: form.get("notes") || ""
     };
     if (!payload.patient || !payload.appointment_date) {
-      toast.error("Choose a patient and appointment date");
+      showActionError({
+        title: "Appointment details missing",
+        message: "Choose a patient and appointment date."
+      });
       return;
     }
     setSubmitting(true);
@@ -57,7 +61,10 @@ export function AppointmentBooking({
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        toast.error(data.detail || "Appointment could not be booked");
+        showActionError({
+          title: "Appointment could not be booked",
+          message: data.detail || "Appointment could not be booked."
+        });
         return;
       }
       toast.success("Appointment booked");

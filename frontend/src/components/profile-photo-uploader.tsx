@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { LoadingButton } from "@/components/harmony-loading";
 import { Button } from "@/components/ui/button";
+import { showActionError } from "@/lib/action-error";
 
 type UploadState = "idle" | "saving" | "saved" | "error";
 
@@ -28,13 +29,17 @@ export function ProfilePhotoUploader({ avatarUrl, name }: { avatarUrl?: string; 
   function selectFile(nextFile?: File) {
     if (!nextFile) return;
     if (!["image/jpeg", "image/png", "image/webp"].includes(nextFile.type)) {
-      setError("Use a JPG, PNG, or WebP image.");
+      const message = "Use a JPG, PNG, or WebP image.";
+      setError(message);
       setStatus("error");
+      showActionError({ title: "Profile image error", message });
       return;
     }
     if (nextFile.size > 6 * 1024 * 1024) {
-      setError("Choose an image under 6 MB before cropping.");
+      const message = "Choose an image under 6 MB before cropping.";
+      setError(message);
       setStatus("error");
+      showActionError({ title: "Profile image error", message });
       return;
     }
     if (previewUrl) URL.revokeObjectURL(previewUrl);
@@ -87,7 +92,10 @@ export function ProfilePhotoUploader({ avatarUrl, name }: { avatarUrl?: string; 
       setStatus("error");
       const message = uploadError instanceof Error ? uploadError.message : "The profile image could not be saved.";
       setError(message);
-      toast.error(message);
+      showActionError({
+        title: "Profile image error",
+        message
+      });
     }
   }
 
@@ -104,8 +112,12 @@ export function ProfilePhotoUploader({ avatarUrl, name }: { avatarUrl?: string; 
       return;
     }
     setStatus("error");
-    setError("The profile image could not be removed.");
-    toast.error("The profile image could not be removed.");
+    const message = "The profile image could not be removed.";
+    setError(message);
+    showActionError({
+      title: "Profile image error",
+      message
+    });
   }
 
   const displayUrl = previewUrl || avatarUrl || "/brand/harmony-icon-sm.webp";

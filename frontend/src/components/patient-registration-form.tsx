@@ -18,6 +18,7 @@ import { Label } from "@/components/ui/label";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
+import { showActionError } from "@/lib/action-error";
 import { cn } from "@/lib/utils";
 import { RELATIONSHIP_OPTIONS } from "@/lib/relationships";
 
@@ -296,7 +297,10 @@ export function PatientRegistrationForm() {
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
-        toast.error(data.detail || "The patient record could not be saved.");
+        showActionError({
+          title: "Patient could not be created",
+          message: data.detail || "The patient record could not be saved."
+        });
         return;
       }
       toast.success("Patient created. Consent signing is the next step.");

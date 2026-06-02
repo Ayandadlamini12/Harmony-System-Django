@@ -11,6 +11,7 @@ import { LoadingButton } from "@/components/harmony-loading";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Slider } from "@/components/ui/slider";
+import { showActionError } from "@/lib/action-error";
 import type { Patient, Visit } from "@/types/clinic";
 
 type SymptomProblemRow = {
@@ -283,7 +284,10 @@ export function VisitForm({
     } else {
       const message = extractSubmitError(data);
       setError(message);
-      toast.error(message);
+      showActionError({
+        title: "Visit could not be saved",
+        message
+      });
       setLoading(false);
     }
   }

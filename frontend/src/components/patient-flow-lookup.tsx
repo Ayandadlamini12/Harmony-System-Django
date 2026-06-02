@@ -4,13 +4,13 @@ import Link from "next/link";
 import { CalendarDays, CheckCircle2, Clock3, Hash, IdCard, ListChecks, Phone, Search, UserRound } from "lucide-react";
 import type React from "react";
 import { useState } from "react";
-import { toast } from "sonner";
 
 import { LoadingButton } from "@/components/harmony-loading";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { showActionError } from "@/lib/action-error";
 import type { PatientJourney } from "@/types/clinic";
 
 type LookupResponse = {
@@ -76,7 +76,10 @@ export function PatientFlowLookup({ initialIdentifier = "" }: { initialIdentifie
   async function handleLookup(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!identifier.trim()) {
-      toast.error("Enter a patient identifier first");
+      showActionError({
+        title: "Patient lookup missing identifier",
+        message: "Enter a patient identifier first."
+      });
       return;
     }
     setLoading(true);
@@ -89,7 +92,10 @@ export function PatientFlowLookup({ initialIdentifier = "" }: { initialIdentifie
       const data = await response.json().catch(() => ({}));
       if (!response.ok) {
         setResult(null);
-        toast.error(data.detail || "No matching patient flow was found");
+        showActionError({
+          title: "Patient flow not found",
+          message: data.detail || "No matching patient flow was found."
+        });
         return;
       }
       setResult(data as LookupResponse);

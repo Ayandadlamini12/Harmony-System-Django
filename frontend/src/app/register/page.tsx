@@ -6,6 +6,14 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { FormEvent, Suspense, useState } from "react";
 
 import { LoadingButton } from "@/components/harmony-loading";
+import { showActionError } from "@/lib/action-error";
+
+function registrationErrorMessage(error: string) {
+  if (error === "exists") return "A user with that User ID already exists.";
+  if (error === "mismatch") return "Passwords do not match.";
+  if (error === "weak") return "Password is too weak. Minimum 8 characters required.";
+  return "Registration failed. Please try again.";
+}
 
 function RegisterForm() {
   const router = useRouter();
@@ -38,7 +46,12 @@ function RegisterForm() {
     if (data.success) {
       router.push("/login?registered=1");
     } else {
-      setError(data.error || "unknown");
+      const errorCode = data.error || "unknown";
+      setError(errorCode);
+      showActionError({
+        title: "Registration failed",
+        message: registrationErrorMessage(errorCode)
+      });
       setLoading(false);
     }
   }
@@ -58,10 +71,7 @@ function RegisterForm() {
 
         {error && (
           <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
-            {error === "exists" && "A user with that User ID already exists."}
-            {error === "mismatch" && "Passwords do not match."}
-            {error === "weak" && "Password is too weak. Minimum 8 characters required."}
-            {error === "unknown" && "Registration failed. Please try again."}
+            {registrationErrorMessage(error)}
           </div>
         )}
 

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { LoadingButton } from "@/components/harmony-loading";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { showActionError } from "@/lib/action-error";
 import type { Case, Patient, Visit } from "@/types/clinic";
 
 function formatDate(text?: string | null) {
@@ -109,7 +110,12 @@ export function CaseForm({
     }
 
     if (!body.patient || !body.visit || !body.title) {
-      setError("Patient, visit, and case title are required.");
+      const message = "Patient, visit, and case title are required.";
+      setError(message);
+      showActionError({
+        title: "Case details missing",
+        message
+      });
       setLoading(false);
       return;
     }
@@ -128,11 +134,18 @@ export function CaseForm({
       } else {
         const detail = data.detail || data.title?.[0] || "Could not save case";
         setError(detail);
-        toast.error(detail);
+        showActionError({
+          title: "Case could not be saved",
+          message: detail
+        });
       }
     } catch {
-      setError("Could not save case. Check the connection and try again.");
-      toast.error("Could not save case");
+      const message = "Could not save case. Check the connection and try again.";
+      setError(message);
+      showActionError({
+        title: "Case could not be saved",
+        message
+      });
     } finally {
       setLoading(false);
     }

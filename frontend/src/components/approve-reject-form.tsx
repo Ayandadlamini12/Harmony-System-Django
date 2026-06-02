@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { toast } from "sonner";
 
 import { LoadingButton } from "@/components/harmony-loading";
+import { showActionError } from "@/lib/action-error";
 
 export function ApproveRejectForm({ requestId, onDone }: { requestId: number; onDone: (action: "approved" | "rejected") => void }) {
   const [approveLoading, setApproveLoading] = useState(false);
@@ -29,7 +30,10 @@ export function ApproveRejectForm({ requestId, onDone }: { requestId: number; on
       onDone("approved");
     } else {
       setApproveError("Failed to approve.");
-      toast.error("Failed to approve access request");
+      showActionError({
+        title: "Access request update failed",
+        message: "Failed to approve access request"
+      });
     }
     setApproveLoading(false);
   }
@@ -52,7 +56,10 @@ export function ApproveRejectForm({ requestId, onDone }: { requestId: number; on
       onDone("rejected");
     } else {
       setRejectError("Failed to reject.");
-      toast.error("Failed to reject access request");
+      showActionError({
+        title: "Access request update failed",
+        message: "Failed to reject access request"
+      });
     }
     setRejectLoading(false);
   }

@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { toast } from "sonner";
 
 import { LoadingButton } from "@/components/harmony-loading";
+import { showActionError } from "@/lib/action-error";
 
 export function ChangePasswordForm() {
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -31,7 +32,10 @@ export function ChangePasswordForm() {
         : data.error === "weak" ? "New password is too weak. Minimum 8 characters, not too common."
         : "Password change failed.";
       setMessage({ type: "error", text: msg });
-      toast.error(msg);
+      showActionError({
+        title: "Password change failed",
+        message: msg
+      });
     }
     setLoading(false);
   }

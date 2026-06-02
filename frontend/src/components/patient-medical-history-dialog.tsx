@@ -5,6 +5,7 @@ import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { showActionError } from "@/lib/action-error";
 import type { Patient, PatientProfile } from "@/types/clinic";
 
 const HIV_STATUSES = [
@@ -60,7 +61,10 @@ export function PatientMedicalHistoryDialog({ patient, onSaved }: { patient: Pat
       toast.success("Medical history saved");
       setOpen(false);
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : "Could not save medical history");
+      showActionError({
+        title: "Medical history could not be saved",
+        message: e instanceof Error ? e.message : "Could not save medical history."
+      });
     } finally {
       setSaving(false);
     }

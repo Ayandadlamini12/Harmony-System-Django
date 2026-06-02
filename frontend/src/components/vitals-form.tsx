@@ -7,6 +7,7 @@ import { toast } from "sonner";
 
 import { FormSectionHeader } from "@/components/form-section-header";
 import { LoadingButton } from "@/components/harmony-loading";
+import { showActionError } from "@/lib/action-error";
 import type { Patient, Visit } from "@/types/clinic";
 
 export function VitalsForm({
@@ -79,7 +80,10 @@ export function VitalsForm({
       router.refresh();
     } else {
       setError("save_failed");
-      toast.error("The vitals could not be saved");
+      showActionError({
+        title: "Vitals could not be saved",
+        message: data.detail || "The vitals could not be saved. Select a visit and check the recorded values."
+      });
       setLoading(false);
     }
   }

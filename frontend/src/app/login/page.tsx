@@ -6,6 +6,7 @@ import { FormEvent, Suspense, useState } from "react";
 import { Activity, LockKeyhole, ShieldCheck } from "lucide-react";
 
 import { LoadingButton } from "@/components/harmony-loading";
+import { showActionError } from "@/lib/action-error";
 
 function LoginForm() {
   const router = useRouter();
@@ -33,10 +34,18 @@ function LoginForm() {
         router.push(redirectTo);
       } else {
         setError("invalid");
+        showActionError({
+          title: "Sign in failed",
+          message: "Invalid User ID or password."
+        });
         setLoading(false);
       }
     } catch {
       setError("invalid");
+      showActionError({
+        title: "Sign in failed",
+        message: "Invalid User ID or password."
+      });
       setLoading(false);
     }
   }

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Suspense } from "react";
 
 import { HarmonyToaster } from "@/components/harmony-toaster";
+import { ActionErrorCenter } from "@/components/action-error-center";
 import { RouteProgress } from "@/components/route-progress";
 
 import "./globals.css";
@@ -23,6 +24,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
           <RouteProgress />
         </Suspense>
         {children}
+        <ActionErrorCenter />
         <HarmonyToaster />
       </body>
     </html>

@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { showActionError } from "@/lib/action-error";
 import type { MessageRecipient, MessageThread } from "@/types/clinic";
 
 type Props = {
@@ -50,6 +51,11 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
     }
   }
 
+  function showMessagingError(title: string, message: string) {
+    setError(message);
+    showActionError({ title, message });
+  }
+
   async function handleCreateThread(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -59,7 +65,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
     const subject = String(formData.get("subject") || "").trim();
     const initialMessage = String(formData.get("initial_message") || "").trim();
     if (!recipientId || !subject || !initialMessage) {
-      setError("Choose a recipient, subject, and first message.");
+      showMessagingError("Thread details missing", "Choose a recipient, subject, and first message.");
       setIsSubmitting(false);
       return;
     }
@@ -76,7 +82,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.detail || "Could not create the message thread.");
+        showMessagingError("Thread could not be created", data.detail || "Could not create the message thread.");
         return;
       }
       const createdThread = data as MessageThread;
@@ -86,7 +92,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       setIsCreating(false);
       void refreshThreads(createdThread.id);
     } catch {
-      setError("Could not create the message thread. Please try again.");
+      showMessagingError("Thread could not be created", "Could not create the message thread. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -101,7 +107,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
     const formData = new FormData(form);
     const body = String(formData.get("body") || "").trim();
     if (!body) {
-      setError("Write a message before sending.");
+      showMessagingError("Message is empty", "Write a message before sending.");
       setIsSubmitting(false);
       return;
     }
@@ -113,7 +119,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setError(data.detail || data.body?.[0] || "Could not send the message.");
+        showMessagingError("Message could not be sent", data.detail || data.body?.[0] || "Could not send the message.");
         return;
       }
       form.reset();
@@ -131,7 +137,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       );
       void refreshThreads(selectedThread.id);
     } catch {
-      setError("Could not send the message. Please try again.");
+      showMessagingError("Message could not be sent", "Could not send the message. Please try again.");
     } finally {
       setIsSubmitting(false);
     }
@@ -284,7 +290,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       </section>
 
       {error ? (
-        <div className="fixed bottom-5 right-5 z-50 max-w-md rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900 shadow-lg">
+        <div className="sr-only" role="status">
           {error}
         </div>
       ) : null}

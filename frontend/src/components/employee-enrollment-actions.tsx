@@ -6,6 +6,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 
 import { LoadingButton } from "@/components/harmony-loading";
+import { showActionError } from "@/lib/action-error";
 
 export function EmployeeEnrollmentActions({ requestId, status }: { requestId: number; status: string }) {
   const router = useRouter();
@@ -25,7 +26,10 @@ export function EmployeeEnrollmentActions({ requestId, status }: { requestId: nu
       });
       const data = await response.json().catch(() => ({}));
       if (!response.ok || !data.success) {
-        toast.error(data.error || `Could not ${action} request`);
+        showActionError({
+          title: "Enrollment request update failed",
+          message: data.error || `Could not ${action} request.`
+        });
         return;
       }
       toast.success(isApprove ? "Employee onboarding approved" : "Employee onboarding rejected");

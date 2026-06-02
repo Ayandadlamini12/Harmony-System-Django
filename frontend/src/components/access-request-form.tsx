@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import { toast } from "sonner";
 
 import { LoadingButton } from "@/components/harmony-loading";
+import { showActionError } from "@/lib/action-error";
 import type { Patient } from "@/types/clinic";
 
 export function AccessRequestForm({ patients }: { patients: Patient[] }) {
@@ -29,7 +30,10 @@ export function AccessRequestForm({ patients }: { patients: Patient[] }) {
       e.currentTarget.reset();
     } else {
       setMessage({ type: "error", text: "Could not submit request." });
-      toast.error("Could not submit access request");
+      showActionError({
+        title: "Access request failed",
+        message: "Could not submit access request."
+      });
     }
     setLoading(false);
   }

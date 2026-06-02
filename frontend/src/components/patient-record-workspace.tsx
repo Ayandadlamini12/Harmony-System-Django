@@ -17,6 +17,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
+import { showActionError } from "@/lib/action-error";
 import { relationshipLabel } from "@/lib/relationships";
 import type { Case, Patient, PatientDocument, PatientProfile, PatientWorkflowAction, Visit, Vital } from "@/types/clinic";
 
@@ -301,7 +302,10 @@ function CasesTab({ patientId, initialCases }: { patientId: number; initialCases
       );
       toast.success("Case resolved");
     } catch {
-      toast.error("Could not resolve case");
+      showActionError({
+        title: "Case could not be resolved",
+        message: "Could not resolve case."
+      });
     } finally {
       setResolvingId(null);
     }
