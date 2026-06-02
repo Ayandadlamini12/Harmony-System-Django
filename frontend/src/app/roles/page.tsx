@@ -8,7 +8,11 @@ import { getRoleModuleMatrix } from "@/lib/api";
 const roleLabels: Record<string, string> = {
   admin: "Admin",
   clinician: "Clinician",
-  receptionist: "Receptionist"
+  receptionist: "Receptionist",
+  supplier_contact: "Supplier contact",
+  supplier_manager: "Supplier manager",
+  partner_contact: "Partner contact",
+  partner_manager: "Partner manager"
 };
 
 export default async function RolesPage({ searchParams }: { searchParams: Promise<{ saved?: string; error?: string }> }) {

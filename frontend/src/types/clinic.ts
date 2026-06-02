@@ -321,7 +321,7 @@ export type User = {
   first_name: string;
   last_name: string;
   name: string;
-  role: "admin" | "clinician" | "receptionist";
+  role: "admin" | "clinician" | "receptionist" | "supplier_contact" | "supplier_manager" | "partner_contact" | "partner_manager";
   is_active: boolean;
   avatar_url?: string | null;
 };

@@ -13,6 +13,16 @@ IDENTITY_TYPE_PREFIXES = {
     "supplier": "HH300",
     "external_partner": "HH400",
 }
+IDENTITY_TYPE_ROLES = {
+    "employee": ("admin", "clinician", "receptionist"),
+    "supplier": ("supplier_contact", "supplier_manager"),
+    "external_partner": ("partner_contact", "partner_manager"),
+}
+IDENTITY_TYPE_DEFAULT_ROLE = {
+    "employee": "receptionist",
+    "supplier": "supplier_contact",
+    "external_partner": "partner_contact",
+}
 IDENTITY_SEQUENCE_START = 5110
 IDENTITY_SEQUENCE_STEP = 77
 
@@ -68,6 +78,12 @@ class UserSerializer(serializers.ModelSerializer):
         password = validated_data.pop("password", None)
         if not validated_data.get("username"):
             validated_data["username"] = generate_harmony_user_id(identity_type)
+        role = validated_data.get("role") or IDENTITY_TYPE_DEFAULT_ROLE[identity_type]
+        if role not in IDENTITY_TYPE_ROLES[identity_type]:
+            raise serializers.ValidationError(
+                {"role": f"Role is not valid for {identity_type.replace('_', ' ')} accounts."}
+            )
+        validated_data["role"] = role
         user = User(**validated_data)
         if password:
             user.set_password(password)

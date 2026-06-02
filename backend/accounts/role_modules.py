@@ -1,4 +1,12 @@
-ROLE_CHOICES = ("admin", "clinician", "receptionist")
+ROLE_CHOICES = (
+    "admin",
+    "clinician",
+    "receptionist",
+    "supplier_contact",
+    "supplier_manager",
+    "partner_contact",
+    "partner_manager",
+)
 
 ROLE_MODULES = [
     {
@@ -6,7 +14,7 @@ ROLE_MODULES = [
         "label": "Dashboard",
         "category": "Workspace",
         "description": "Main role dashboard and daily workspace overview.",
-        "default_roles": ["admin", "clinician", "receptionist"],
+        "default_roles": ["admin", "clinician", "receptionist", "supplier_contact", "supplier_manager", "partner_contact", "partner_manager"],
     },
     {
         "key": "patient_register",

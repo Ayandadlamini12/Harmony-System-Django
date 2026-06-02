@@ -13,6 +13,10 @@ class User(AbstractUser):
         ADMIN = "admin", "Admin"
         CLINICIAN = "clinician", "Clinician"
         RECEPTIONIST = "receptionist", "Receptionist"
+        SUPPLIER_CONTACT = "supplier_contact", "Supplier Contact"
+        SUPPLIER_MANAGER = "supplier_manager", "Supplier Manager"
+        PARTNER_CONTACT = "partner_contact", "Partner Contact"
+        PARTNER_MANAGER = "partner_manager", "Partner Manager"
 
     role = models.CharField(max_length=30, choices=Role.choices, default=Role.RECEPTIONIST)
     is_active = models.BooleanField(default=True)

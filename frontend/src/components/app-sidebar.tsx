@@ -19,6 +19,16 @@ import { allowedForRole, navItems } from "@/lib/role-workflows";
 import type { UserRole } from "@/lib/session";
 import { cn } from "@/lib/utils";
 
+const roleLabels: Record<UserRole, string> = {
+  admin: "Admin",
+  clinician: "Clinician",
+  receptionist: "Receptionist",
+  supplier_contact: "Supplier contact",
+  supplier_manager: "Supplier manager",
+  partner_contact: "Partner contact",
+  partner_manager: "Partner manager",
+};
+
 export function AppSidebar({
   children,
   avatarUrl,
@@ -129,8 +139,8 @@ function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: s
             <>
               <div className="text-xs font-bold uppercase text-[#66736d]">Workspace</div>
               <div className="mt-2 rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-3">
-                <div className="font-bold text-[var(--hh-purple-dark)]">{role === "clinician" ? "Clinician dashboard" : `${role} dashboard`}</div>
-                <div className="mt-1 text-xs capitalize text-[#66736d]">{role}-based navigation</div>
+                <div className="font-bold text-[var(--hh-purple-dark)]">{roleLabels[role]} dashboard</div>
+                <div className="mt-1 text-xs text-[#66736d]">{roleLabels[role]}-based navigation</div>
               </div>
             </>
           ) : (

@@ -46,8 +46,10 @@ export type WorkflowCard = {
   status?: "ready" | "planned";
 };
 
+const allRoles: UserRole[] = ["admin", "clinician", "receptionist", "supplier_contact", "supplier_manager", "partner_contact", "partner_manager"];
+
 export const navItems: NavItem[] = [
-  { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: ["admin", "clinician", "receptionist"] },
+  { href: "/", label: "Dashboard", icon: LayoutDashboard, roles: allRoles },
   {
     href: "/patients",
     label: "Patients",
@@ -101,7 +103,7 @@ export const navItems: NavItem[] = [
       { href: "/administration/system-health", label: "System Health", icon: Activity, roles: ["admin"] }
     ]
   },
-  { href: "/account", label: "Settings", icon: Settings, roles: ["admin", "clinician", "receptionist"] }
+  { href: "/account", label: "Settings", icon: Settings, roles: allRoles }
 ];
 
 export const workflowCards: WorkflowCard[] = [

@@ -6,8 +6,37 @@ import { getDashboardStats, getFormDrafts, getPatients, getVisits } from "@/lib/
 import { getSessionUser } from "@/lib/session";
 import { allowedForRole, workflowCards } from "@/lib/role-workflows";
 
+const roleLabels: Record<string, string> = {
+  admin: "Admin",
+  clinician: "Clinician",
+  receptionist: "Receptionist",
+  supplier_contact: "Supplier contact",
+  supplier_manager: "Supplier manager",
+  partner_contact: "Partner contact",
+  partner_manager: "Partner manager",
+};
+
 export default async function DashboardPage({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const session = await getSessionUser();
+  const isClinicRole = session.role === "admin" || session.role === "clinician" || session.role === "receptionist";
+
+  if (!isClinicRole) {
+    return (
+      <AppShell title={`${roleLabels[session.role] || "User"} dashboard`}>
+        <section className="hh-panel p-6">
+          <h2 className="text-lg font-bold text-[var(--hh-purple-dark)]">Harmony account access</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-[#66736d]">
+            This account is active for external access. Patient records, clinical workflows, and administration modules are not enabled for this role.
+          </p>
+          <div className="mt-5 flex flex-wrap gap-3">
+            <Button asChild>
+              <Link href="/account">Manage account</Link>
+            </Button>
+          </div>
+        </section>
+      </AppShell>
+    );
+  }
 
   const [stats, patients, visits, drafts] = await Promise.all([getDashboardStats(), getPatients(), getVisits(), getFormDrafts()]);
   const workflows = allowedForRole(workflowCards, session.role);
@@ -21,10 +50,10 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
 
   return (
     <AppShell
-      title={`${session.role.charAt(0).toUpperCase()}${session.role.slice(1)} dashboard`}
+      title={`${roleLabels[session.role] || session.role} dashboard`}
       action={
         <>
-          {session.role !== "receptionist" && <Button asChild variant="secondary"><Link href="/visits/new">Add visit</Link></Button>}
+          {(session.role === "admin" || session.role === "clinician") && <Button asChild variant="secondary"><Link href="/visits/new">Add visit</Link></Button>}
           {(session.role === "admin" || session.role === "receptionist") && <Button asChild><Link href="/patients/new">Register patient</Link></Button>}
         </>
       }

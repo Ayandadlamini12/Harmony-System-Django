@@ -1,6 +1,13 @@
 import { cookies } from "next/headers";
 
-export type UserRole = "admin" | "clinician" | "receptionist";
+export type UserRole =
+  | "admin"
+  | "clinician"
+  | "receptionist"
+  | "supplier_contact"
+  | "supplier_manager"
+  | "partner_contact"
+  | "partner_manager";
 
 export type SessionUser = {
   signedIn: boolean;

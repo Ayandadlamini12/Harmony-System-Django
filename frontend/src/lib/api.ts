@@ -184,12 +184,16 @@ export function getEmployeeEnrollmentRequests(status = "") {
 
 export function getRoleModuleMatrix() {
   return apiGet<RoleModuleMatrix>("/role-module-permissions/matrix/", {
-    roles: ["admin", "clinician", "receptionist"],
+    roles: ["admin", "clinician", "receptionist", "supplier_contact", "supplier_manager", "partner_contact", "partner_manager"],
     modules: [],
     permissions: {
       admin: {},
       clinician: {},
-      receptionist: {}
+      receptionist: {},
+      supplier_contact: {},
+      supplier_manager: {},
+      partner_contact: {},
+      partner_manager: {}
     }
   });
 }

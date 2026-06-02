@@ -7,6 +7,16 @@ import { getUsers } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
 import { toggleUserStatus, updateUser } from "./actions";
 
+const roleLabels: Record<string, string> = {
+  admin: "Admin",
+  clinician: "Clinician",
+  receptionist: "Receptionist",
+  supplier_contact: "Supplier contact",
+  supplier_manager: "Supplier manager",
+  partner_contact: "Partner contact",
+  partner_manager: "Partner manager",
+};
+
 export default async function UsersPage({ searchParams }: { searchParams: Promise<{ search?: string; error?: string }> }) {
   const params = await searchParams;
   const [data, session] = await Promise.all([getUsers(params.search || ""), getSessionUser()]);
@@ -59,6 +69,10 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                 <option value="receptionist">Receptionist</option>
                 <option value="clinician">Clinician</option>
                 <option value="admin">Admin</option>
+                <option value="supplier_contact">Supplier contact</option>
+                <option value="supplier_manager">Supplier manager</option>
+                <option value="partner_contact">Partner contact</option>
+                <option value="partner_manager">Partner manager</option>
               </select>
             </label>
             <label>
@@ -96,7 +110,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
                   <td className="px-5 py-4">
                     <span className="inline-flex items-center gap-1 rounded-full bg-[#f5edfa] px-2 py-1 text-xs font-bold capitalize text-[var(--hh-purple)]">
                       <ShieldCheck size={12} />
-                      {user.role}
+                      {roleLabels[user.role] || user.role}
                     </span>
                   </td>
                   <td className="px-5 py-4">

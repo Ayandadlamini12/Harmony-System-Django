@@ -1,9 +1,7 @@
 import { UserRoundCog } from "lucide-react";
-import Link from "next/link";
 
 import { AppShell } from "@/components/app-shell";
-import { Button } from "@/components/ui/button";
-import { createUser } from "@/app/users/actions";
+import { CreateLoginAccountForm } from "@/components/create-login-account-form";
 
 export default async function EnrolUserPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   const params = await searchParams;
@@ -26,48 +24,7 @@ export default async function EnrolUserPage({ searchParams }: { searchParams: Pr
             </div>
           </div>
 
-          <form action={createUser} className="grid max-w-2xl gap-4">
-            <div className="grid gap-4 md:grid-cols-2">
-              <label>
-                <span className="hh-label">First name</span>
-                <input className="hh-input" name="first_name" required />
-              </label>
-              <label>
-                <span className="hh-label">Last name</span>
-                <input className="hh-input" name="last_name" required />
-              </label>
-            </div>
-            <label>
-              <span className="hh-label">Account type</span>
-              <select className="hh-input" name="identity_type" defaultValue="employee">
-                <option value="employee">Employee - HH200 range</option>
-                <option value="supplier">Supplier - HH300 range</option>
-                <option value="external_partner">External partner - HH400 range</option>
-              </select>
-            </label>
-            <label>
-              <span className="hh-label">Email</span>
-              <input className="hh-input" name="email" type="email" />
-            </label>
-            <label>
-              <span className="hh-label">Role</span>
-              <select className="hh-input" name="role" defaultValue="receptionist">
-                <option value="receptionist">Receptionist</option>
-                <option value="clinician">Clinician</option>
-                <option value="admin">Admin</option>
-              </select>
-            </label>
-            <label>
-              <span className="hh-label">Temporary password</span>
-              <input className="hh-input" name="password" type="password" autoComplete="new-password" minLength={8} required />
-            </label>
-            <div className="flex flex-wrap gap-3">
-              <Button type="submit">Create account</Button>
-              <Button asChild type="button" variant="secondary">
-                <Link href="/users">Cancel</Link>
-              </Button>
-            </div>
-          </form>
+          <CreateLoginAccountForm />
         </div>
 
         <div className="hh-panel p-5">
