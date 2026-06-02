@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ClipboardList, FileText, IdCard, LockKeyhole, MapPin, Phone, Users, ChevronLeft, ChevronRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { z } from "zod";
 
 import { FormStepWheel } from "@/components/form-step-wheel";
+import { FormSectionHeader } from "@/components/form-section-header";
 import { LoadingButton } from "@/components/harmony-loading";
 import { countryCodeOptions, resolveCountryFromDialCode } from "@/components/phone-number-input";
 import { Button } from "@/components/ui/button";
@@ -181,36 +182,48 @@ export function PatientRegistrationForm() {
       id: "identity",
       title: "Identity",
       description: "Name, ID, date of birth, and gender.",
+      icon: IdCard,
+      tone: "identity" as const,
       fields: ["first_name", "last_name", "national_id", "date_of_birth", "gender", "marital_status", "occupation", "allergies", "smoking_status", "smoking_details", "smoking_years", "alcohol_status", "alcohol_details"] as const
     },
     {
       id: "contact",
       title: "Contact and location",
       description: "Country code, phones, email, region, locality, and village.",
+      icon: Phone,
+      tone: "contact" as const,
       fields: ["primary_phone", "secondary_phone", "email", "region", "town_or_locality", "village"] as const
     },
     {
       id: "next-of-kin",
       title: "Next of kin",
       description: "Emergency contact and relationship details.",
+      icon: Users,
+      tone: "contact" as const,
       fields: ["next_of_kin_full_name", "next_of_kin_phone", "next_of_kin_email", "next_of_kin_relationship", "next_of_kin_relationship_other"] as const
     },
     {
       id: "clinical",
       title: "Medical history",
       description: "Semi-stable medical history and important patient notes.",
+      icon: ClipboardList,
+      tone: "clinical" as const,
       fields: ["hiv_status", "children_count", "past_medical_history", "family_medical_history", "allopathic_medication", "other_important_information"] as const
     },
     {
       id: "conditions",
       title: "Confidential medical records",
       description: "Sickness record flags. Yes uses a tick; No uses an X.",
+      icon: LockKeyhole,
+      tone: "secure" as const,
       fields: ["conditions"] as const
     },
     {
       id: "review",
       title: "Review and save",
       description: "Confirm the intake details before creating the patient record.",
+      icon: FileText,
+      tone: "notes" as const,
       fields: [] as const
     }
   ];
@@ -298,11 +311,15 @@ export function PatientRegistrationForm() {
     <form onSubmit={form.handleSubmit(onSubmit)} className="grid gap-6">
       <FormStepWheel steps={steps} activeIndex={activeIndex} setActiveIndex={setActiveIndex} />
       <section className="grid gap-5">
-        <div className="rounded-lg border border-[var(--hh-border)] bg-white">
-          <div className="border-b border-[var(--hh-border)] px-5 py-4">
-            <p className="text-xs font-bold uppercase text-[#66736d]">Step {activeIndex + 1} of {steps.length}</p>
-            <h2 className="mt-1 text-lg font-bold">{activeStep.title}</h2>
-            <p className="mt-1 text-sm text-[#66736d]">{activeStep.description}</p>
+        <div className="hh-panel overflow-hidden">
+          <div className="border-b border-[var(--hh-border)] bg-[#fbfdfc] p-4">
+            <FormSectionHeader
+              icon={activeStep.icon}
+              title={activeStep.title}
+              description={activeStep.description}
+              eyebrow={`Step ${activeIndex + 1} of ${steps.length}`}
+              tone={activeStep.tone}
+            />
           </div>
           <div className="p-5">
             <div className={cn(activeStep.id === "identity" ? "block" : "hidden")}>
@@ -364,6 +381,16 @@ export function PatientRegistrationForm() {
             </div>
 
             <div className={cn(activeStep.id === "contact" ? "block" : "hidden")}>
+              <div className="mb-4 grid gap-3 sm:grid-cols-2">
+                <div className="flex items-center gap-2 rounded-lg border border-[#d5e3da] bg-[#f7fbf8] px-3 py-2 text-sm font-bold text-[#24302b]">
+                  <Phone size={17} className="text-[var(--hh-purple)]" />
+                  Contact details
+                </div>
+                <div className="flex items-center gap-2 rounded-lg border border-[#cce4d1] bg-[#f2fbf4] px-3 py-2 text-sm font-bold text-[#24302b]">
+                  <MapPin size={17} className="text-[#2f7d3b]" />
+                  Location details
+                </div>
+              </div>
               <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <label className={fieldClass}>
                   <Label>Primary phone</Label>

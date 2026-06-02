@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { FormEvent, useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { FormSectionHeader } from "@/components/form-section-header";
 import { LoadingButton } from "@/components/harmony-loading";
 import type { Patient, Visit } from "@/types/clinic";
 
@@ -92,10 +93,7 @@ export function VitalsForm({
       )}
 
       <section className="hh-panel p-5">
-        <div className="mb-4 flex items-center gap-3">
-          <HeartPulse className="text-[var(--hh-purple)]" size={22} />
-          <h2 className="font-bold">Vitals context</h2>
-        </div>
+        <FormSectionHeader className="mb-4" icon={HeartPulse} title="Vitals context" description="Link the vitals record to the correct patient, visit, date, and time." tone="vitals" />
         <div className="grid gap-4 md:grid-cols-3">
           {lockedPatient ? (
             <input name="patient" type="hidden" value={selectedPatient} />
@@ -131,7 +129,7 @@ export function VitalsForm({
       </section>
 
       <section className="hh-panel p-5">
-        <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Measurements</h2>
+        <FormSectionHeader className="mb-4" icon={HeartPulse} title="Measurements" description="Record blood pressure, pulse, temperature, weight, glucose, and related context." tone="vitals" />
         <div className="grid gap-4 md:grid-cols-4">
           <label><span className="hh-label">BP first</span><input className="hh-input" name="bp_first_reading" placeholder="120" /></label>
           <label><span className="hh-label">BP second</span><input className="hh-input" name="bp_second_reading" placeholder="80" /></label>

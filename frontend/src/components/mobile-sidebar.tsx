@@ -15,19 +15,19 @@ function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRo
   const nav = allowedForRole(navItems, role);
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-[var(--hh-purple-dark)] text-white">
-      <div className="flex h-16 shrink-0 items-center gap-3 px-5">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/12">
+    <div className="flex h-full min-h-0 flex-col bg-[#f9fcfa] text-[#24302b]">
+      <div className="flex h-16 shrink-0 items-center gap-3 border-b border-[#d7e3dc] bg-white/80 px-5">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[#f7f0fb]">
           <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon-sm.webp" />
         </div>
         <div>
           <div className="font-bold">Harmony Health</div>
-          <div className="text-xs text-white/70">Clinic system</div>
+          <div className="text-xs text-[#66736d]">Clinic system</div>
         </div>
       </div>
-      <div className="mx-3 mb-3 shrink-0 rounded-lg bg-white/8 px-3 py-3">
-        <div className="text-sm font-bold">{name}</div>
-        <div className="mt-1 text-xs capitalize text-white/65">{role} workspace</div>
+      <div className="mx-3 mb-3 mt-3 shrink-0 rounded-lg border border-[#c7d7cd] bg-gradient-to-br from-[#fbfdfc] to-[#f2fbf4] px-3 py-3 shadow-sm">
+        <div className="text-sm font-bold text-[var(--hh-purple-dark)]">{name}</div>
+        <div className="mt-1 text-xs capitalize text-[#66736d]">{role} workspace</div>
       </div>
       <nav className="grid min-h-0 flex-1 gap-1 overflow-y-auto overscroll-contain px-3 pb-5 pr-2 [scrollbar-gutter:stable]">
         {nav.map((item) => {
@@ -41,8 +41,8 @@ function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRo
               <details key={item.href} className="rounded-lg" open={active}>
                 <summary
                   className={cn(
-                    "flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-white/82 transition-colors hover:bg-white/10 [&::-webkit-details-marker]:hidden",
-                    active && "bg-white/14 text-white"
+                    "flex min-h-11 cursor-pointer list-none items-center gap-3 rounded-lg border-l-4 border-l-transparent px-3 py-2.5 text-sm font-semibold text-[#24302b] transition-colors hover:bg-white hover:text-[var(--hh-purple)] hover:shadow-sm [&::-webkit-details-marker]:hidden",
+                    active && "border-l-[var(--hh-purple)] bg-white text-[var(--hh-purple)] shadow-sm"
                   )}
                 >
                   <Icon size={18} />
@@ -59,13 +59,13 @@ function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRo
                         href={child.href}
                         onClick={onNavigate}
                         className={cn(
-                          "flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-xs font-semibold text-white/75 transition-colors hover:bg-white/10",
-                          childCurrent && "bg-white/14 text-white"
+                          "flex min-h-10 items-center gap-2 rounded-lg border-l-4 border-l-transparent px-3 py-2 text-xs font-semibold text-[#53605a] transition-colors hover:bg-white hover:text-[var(--hh-purple)]",
+                          childCurrent && "border-l-[var(--hh-purple)] bg-white text-[var(--hh-purple)] shadow-sm"
                         )}
                       >
                         <ChildIcon size={15} />
                         {child.label}
-                        {child.status === "planned" && <span className="ml-auto text-[10px] uppercase text-white/55">Future</span>}
+                        {child.status === "planned" && <span className="ml-auto text-[10px] uppercase text-[#66736d]">Future</span>}
                       </Link>
                     );
                   })}
@@ -79,8 +79,8 @@ function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRo
               href={item.href}
               onClick={onNavigate}
               className={cn(
-                "flex min-h-11 items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-semibold text-white/82 transition-colors hover:bg-white/10",
-                active && "bg-white/14 text-white"
+                "flex min-h-11 items-center gap-3 rounded-lg border-l-4 border-l-transparent px-3 py-2.5 text-sm font-semibold text-[#24302b] transition-colors hover:bg-white hover:text-[var(--hh-purple)] hover:shadow-sm",
+                active && "border-l-[var(--hh-purple)] bg-white text-[var(--hh-purple)] shadow-sm"
               )}
             >
               <Icon size={18} />
@@ -116,7 +116,7 @@ export function MobileSidebar({ name, role }: { name: string; role: UserRole }) 
 
       <SheetContent className="lg:hidden overflow-hidden">
         <SheetTitle className="sr-only">Navigation menu</SheetTitle>
-        <SheetClose className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white">
+        <SheetClose className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-[#f7f0fb] text-[var(--hh-purple)]">
           <X size={18} />
           <span className="sr-only">Close menu</span>
         </SheetClose>

@@ -1,11 +1,12 @@
 "use client";
 
-import { Check, ChevronLeft, ChevronRight, Eye, Plus, Save, Trash2, X } from "lucide-react";
+import { CalendarCheck, Check, ChevronLeft, ChevronRight, ClipboardList, Eye, FileText, HeartPulse, Plus, Save, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { FormStepWheel } from "@/components/form-step-wheel";
+import { FormSectionHeader } from "@/components/form-section-header";
 import { LoadingButton } from "@/components/harmony-loading";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
@@ -57,18 +58,18 @@ export function VisitForm({
   const shouldCaptureReproductiveReview = selectedPatient?.gender === "female";
   const visitSteps = isFollowUp
     ? [
-        { id: "details", title: "Visit details", description: "Patient, date, and previous complaint." },
-        { id: "symptoms", title: "Symptoms / Problems", description: "Carry forward, add, or resolve items." },
-        { id: "follow-up", title: "Follow-up evaluation", description: "Changes since remedy." },
-        { id: "decision", title: "New decision", description: "New diagnosis, remedy, and recommendations." }
+        { id: "details", title: "Visit details", description: "Patient, date, and previous complaint.", icon: CalendarCheck, tone: "appointment" as const },
+        { id: "symptoms", title: "Symptoms / Problems", description: "Carry forward, add, or resolve items.", icon: ClipboardList, tone: "clinical" as const },
+        { id: "follow-up", title: "Follow-up evaluation", description: "Changes since remedy.", icon: HeartPulse, tone: "vitals" as const },
+        { id: "decision", title: "New decision", description: "New diagnosis, remedy, and recommendations.", icon: FileText, tone: "notes" as const }
       ]
     : [
-        { id: "details", title: "Visit details", description: "Patient, date, and complaint summary." },
-        { id: "symptoms", title: "Symptoms / Problems", description: "Working problem list for this visit." },
-        { id: "digestive", title: "Digestive review", description: "GI, appetite, thirst, cravings, and aggravation." },
-        { id: "elimination", title: "Bowel and urinary review", description: "Bowel function and urination details." },
-        { id: "general", title: "General review", description: "Reproductive, sleep, energy, weather, mental." },
-        { id: "decision", title: "Clinical decision", description: "Exam, diagnosis, remedy, recommendations." }
+        { id: "details", title: "Visit details", description: "Patient, date, and complaint summary.", icon: CalendarCheck, tone: "appointment" as const },
+        { id: "symptoms", title: "Symptoms / Problems", description: "Working problem list for this visit.", icon: ClipboardList, tone: "clinical" as const },
+        { id: "digestive", title: "Digestive review", description: "GI, appetite, thirst, cravings, and aggravation.", icon: ClipboardList, tone: "clinical" as const },
+        { id: "elimination", title: "Bowel and urinary review", description: "Bowel function and urination details.", icon: HeartPulse, tone: "vitals" as const },
+        { id: "general", title: "General review", description: "Reproductive, sleep, energy, weather, mental.", icon: ClipboardList, tone: "clinical" as const },
+        { id: "decision", title: "Clinical decision", description: "Exam, diagnosis, remedy, recommendations.", icon: FileText, tone: "notes" as const }
       ];
   const activeStep = visitSteps[Math.min(activeStepIndex, visitSteps.length - 1)];
   const isFirstStep = activeStepIndex === 0;
@@ -302,10 +303,14 @@ export function VisitForm({
     <form onSubmit={handleSubmit} className="grid gap-6">
       <FormStepWheel steps={visitSteps} activeIndex={activeStepIndex} setActiveIndex={setActiveStepIndex} />
       <div className="grid gap-6">
-        <section className="hh-panel p-5">
-          <p className="text-xs font-bold uppercase text-[#66736d]">Step {activeStepIndex + 1} of {visitSteps.length}</p>
-          <h2 className="mt-1 text-xl font-bold text-[var(--hh-purple-dark)]">{activeStep.title}</h2>
-          <p className="mt-1 text-sm text-[#66736d]">{activeStep.description}</p>
+        <section className="hh-panel p-4">
+          <FormSectionHeader
+            icon={activeStep.icon}
+            title={activeStep.title}
+            description={activeStep.description}
+            eyebrow={`Step ${activeStepIndex + 1} of ${visitSteps.length}`}
+            tone={activeStep.tone}
+          />
         </section>
       {error && (
         <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
@@ -314,7 +319,7 @@ export function VisitForm({
       )}
 
       <section className={activeStep.id === "details" ? "hh-panel p-5" : "hidden"}>
-        <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Visit details</h2>
+        <FormSectionHeader className="mb-4" icon={CalendarCheck} title="Visit details" description="Choose the patient, visit type, date, and complaint context." tone="appointment" />
         <div className="grid gap-4 md:grid-cols-3">
           <label>
             <span className="hh-label">Patient</span>
@@ -353,7 +358,10 @@ export function VisitForm({
       <section className={activeStep.id === "symptoms" ? "hh-panel p-5" : "hidden"}>
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
-            <h2 className="text-sm font-bold uppercase text-[#66736d]">Symptoms / Problems</h2>
+            <div className="flex items-center gap-2 text-sm font-bold uppercase text-[#66736d]">
+              <ClipboardList size={17} className="text-[var(--hh-purple)]" />
+              Symptoms / Problems
+            </div>
             <p className="mt-1 text-sm leading-6 text-[#53605a]">
               Add each symptom or problem as its own item. Follow-up visits carry open items forward so they can be explained, kept open, or marked resolved.
             </p>
@@ -419,7 +427,7 @@ export function VisitForm({
 
       {!isFollowUp && (
         <section className={activeStep.id === "digestive" ? "hh-panel p-5" : "hidden"}>
-          <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Digestive review</h2>
+          <FormSectionHeader className="mb-4" icon={ClipboardList} title="Digestive review" description="GI, appetite, thirst, cravings, and aggravation." tone="clinical" />
           <div className="grid gap-4 md:grid-cols-2">
             <label><span className="hh-label">Gastrointestinal</span><textarea className="hh-input min-h-24" name="gastrointestinal" placeholder="Indigestion, heartburn, cramps, flatulence, aversions" /></label>
             <SelectField name="appetite_status" label="Appetite" options={["", "Increased", "Decreased", "Normal"]} />
@@ -435,7 +443,7 @@ export function VisitForm({
 
       {!isFollowUp && (
         <section className={activeStep.id === "elimination" ? "hh-panel p-5" : "hidden"}>
-          <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">Bowel and urinary review</h2>
+          <FormSectionHeader className="mb-4" icon={HeartPulse} title="Bowel and urinary review" description="Bowel function, urination frequency, urgency, and pain." tone="vitals" />
           <div className="grid gap-4 md:grid-cols-2">
             <label><span className="hh-label">Bowel function</span><textarea className="hh-input min-h-24" name="bowel_function" placeholder="Constipation, diarrhea, hemorrhoids" /></label>
             <label><span className="hh-label">Urination frequency per day</span><input className="hh-input" name="urination_frequency_per_day" type="number" min="0" /></label>
@@ -448,9 +456,7 @@ export function VisitForm({
 
       {!isFollowUp && (
         <section className={activeStep.id === "general" ? "hh-panel p-5" : "hidden"}>
-          <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">
-            {shouldCaptureReproductiveReview ? "Reproductive, sleep, general, and mental review" : "Sleep, general, and mental review"}
-          </h2>
+          <FormSectionHeader className="mb-4" icon={ClipboardList} title={shouldCaptureReproductiveReview ? "Reproductive, sleep, general, and mental review" : "Sleep, general, and mental review"} description="General modalities, sleep, energy, weather preference, and mental review." tone="clinical" />
           <div className="grid gap-4 md:grid-cols-2">
             {shouldCaptureReproductiveReview && (
               <>
@@ -495,7 +501,10 @@ export function VisitForm({
         <section className={activeStep.id === "follow-up" ? "hh-panel p-5" : "hidden"}>
           <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <h2 className="text-sm font-bold uppercase text-[#66736d]">Follow-up context</h2>
+              <div className="flex items-center gap-2 text-sm font-bold uppercase text-[#66736d]">
+                <HeartPulse size={17} className="text-[#8f1f32]" />
+                Follow-up context
+              </div>
               <p className="mt-2 text-sm leading-6 text-[#53605a]">
                 The previous complaint is pulled into this visit. Previous diagnosis, remedy, and recommendations are hidden until opened for review.
               </p>
@@ -504,7 +513,7 @@ export function VisitForm({
           </div>
 
           <div className="mt-5 overflow-x-auto rounded-lg border border-[var(--hh-border)]">
-            <table className="w-full text-left text-sm">
+            <table className="hh-table w-full text-left text-sm">
               <thead className="bg-[#f7faf8] text-xs uppercase text-[#66736d]">
                 <tr>
                   <th className="px-3 py-2">Date</th>
@@ -534,7 +543,7 @@ export function VisitForm({
       )}
 
       <section className={activeStep.id === "follow-up" || (!isFollowUp && activeStep.id === "decision") ? "hh-panel p-5" : "hidden"}>
-        <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">{isFollowUp ? "Evaluation (follow up)" : "Clinical notes"}</h2>
+        <FormSectionHeader className="mb-4" icon={FileText} title={isFollowUp ? "Evaluation (follow up)" : "Clinical notes"} description={isFollowUp ? "Record response to previous remedy and changes since the last consult." : "Capture examination, diagnosis, remedy, and recommendations."} tone="notes" />
         {isFollowUp ? (
           <div className="grid gap-4 md:grid-cols-2">
             <label><span className="hh-label">Symptoms of previous consult</span><textarea className="hh-input min-h-28" name="previous_consult_symptoms" /></label>
@@ -561,7 +570,7 @@ export function VisitForm({
 
       {isFollowUp && (
         <section className={activeStep.id === "decision" ? "hh-panel p-5" : "hidden"}>
-          <h2 className="mb-4 text-sm font-bold uppercase text-[#66736d]">New clinical decision</h2>
+          <FormSectionHeader className="mb-4" icon={FileText} title="New clinical decision" description="Record the updated diagnosis, remedy, and recommendations." tone="notes" />
           <div className="grid gap-4 md:grid-cols-2">
             <label><span className="hh-label">Physical examination</span><textarea className="hh-input min-h-28" name="physical_examination" /></label>
             <label><span className="hh-label">New diagnosis</span><textarea className="hh-input min-h-28" name="diagnosis" /></label>

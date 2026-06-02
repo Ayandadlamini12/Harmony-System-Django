@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 
+import { FormSectionHeader } from "@/components/form-section-header";
 import { LoadingButton } from "@/components/harmony-loading";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -70,11 +71,12 @@ export function AppointmentBooking({
   return (
     <Card>
       <CardHeader className="px-5 py-4">
-        <div className="flex items-center gap-2 font-bold">
-          <CalendarPlus size={18} />
-          Book appointment
-        </div>
-        <p className="text-sm text-[#66736d]">Appointments can be entered by reception, a clinician, or later by external channels like WhatsApp and Telegram.</p>
+        <FormSectionHeader
+          icon={CalendarPlus}
+          title="Book appointment"
+          description="Appointments can be entered by reception, a clinician, or later by external channels like WhatsApp and Telegram."
+          tone="appointment"
+        />
       </CardHeader>
       <CardContent className="p-5 pt-0">
         <form className="grid gap-4" onSubmit={handleSubmit}>

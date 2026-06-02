@@ -8,8 +8,11 @@
   --hh-green-dark: #2E7D32;
   --hh-red: #E74C3C;
   --hh-text: #2B2F38;
-  --hh-soft: #F7FAF8;
-  --hh-border: #BFCFC6;
+  --hh-soft: #F3F8F4;
+  --hh-surface: #FFFFFF;
+  --hh-section: #F7FBF8;
+  --hh-border: #B8CABE;
+  --hh-border-strong: #9EB4A8;
 }
 
 @keyframes hh-indeterminate {
@@ -27,7 +30,9 @@
 
 body {
   margin: 0;
-  background: var(--hh-soft);
+  background:
+    radial-gradient(circle at top left, rgba(80, 184, 96, 0.08), transparent 32rem),
+    linear-gradient(180deg, #f7fbf8 0%, var(--hh-soft) 100%);
   color: var(--hh-text);
   font-family: Arial, Helvetica, sans-serif;
 }
@@ -90,8 +95,16 @@ a {
 }
 
 .hh-panel {
-  border: 1px solid var(--hh-border);
+  border: 1px solid #c7d7cd;
   border-radius: 8px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(20, 35, 28, 0.08), 0 0 0 1px rgba(20, 35, 28, 0.015);
+  box-shadow: 0 2px 5px rgba(20, 35, 28, 0.09), 0 14px 30px rgba(20, 35, 28, 0.045);
+}
+
+.hh-table tbody tr:nth-child(even) {
+  background: #f8fbf9;
+}
+
+.hh-table tbody tr {
+  border-top: 1px solid #d7e3dc;
 }

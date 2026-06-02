@@ -132,13 +132,13 @@ function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: s
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   return (
-    <aside className="fixed bottom-0 left-0 top-16 z-20 hidden border-r border-[var(--hh-border)] bg-white lg:block">
+    <aside className="fixed bottom-0 left-0 top-16 z-20 hidden border-r border-[#c7d7cd] bg-[#f9fcfa] lg:block">
       <div className={cn("flex h-full flex-col transition-all", collapsed ? "w-[76px]" : "w-[260px]")}>
-        <div className="border-b border-[var(--hh-border)] p-3">
+        <div className="border-b border-[#d7e3dc] bg-white/70 p-3">
           {!collapsed ? (
             <>
               <div className="text-xs font-bold uppercase text-[#66736d]">Workspace</div>
-              <div className="mt-2 rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-3">
+              <div className="mt-2 rounded-lg border border-[#c7d7cd] bg-gradient-to-br from-[#fbfdfc] to-[#f2fbf4] p-3 shadow-sm">
                 <div className="font-bold text-[var(--hh-purple-dark)]">{roleLabels[role]} dashboard</div>
                 <div className="mt-1 text-xs text-[#66736d]">{roleLabels[role]}-based navigation</div>
               </div>
@@ -167,8 +167,8 @@ function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: s
                       <TooltipTrigger asChild>
                         <Button
                           className={cn(
-                            "w-full justify-start gap-3 px-3 text-sm font-bold text-[#24302b] hover:text-[var(--hh-purple)]",
-                            active && "bg-[#f7f0fb] text-[var(--hh-purple)]",
+                            "w-full justify-start gap-3 border-l-4 border-l-transparent px-3 text-sm font-bold text-[#24302b] hover:bg-white hover:text-[var(--hh-purple)] hover:shadow-sm",
+                            active && "border-l-[var(--hh-purple)] bg-white text-[var(--hh-purple)] shadow-sm",
                             collapsed && "justify-center px-0"
                           )}
                           onClick={() => setOpenGroups((current) => ({ ...current, [item.href]: !expanded }))}
@@ -197,8 +197,8 @@ function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: s
                               key={child.href}
                               asChild
                               className={cn(
-                                "w-full justify-start gap-2 px-3 text-xs font-bold text-[#52615a] hover:text-[var(--hh-purple)]",
-                                childCurrent && "bg-[#f7f0fb] text-[var(--hh-purple)]"
+                                "w-full justify-start gap-2 border-l-4 border-l-transparent px-3 text-xs font-bold text-[#52615a] hover:bg-white hover:text-[var(--hh-purple)]",
+                                childCurrent && "border-l-[var(--hh-purple)] bg-white text-[var(--hh-purple)] shadow-sm"
                               )}
                               variant="ghost"
                             >
@@ -222,8 +222,8 @@ function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: s
                     <Button
                       asChild
                       className={cn(
-                        "w-full justify-start gap-3 px-3 text-sm font-bold text-[#24302b] hover:text-[var(--hh-purple)]",
-                        active && "bg-[#f7f0fb] text-[var(--hh-purple)]",
+                        "w-full justify-start gap-3 border-l-4 border-l-transparent px-3 text-sm font-bold text-[#24302b] hover:bg-white hover:text-[var(--hh-purple)] hover:shadow-sm",
+                        active && "border-l-[var(--hh-purple)] bg-white text-[var(--hh-purple)] shadow-sm",
                         collapsed && "justify-center px-0"
                       )}
                       variant="ghost"
@@ -241,7 +241,7 @@ function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: s
           </nav>
         </TooltipProvider>
 
-        <div className="border-t border-[var(--hh-border)] p-3">
+        <div className="border-t border-[#d7e3dc] bg-white/70 p-3">
           <Button
             asChild
             className={cn(
