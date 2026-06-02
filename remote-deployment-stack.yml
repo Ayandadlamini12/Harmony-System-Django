@@ -52,6 +52,9 @@ services:
       KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-harmony-mis}
       KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-}
       KEYCLOAK_ALLOW_LOCAL_FALLBACK: ${KEYCLOAK_ALLOW_LOCAL_FALLBACK:-true}
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
+      KEYCLOAK_ACTION_EMAIL_LIFESPAN: ${KEYCLOAK_ACTION_EMAIL_LIFESPAN:-432000}
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&

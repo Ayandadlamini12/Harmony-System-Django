@@ -1,7 +1,11 @@
 from django.contrib.auth import get_user_model, password_validation
 from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.conf import settings
 from rest_framework import serializers
 
+from .emailing import send_user_account_created_email
+from .keycloak import KeycloakProvisioningError, keycloak_admin_enabled, upsert_keycloak_user
 from .models import ClinicianProfile, EmailDeliveryLog, EmployeeEnrollmentRequest, RoleModulePermission, SystemEmailSettings
 from .role_modules import ROLE_CHOICES, ROLE_MODULES
 
@@ -83,6 +87,7 @@ class UserSerializer(serializers.ModelSerializer):
         attrs["role"] = role
         return attrs
 
+    @transaction.atomic
     def create(self, validated_data):
         identity_type = validated_data.pop("identity_type", "employee")
         password = validated_data.pop("password", None)
@@ -94,6 +99,16 @@ class UserSerializer(serializers.ModelSerializer):
         else:
             user.set_unusable_password()
         user.save()
+        if settings.KEYCLOAK_ENABLED:
+            if not keycloak_admin_enabled():
+                raise serializers.ValidationError(
+                    {"keycloak": "Keycloak admin provisioning is not configured."}
+                )
+            try:
+                upsert_keycloak_user(user, temporary_password=password, send_password_email=True)
+            except KeycloakProvisioningError as exc:
+                raise serializers.ValidationError({"keycloak": str(exc)}) from exc
+        send_user_account_created_email(user)
         return user
 
     def update(self, instance, validated_data):

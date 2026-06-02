@@ -133,3 +133,34 @@ def send_enrollment_under_review_email(enrollment_request: EmployeeEnrollmentReq
     enrollment_request.review_email_error = ""
     enrollment_request.save(update_fields=["review_email_sent_at", "review_email_error", "updated_at"])
     return True
+
+
+def send_user_account_created_email(user) -> bool:
+    if not user.email:
+        return False
+
+    first_name = user.first_name or user.get_full_name() or "there"
+    body = (
+        f"Hello {first_name},\n\n"
+        "Your Harmony Health MIS account has been created.\n\n"
+        f"Your Harmony User ID is: {user.username.upper()}\n\n"
+        "You will receive a separate password setup email from Harmony Health authentication. "
+        "Use the User ID above when signing in after setting your password.\n\n"
+        "Sign-in page:\n"
+        f"{django_settings.HARMONY_PUBLIC_URL or 'https://mis.harmonyhealthsz.com'}/login\n\n"
+        "If you did not expect this account, please contact Harmony Health administration.\n\n"
+        "Regards,\n"
+        "Harmony Health MIS"
+    )
+
+    try:
+        send_system_email(
+            subject="Your Harmony Health MIS account details",
+            body=body,
+            to=[user.email],
+            template_key="user_account_created",
+            metadata={"user_id": user.id, "username": user.username},
+        )
+    except Exception:
+        return False
+    return True
