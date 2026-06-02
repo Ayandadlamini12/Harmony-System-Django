@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 const toneClasses = {
   default: "border-[#d5e3da] bg-[#f7fbf8] text-[var(--hh-purple-dark)]",
-  identity: "border-[#dcd2e8] bg-[#f8f1fb] text-[var(--hh-purple-dark)]",
+  identity: "border-[#cce4d1] bg-[#f2fbf4] text-[#225c2c]",
   contact: "border-[#cce4d1] bg-[#f2fbf4] text-[#1f6f32]",
   secure: "border-[#e5d4ef] bg-[#f8f0fb] text-[var(--hh-purple-dark)]",
   clinical: "border-[#d7e3dc] bg-[#f7fbf8] text-[#24302b]",
