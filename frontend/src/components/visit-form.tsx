@@ -30,6 +30,12 @@ function previousComplaint(visit?: Visit) {
   return visit?.initial_complaints || visit?.main_complaint || "";
 }
 
+function extractSubmitError(payload: unknown) {
+  if (!payload || typeof payload !== "object") return "The visit could not be saved.";
+  const record = payload as Record<string, unknown>;
+  return String(record.detail || record.error || "The visit could not be saved.");
+}
+
 export function VisitForm({
   patients,
   patientId,
@@ -275,8 +281,9 @@ export function VisitForm({
       toast.success("Visit saved");
       router.push("/visits");
     } else {
-      setError("save_failed");
-      toast.error("The visit could not be saved");
+      const message = extractSubmitError(data);
+      setError(message);
+      toast.error(message);
       setLoading(false);
     }
   }
@@ -314,7 +321,7 @@ export function VisitForm({
         </section>
       {error && (
         <div className="mb-5 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm font-semibold text-red-700">
-          The visit could not be saved. Choose a patient, visit date, and main complaint.
+          {error}
         </div>
       )}
 

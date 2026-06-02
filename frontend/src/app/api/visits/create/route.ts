@@ -1,28 +1,47 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 
-const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
+import { apiFetchWithAuth } from "@/lib/api-auth";
+
+function readableError(payload: unknown): string {
+  if (!payload) return "The visit could not be saved.";
+  if (typeof payload === "string") return payload;
+  if (Array.isArray(payload)) return payload.map(readableError).filter(Boolean).join(" ");
+  if (typeof payload !== "object") return String(payload);
+
+  const record = payload as Record<string, unknown>;
+  if (typeof record.detail === "string") return record.detail;
+  if (typeof record.error === "string") return record.error;
+
+  return Object.entries(record)
+    .map(([key, value]) => {
+      const message = readableError(value);
+      return message ? `${key.replaceAll("_", " ")}: ${message}` : "";
+    })
+    .filter(Boolean)
+    .join(" ");
+}
 
 export async function POST(request: Request) {
-  const accessToken = (await cookies()).get("harmony_access")?.value;
-  if (!accessToken) {
-    return NextResponse.json({ success: false, error: "unauthorized" }, { status: 401 });
-  }
-
   const body = await request.json();
 
-  const response = await fetch(`${API_BASE_URL}/visits/`, {
+  const response = await apiFetchWithAuth("/visits/", {
     method: "POST",
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      "Content-Type": "application/json"
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body)
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    return NextResponse.json({ success: false, error: errorText.slice(0, 180) }, { status: 400 });
+    const rawText = await response.text();
+    let parsed: unknown = rawText;
+    try {
+      parsed = JSON.parse(rawText);
+    } catch {
+      parsed = rawText;
+    }
+    return NextResponse.json(
+      { success: false, detail: readableError(parsed) || "The visit could not be saved." },
+      { status: response.status }
+    );
   }
 
   const data = await response.json();
