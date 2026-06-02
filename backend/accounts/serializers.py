@@ -31,6 +31,7 @@ def generate_harmony_user_id(identity_type: str) -> str:
 
 
 class UserSerializer(serializers.ModelSerializer):
+    username = serializers.CharField(required=False, allow_blank=True)
     name = serializers.CharField(source="get_full_name", read_only=True)
     password = serializers.CharField(write_only=True, required=False, min_length=8)
     avatar_url = serializers.SerializerMethodField()
