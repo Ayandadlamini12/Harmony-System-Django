@@ -1,0 +1,158 @@
+name: harmony
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: harmony-django-db
+    restart: always
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-harmony}
+      POSTGRES_USER: ${DB_USERNAME:-harmony}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - postgres_django_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USERNAME:-harmony} -d ${DB_DATABASE:-harmony}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - harmony-net
+
+  redis:
+    image: redis:7-alpine
+    container_name: harmony-django-redis
+    restart: always
+    networks:
+      - harmony-net
+
+  backend:
+    image: ghcr.io/ayandadlamini12/harmony-mis-backend:${IMAGE_TAG}
+    container_name: harmony-django-backend
+    restart: always
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: "false"
+      DJANGO_ALLOWED_HOSTS: ${APP_HOSTS}
+      DATABASE_URL: postgres://${DB_USERNAME:-harmony}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-harmony}
+      POSTGRES_DB: ${DB_DATABASE:-harmony}
+      POSTGRES_USER: ${DB_USERNAME:-harmony}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_HOST: postgres
+      POSTGRES_PORT: 5432
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+      HARMONY_WEBHOOK_SECRET: ${HARMONY_WEBHOOK_SECRET}
+      HARMONY_PUBLIC_URL: ${APP_URL}
+      KEYCLOAK_ENABLED: ${KEYCLOAK_ENABLED:-false}
+      KEYCLOAK_SERVER_URL: ${KEYCLOAK_SERVER_URL:-}
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-harmony-health}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID:-harmony-mis}
+      KEYCLOAK_CLIENT_SECRET: ${KEYCLOAK_CLIENT_SECRET:-}
+      KEYCLOAK_ALLOW_LOCAL_FALLBACK: ${KEYCLOAK_ALLOW_LOCAL_FALLBACK:-true}
+      KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
+      KEYCLOAK_ACTION_EMAIL_LIFESPAN: ${KEYCLOAK_ACTION_EMAIL_LIFESPAN:-432000}
+    command: >
+      sh -c "python manage.py migrate --noinput &&
+             python manage.py collectstatic --noinput &&
+             gunicorn config.wsgi:application --bind 0.0.0.0:8000"
+    volumes:
+      - backend_django_media:/app/media
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health/', timeout=3).read()"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    networks:
+      - harmony-net
+
+  celery:
+    image: ghcr.io/ayandadlamini12/harmony-mis-backend:${IMAGE_TAG}
+    container_name: harmony-django-celery
+    restart: always
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: "false"
+      DATABASE_URL: postgres://${DB_USERNAME:-harmony}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-harmony}
+      POSTGRES_DB: ${DB_DATABASE:-harmony}
+      POSTGRES_USER: ${DB_USERNAME:-harmony}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_HOST: postgres
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    command: celery -A config worker -l info
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - harmony-net
+
+  celery-beat:
+    image: ghcr.io/ayandadlamini12/harmony-mis-backend:${IMAGE_TAG}
+    container_name: harmony-django-beat
+    restart: always
+    environment:
+      DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
+      DJANGO_DEBUG: "false"
+      DATABASE_URL: postgres://${DB_USERNAME:-harmony}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-harmony}
+      POSTGRES_DB: ${DB_DATABASE:-harmony}
+      POSTGRES_USER: ${DB_USERNAME:-harmony}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_HOST: postgres
+      CELERY_BROKER_URL: redis://redis:6379/0
+      CELERY_RESULT_BACKEND: redis://redis:6379/1
+    command: celery -A config beat -l info
+    depends_on:
+      - backend
+      - redis
+    networks:
+      - harmony-net
+
+  frontend:
+    image: ghcr.io/ayandadlamini12/harmony-mis-frontend:${IMAGE_TAG}
+    container_name: harmony-django-frontend
+    restart: always
+    environment:
+      API_BASE_URL: http://backend:8000/api
+      NEXT_PUBLIC_API_BASE_URL: ${APP_URL}/api
+      APP_BASE_URL: ${APP_URL}
+      COOKIE_SECURE: "true"
+    ports:
+      - "${FRONTEND_PORT:-30001}:3000"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+    networks:
+      - harmony-net
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: cloudflared-harmony-django
+    restart: always
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      frontend:
+        condition: service_healthy
+    networks:
+      - harmony-net
+
+volumes:
+  postgres_django_data:
+  backend_django_media:
+
+networks:
+  harmony-net:
+    driver: bridge
