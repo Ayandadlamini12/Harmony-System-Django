@@ -15,8 +15,8 @@ function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRo
   const nav = allowedForRole(navItems, role);
 
   return (
-    <div className="flex h-full flex-col bg-[var(--hh-purple-dark)] text-white">
-      <div className="flex h-16 items-center gap-3 px-5">
+    <div className="flex h-full min-h-0 flex-col bg-[var(--hh-purple-dark)] text-white">
+      <div className="flex h-16 shrink-0 items-center gap-3 px-5">
         <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white/12">
           <img alt="" className="h-9 w-9 rounded-md object-cover" src="/brand/harmony-icon-sm.webp" />
         </div>
@@ -25,11 +25,11 @@ function SidebarContent({ name, role, onNavigate }: { name: string; role: UserRo
           <div className="text-xs text-white/70">Clinic system</div>
         </div>
       </div>
-      <div className="mx-3 mb-3 rounded-lg bg-white/8 px-3 py-3">
+      <div className="mx-3 mb-3 shrink-0 rounded-lg bg-white/8 px-3 py-3">
         <div className="text-sm font-bold">{name}</div>
         <div className="mt-1 text-xs capitalize text-white/65">{role} workspace</div>
       </div>
-      <nav className="grid gap-1 px-3">
+      <nav className="grid min-h-0 flex-1 gap-1 overflow-y-auto overscroll-contain px-3 pb-5 pr-2 [scrollbar-gutter:stable]">
         {nav.map((item) => {
           const Icon = item.icon;
           const children = item.children ? allowedForRole(item.children, role) : [];
@@ -114,7 +114,7 @@ export function MobileSidebar({ name, role }: { name: string; role: UserRole }) 
         </SheetTrigger>
       </div>
 
-      <SheetContent className="lg:hidden">
+      <SheetContent className="lg:hidden overflow-hidden">
         <SheetTitle className="sr-only">Navigation menu</SheetTitle>
         <SheetClose className="absolute right-3 top-3 z-10 inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white/10 text-white">
           <X size={18} />

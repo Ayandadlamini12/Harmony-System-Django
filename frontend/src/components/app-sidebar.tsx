@@ -151,7 +151,7 @@ function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: s
         </div>
 
         <TooltipProvider delayDuration={150}>
-          <nav className="flex-1 space-y-1 p-3">
+          <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-3 pr-2 [scrollbar-gutter:stable]">
             {nav.map((item) => {
               const Icon = item.icon;
               const children = item.children ? allowedForRole(item.children, role) : [];
