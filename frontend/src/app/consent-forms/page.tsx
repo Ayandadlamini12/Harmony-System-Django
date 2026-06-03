@@ -22,8 +22,7 @@ const consentStatusColors: Record<string, string> = {
 
 export default async function ConsentFormsPage() {
   const session = await getSessionUser();
-  const data = await getConsentForms();
-  const patients = data.results;
+  const patients = await getConsentForms();
 
   return (
     <AppShell title="Consent Forms">

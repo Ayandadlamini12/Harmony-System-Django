@@ -164,12 +164,7 @@ export function getMyClinicianProfile() {
 }
 
 export function getConsentForms() {
-  return apiGet<Paginated<Patient>>("/patients/consent-forms/", {
-    count: 0,
-    next: null,
-    previous: null,
-    results: []
-  });
+  return apiGet<Patient[]>("/patients/consent-forms/", []);
 }
 
 export function getEmployeeEnrollmentRequests(status = "") {
