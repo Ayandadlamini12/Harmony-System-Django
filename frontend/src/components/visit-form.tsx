@@ -23,6 +23,13 @@ type SymptomProblemRow = {
   status: "open" | "resolved";
 };
 
+type RemedyRow = {
+  key: string;
+  name: string;
+  instructions: string;
+  reason: string;
+};
+
 function formatDate(text?: string | null) {
   if (!text) return "--";
   return new Intl.DateTimeFormat("en", { day: "numeric", month: "short", year: "numeric" }).format(new Date(text));
@@ -59,6 +66,9 @@ export function VisitForm({
   const [symptomProblems, setSymptomProblems] = useState<SymptomProblemRow[]>([
     { key: "new-0", description: "", note: "", status: "open" }
   ]);
+  const [remedies, setRemedies] = useState<RemedyRow[]>([
+    { key: "new-rem-0", name: "", instructions: "", reason: "" }
+  ]);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
 
   const searchParams = useSearchParams();
@@ -75,6 +85,7 @@ export function VisitForm({
       if (parsed.visitType) setVisitType(parsed.visitType);
       if (parsed.mainComplaint) setMainComplaint(parsed.mainComplaint);
       if (parsed.symptomProblems) setSymptomProblems(parsed.symptomProblems);
+      if (parsed.remedies) setRemedies(parsed.remedies);
       if (typeof parsed.activeStepIndex === "number") {
         setActiveStepIndex(parsed.activeStepIndex);
       }
@@ -116,6 +127,7 @@ export function VisitForm({
     const isDirty =
       mainComplaint.trim().length > 0 ||
       symptomProblems.some((p) => p.description.trim().length > 0) ||
+      remedies.some((r) => r.name.trim().length > 0) ||
       Object.entries(fields).some(([key, val]) => {
         if (["patient", "visit_type", "visit_date", "visit_time"].includes(key)) return false;
         return val.trim().length > 0;
@@ -128,6 +140,7 @@ export function VisitForm({
       selectedPatientId,
       mainComplaint,
       symptomProblems,
+      remedies,
       activeStepIndex,
       timestamp: new Date().toISOString(),
       formFields: fields
@@ -319,17 +332,47 @@ export function VisitForm({
         .filter(Boolean)
         .join(", ");
 
+    const compiledRemedy = remedies
+      .filter((r) => r.name.trim())
+      .map((r) => `• ${r.name.trim()}${r.instructions.trim() ? `\n  Instructions: ${r.instructions.trim()}` : ""}`)
+      .join("\n\n");
+
+    const compiledReason = remedies
+      .filter((r) => r.name.trim() && r.reason.trim())
+      .map((r) => `• ${r.name.trim()}:\n  ${r.reason.trim()}`)
+      .join("\n\n");
+
+    const practitionerEvaluationNote = val("practitioner_evaluation_note");
+
+    const compiledEvaluationNotes = isFollowUp
+      ? [
+          "--- SYMPTOM OUTCOMES ---",
+          ...symptom_problem_updates.map((p) => `${p.status === "resolved" ? "✓" : "⚡"} ${p.description}: ${p.status}\n  ${p.note}`),
+          "",
+          "--- VITALS & ENERGY ---",
+          `Energy: ${val("energy_since_remedy_score")}/10 - ${val("energy_since_remedy")}`,
+          `Appetite: ${val("appetite_since_remedy_score")}/10 - ${val("appetite_since_remedy")}`,
+          `Sleep: ${val("sleep_since_remedy_score")}/10 - ${val("sleep_since_remedy")}`,
+          `Mental State: ${val("mental_since_remedy_score")}/10 - ${val("mental_since_remedy")}`,
+          "",
+          "--- CLINICIAN OVERVIEW ---",
+          practitionerEvaluationNote || "No additional overview provided."
+        ]
+          .filter(Boolean)
+          .join("\n")
+      : "";
+
     const body = {
       patient: Number(val("patient")),
       visit_type: val("visit_type") || "new_consultation",
       visit_date: val("visit_date"),
       visit_time: val("visit_time") || null,
       main_complaint: complaintSummary,
-      initial_complaints: isFollowUp ? "" : val("initial_complaints"),
+      initial_complaints: "",
       physical_examination: val("physical_examination"),
       diagnosis: val("diagnosis"),
-      remedy: val("remedy"),
-      reason_for_remedy: val("reason_for_remedy"),
+      remedy: compiledRemedy,
+      reason_for_remedy: compiledReason,
       dietary_recommendation: val("dietary_recommendation"),
       lifestyle_recommendation: val("lifestyle_recommendation"),
       digestive_review: {
@@ -387,7 +430,7 @@ export function VisitForm({
         mental_state: val("mental_state")
       },
       follow_up_review: {
-        evaluation_previous_complaint: val("evaluation_previous_complaint"),
+        evaluation_previous_complaint: "",
         energy_since_remedy_score: val("energy_since_remedy_score"),
         energy_since_remedy: val("energy_since_remedy"),
         appetite_since_remedy_score: val("appetite_since_remedy_score"),
@@ -401,12 +444,12 @@ export function VisitForm({
       ...(isFollowUp
         ? {
             follow_up_evaluation: {
-              previous_consult_symptoms: val("previous_consult_symptoms"),
+              previous_consult_symptoms: "",
               dietary_changes: val("dietary_changes"),
               lifestyle_changes: val("lifestyle_changes"),
               exercise_notes: "",
               energy_notes: val("energy_since_remedy"),
-              evaluation_notes: val("evaluation_previous_complaint")
+              evaluation_notes: compiledEvaluationNotes
             }
           }
         : {})
@@ -451,6 +494,24 @@ export function VisitForm({
     setSymptomProblems((current) => {
       const next = current.filter((problem) => problem.key !== key);
       return next.length > 0 ? next : [{ key: "new-0", description: "", note: "", status: "open" }];
+    });
+  }
+
+  function updateRemedy(key: string, patch: Partial<RemedyRow>) {
+    setRemedies((current) => current.map((r) => (r.key === key ? { ...r, ...patch } : r)));
+  }
+
+  function addRemedy() {
+    setRemedies((current) => [
+      ...current,
+      { key: `new-rem-${Date.now()}-${current.length}`, name: "", instructions: "", reason: "" }
+    ]);
+  }
+
+  function removeRemedy(key: string) {
+    setRemedies((current) => {
+      const next = current.filter((r) => r.key !== key);
+      return next.length > 0 ? next : [{ key: "new-rem-0", name: "", instructions: "", reason: "" }];
     });
   }
 
@@ -802,8 +863,48 @@ export function VisitForm({
                 {remedyEvaluations.map((row) => (
                   <tr key={row.id} className="border-t border-[var(--hh-border)]">
                     <td className="px-3 py-3">{formatDate(row.date)}</td>
-                    <td className="px-3 py-3">{row.remedy}</td>
-                    <td className="px-3 py-3">{row.evaluation}</td>
+                    <td className="px-3 py-3">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button type="button" variant="secondary" size="sm" className="text-xs gap-1.5">
+                            <Eye size={14} />
+                            View Remedy
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="w-[min(94vw,600px)]">
+                          <div className="border-b border-[var(--hh-border)] px-5 py-4 pr-14">
+                            <DialogTitle className="text-lg font-bold text-[var(--hh-purple-dark)]">Remedy Details</DialogTitle>
+                            <DialogDescription className="mt-1 text-sm text-[#66736d]">
+                              Visit on {formatDate(row.date)}
+                            </DialogDescription>
+                          </div>
+                          <div className="p-5">
+                            <div className="whitespace-pre-wrap text-sm leading-6 text-[#1f2933] rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4">{row.remedy}</div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </td>
+                    <td className="px-3 py-3">
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button type="button" variant="secondary" size="sm" className="text-xs gap-1.5">
+                            <Eye size={14} />
+                            View Progress
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent className="w-[min(94vw,600px)]">
+                          <div className="border-b border-[var(--hh-border)] px-5 py-4 pr-14">
+                            <DialogTitle className="text-lg font-bold text-[var(--hh-purple-dark)]">Progress Summary</DialogTitle>
+                            <DialogDescription className="mt-1 text-sm text-[#66736d]">
+                              Visit on {formatDate(row.date)}
+                            </DialogDescription>
+                          </div>
+                          <div className="p-5">
+                            <div className="whitespace-pre-wrap text-sm leading-6 text-[#1f2933] rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4">{row.evaluation}</div>
+                          </div>
+                        </DialogContent>
+                      </Dialog>
+                    </td>
                   </tr>
                 ))}
                 {remedyEvaluations.length === 0 && (
@@ -823,18 +924,14 @@ export function VisitForm({
         <FormSectionHeader className="mb-4" icon={FileText} title={isFollowUp ? "Evaluation (follow up)" : "Clinical notes"} description={isFollowUp ? "Record response to previous remedy and changes since the last consult." : "Capture examination, diagnosis, remedy, and recommendations."} tone="notes" />
         {isFollowUp ? (
           <div className="grid gap-4 md:grid-cols-2">
-            <label>
-              <span className="hh-label">Symptoms of previous consult</span>
-              <textarea className="hh-input min-h-28" name="previous_consult_symptoms" defaultValue={initialValues["previous_consult_symptoms"] || ""} />
-            </label>
-            <label>
-              <span className="hh-label">Evaluation on previous complaint</span>
-              <textarea className="hh-input min-h-28" name="evaluation_previous_complaint" placeholder="New symptoms that may have appeared since remedy" defaultValue={initialValues["evaluation_previous_complaint"] || ""} />
-            </label>
             <ScaleWithNote name="energy_since_remedy" scoreName="energy_since_remedy_score" label="Energy since remedy" minLabel="Worse" maxLabel="Much better" placeholder="Any changes since remedy: how, when, and how much" scoreDefaultValue={initialValues["energy_since_remedy_score"] ? Number(initialValues["energy_since_remedy_score"]) : 5} noteDefaultValue={initialValues["energy_since_remedy"] || ""} />
             <ScaleWithNote name="appetite_since_remedy" scoreName="appetite_since_remedy_score" label="Appetite since remedy" minLabel="Worse" maxLabel="Much better" scoreDefaultValue={initialValues["appetite_since_remedy_score"] ? Number(initialValues["appetite_since_remedy_score"]) : 5} noteDefaultValue={initialValues["appetite_since_remedy"] || ""} />
             <ScaleWithNote name="sleep_since_remedy" scoreName="sleep_since_remedy_score" label="Sleep since remedy" minLabel="Worse" maxLabel="Much better" scoreDefaultValue={initialValues["sleep_since_remedy_score"] ? Number(initialValues["sleep_since_remedy_score"]) : 5} noteDefaultValue={initialValues["sleep_since_remedy"] || ""} />
             <ScaleWithNote name="mental_since_remedy" scoreName="mental_since_remedy_score" label="Mental state since remedy" minLabel="Worse" maxLabel="Much better" placeholder="How have they been feeling after the remedy?" scoreDefaultValue={initialValues["mental_since_remedy_score"] ? Number(initialValues["mental_since_remedy_score"]) : 5} noteDefaultValue={initialValues["mental_since_remedy"] || ""} />
+            <label className="md:col-span-2">
+              <span className="hh-label">Practitioner evaluation note</span>
+              <textarea className="hh-input min-h-28" name="practitioner_evaluation_note" placeholder="Your overall clinical impression of the patient's response to previous treatment and current status" defaultValue={initialValues["practitioner_evaluation_note"] || ""} />
+            </label>
             <label>
               <span className="hh-label">Dietary changes</span>
               <textarea className="hh-input min-h-20" name="dietary_changes" defaultValue={initialValues["dietary_changes"] || ""} />
@@ -847,10 +944,6 @@ export function VisitForm({
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
             <label>
-              <span className="hh-label">Initial complaints</span>
-              <textarea className="hh-input min-h-28" name="initial_complaints" defaultValue={initialValues["initial_complaints"] || ""} />
-            </label>
-            <label>
               <span className="hh-label">Physical examination</span>
               <textarea className="hh-input min-h-28" name="physical_examination" defaultValue={initialValues["physical_examination"] || ""} />
             </label>
@@ -858,14 +951,63 @@ export function VisitForm({
               <span className="hh-label">Diagnosis</span>
               <textarea className="hh-input min-h-28" name="diagnosis" defaultValue={initialValues["diagnosis"] || ""} />
             </label>
-            <label>
-              <span className="hh-label">Remedy</span>
-              <textarea className="hh-input min-h-28" name="remedy" defaultValue={initialValues["remedy"] || ""} />
-            </label>
-            <label>
-              <span className="hh-label">Reason for remedy</span>
-              <textarea className="hh-input min-h-28" name="reason_for_remedy" defaultValue={initialValues["reason_for_remedy"] || ""} />
-            </label>
+            <div className="md:col-span-2">
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-bold uppercase text-[#66736d]">
+                    <ClipboardList size={17} className="text-[var(--hh-purple)]" />
+                    Remedies
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-[#53605a]">
+                    Add each remedy as its own item with instructions and reason.
+                  </p>
+                </div>
+                <Button type="button" variant="secondary" onClick={addRemedy}>
+                  <Plus size={16} />
+                  Add remedy
+                </Button>
+              </div>
+              <div className="grid gap-3">
+                {remedies.map((remedy, index) => (
+                  <div key={remedy.key} className="rounded-lg border border-[var(--hh-border-strong)] bg-white p-3 shadow-sm">
+                    <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                      <label>
+                        <span className="hh-label">Remedy {index + 1}</span>
+                        <input
+                          className="hh-input"
+                          value={remedy.name}
+                          onChange={(e) => updateRemedy(remedy.key, { name: e.currentTarget.value })}
+                          placeholder="e.g. Pulsatilla 30C"
+                        />
+                      </label>
+                      <label>
+                        <span className="hh-label">Reason</span>
+                        <input
+                          className="hh-input"
+                          value={remedy.reason}
+                          onChange={(e) => updateRemedy(remedy.key, { reason: e.currentTarget.value })}
+                          placeholder="Why this remedy was chosen"
+                        />
+                      </label>
+                      <div className="flex md:pt-6">
+                        <Button type="button" variant="ghost" onClick={() => removeRemedy(remedy.key)} aria-label="Remove remedy">
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    </div>
+                    <label className="mt-2 block">
+                      <span className="hh-label">Instructions</span>
+                      <input
+                        className="hh-input"
+                        value={remedy.instructions}
+                        onChange={(e) => updateRemedy(remedy.key, { instructions: e.currentTarget.value })}
+                        placeholder="e.g. 3 pellets dry on tongue, twice daily"
+                      />
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
             <label>
               <span className="hh-label">Dietary recommendation</span>
               <textarea className="hh-input min-h-28" name="dietary_recommendation" defaultValue={initialValues["dietary_recommendation"] || ""} />
@@ -890,14 +1032,63 @@ export function VisitForm({
               <span className="hh-label">New diagnosis</span>
               <textarea className="hh-input min-h-28" name="diagnosis" defaultValue={initialValues["diagnosis"] || ""} />
             </label>
-            <label>
-              <span className="hh-label">New remedy</span>
-              <textarea className="hh-input min-h-28" name="remedy" defaultValue={initialValues["remedy"] || ""} />
-            </label>
-            <label>
-              <span className="hh-label">Reason for remedy</span>
-              <textarea className="hh-input min-h-28" name="reason_for_remedy" defaultValue={initialValues["reason_for_remedy"] || ""} />
-            </label>
+            <div className="md:col-span-2">
+              <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="flex items-center gap-2 text-sm font-bold uppercase text-[#66736d]">
+                    <ClipboardList size={17} className="text-[var(--hh-purple)]" />
+                    Remedies
+                  </div>
+                  <p className="mt-1 text-sm leading-6 text-[#53605a]">
+                    Add each remedy as its own item with instructions and reason.
+                  </p>
+                </div>
+                <Button type="button" variant="secondary" onClick={addRemedy}>
+                  <Plus size={16} />
+                  Add remedy
+                </Button>
+              </div>
+              <div className="grid gap-3">
+                {remedies.map((remedy, index) => (
+                  <div key={remedy.key} className="rounded-lg border border-[var(--hh-border-strong)] bg-white p-3 shadow-sm">
+                    <div className="grid gap-3 md:grid-cols-[1fr_1fr_auto]">
+                      <label>
+                        <span className="hh-label">Remedy {index + 1}</span>
+                        <input
+                          className="hh-input"
+                          value={remedy.name}
+                          onChange={(e) => updateRemedy(remedy.key, { name: e.currentTarget.value })}
+                          placeholder="e.g. Pulsatilla 30C"
+                        />
+                      </label>
+                      <label>
+                        <span className="hh-label">Reason</span>
+                        <input
+                          className="hh-input"
+                          value={remedy.reason}
+                          onChange={(e) => updateRemedy(remedy.key, { reason: e.currentTarget.value })}
+                          placeholder="Why this remedy was chosen"
+                        />
+                      </label>
+                      <div className="flex md:pt-6">
+                        <Button type="button" variant="ghost" onClick={() => removeRemedy(remedy.key)} aria-label="Remove remedy">
+                          <Trash2 size={16} />
+                        </Button>
+                      </div>
+                    </div>
+                    <label className="mt-2 block">
+                      <span className="hh-label">Instructions</span>
+                      <input
+                        className="hh-input"
+                        value={remedy.instructions}
+                        onChange={(e) => updateRemedy(remedy.key, { instructions: e.currentTarget.value })}
+                        placeholder="e.g. 3 pellets dry on tongue, twice daily"
+                      />
+                    </label>
+                  </div>
+                ))}
+              </div>
+            </div>
             <label>
               <span className="hh-label">Dietary recommendation</span>
               <textarea className="hh-input min-h-28" name="dietary_recommendation" defaultValue={initialValues["dietary_recommendation"] || ""} />
