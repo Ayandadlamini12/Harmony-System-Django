@@ -33,7 +33,7 @@ services:
     environment:
       DJANGO_SECRET_KEY: ${DJANGO_SECRET_KEY}
       DJANGO_DEBUG: "false"
-      DJANGO_ALLOWED_HOSTS: ${APP_HOSTS}
+      DJANGO_ALLOWED_HOSTS: ${APP_HOSTS:-mis.harmonyhealthsz.com,localhost,127.0.0.1,backend}
       DATABASE_URL: postgres://${DB_USERNAME:-harmony}:${DB_PASSWORD}@postgres:5432/${DB_DATABASE:-harmony}
       POSTGRES_DB: ${DB_DATABASE:-harmony}
       POSTGRES_USER: ${DB_USERNAME:-harmony}

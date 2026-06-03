@@ -1,9 +1,10 @@
 "use client";
 
 import { CalendarCheck, Check, ChevronLeft, ChevronRight, ClipboardList, Eye, FileText, HeartPulse, Plus, Save, Trash2, X } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { getDraftKey, isDraftExpired } from "@/lib/draft-utils";
 
 import { FormStepWheel } from "@/components/form-step-wheel";
 import { FormSectionHeader } from "@/components/form-section-header";
@@ -59,6 +60,146 @@ export function VisitForm({
     { key: "new-0", description: "", note: "", status: "open" }
   ]);
   const [activeStepIndex, setActiveStepIndex] = useState(0);
+
+  const searchParams = useSearchParams();
+  const [formKey, setFormKey] = useState(0);
+  const [initialValues, setInitialValues] = useState<Record<string, string>>({});
+  const [draftTime, setDraftTime] = useState<string | null>(null);
+  const [showRestoreBanner, setShowRestoreBanner] = useState(false);
+  const [lastSavedText, setLastSavedText] = useState<string | null>(null);
+  const autoSaveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  function performRestore(parsed: any) {
+    if (!parsed) return;
+    try {
+      if (parsed.visitType) setVisitType(parsed.visitType);
+      if (parsed.mainComplaint) setMainComplaint(parsed.mainComplaint);
+      if (parsed.symptomProblems) setSymptomProblems(parsed.symptomProblems);
+      if (typeof parsed.activeStepIndex === "number") {
+        setActiveStepIndex(parsed.activeStepIndex);
+      }
+      if (parsed.formFields) {
+        setInitialValues(parsed.formFields);
+        setFormKey((key) => key + 1);
+      }
+      setShowRestoreBanner(false);
+      const timeStr = parsed.timestamp ? new Date(parsed.timestamp).toLocaleTimeString() : "";
+      setLastSavedText(`Draft restored (saved ${timeStr})`);
+      toast.success("Visit draft restored");
+    } catch (err) {
+      console.error("Error restoring draft:", err);
+      toast.error("Failed to restore draft");
+    }
+  }
+
+  function handleDiscardDraft() {
+    if (typeof window === "undefined") return;
+    const draftKey = getDraftKey(selectedPatientId);
+    localStorage.removeItem(draftKey);
+    setShowRestoreBanner(false);
+    setDraftTime(null);
+    setLastSavedText(null);
+    toast.success("Draft discarded");
+  }
+
+  function saveDraftToLocalStorage(formElement: HTMLFormElement, isManual = false) {
+    if (typeof window === "undefined") return;
+
+    const form = new FormData(formElement);
+    const fields: Record<string, string> = {};
+    form.forEach((value, key) => {
+      if (typeof value === "string") {
+        fields[key] = value;
+      }
+    });
+
+    const isDirty =
+      mainComplaint.trim().length > 0 ||
+      symptomProblems.some((p) => p.description.trim().length > 0) ||
+      Object.entries(fields).some(([key, val]) => {
+        if (["patient", "visit_type", "visit_date", "visit_time"].includes(key)) return false;
+        return val.trim().length > 0;
+      });
+
+    if (!isDirty && !isManual) return;
+
+    const draftPayload = {
+      visitType,
+      selectedPatientId,
+      mainComplaint,
+      symptomProblems,
+      activeStepIndex,
+      timestamp: new Date().toISOString(),
+      formFields: fields
+    };
+
+    const draftKey = getDraftKey(selectedPatientId);
+    localStorage.setItem(draftKey, JSON.stringify(draftPayload));
+
+    const timeString = new Date().toLocaleTimeString();
+    setLastSavedText(`Draft auto-saved at ${timeString}`);
+
+    if (isManual) {
+      toast.success(`Draft saved successfully at ${timeString}!`);
+    }
+  }
+
+  function handleFormChange(e: React.FormEvent<HTMLFormElement>) {
+    if (typeof window === "undefined") return;
+    if (autoSaveTimeoutRef.current) {
+      clearTimeout(autoSaveTimeoutRef.current);
+    }
+    const currentForm = e.currentTarget;
+    autoSaveTimeoutRef.current = setTimeout(() => {
+      saveDraftToLocalStorage(currentForm, false);
+    }, 1500);
+  }
+
+  function handleManualSave() {
+    const formElement = document.getElementById("visit-creation-form") as HTMLFormElement;
+    if (formElement) {
+      saveDraftToLocalStorage(formElement, true);
+    } else {
+      toast.error("Could not locate form element to save");
+    }
+  }
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const draftKey = getDraftKey(selectedPatientId);
+    const saved = localStorage.getItem(draftKey);
+
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.timestamp && !isDraftExpired(parsed.timestamp)) {
+          const shouldAutoRestore = searchParams.get("restore") === "1";
+          if (shouldAutoRestore) {
+            performRestore(parsed);
+          } else {
+            setDraftTime(parsed.timestamp);
+            setShowRestoreBanner(true);
+          }
+        } else if (parsed && isDraftExpired(parsed.timestamp)) {
+          localStorage.removeItem(draftKey);
+        }
+      } catch (err) {
+        console.error("Failed to parse visit draft:", err);
+      }
+    } else {
+      setShowRestoreBanner(false);
+      setDraftTime(null);
+    }
+  }, [selectedPatientId, searchParams]);
+
+  useEffect(() => {
+    return () => {
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, []);
   const today = new Date().toISOString().slice(0, 10);
   const isFollowUp = visitType === "follow_up";
   const selectedPatient = patientDetail || patients.find((patient) => String(patient.id) === selectedPatientId) || null;
@@ -279,6 +420,9 @@ export function VisitForm({
 
     const data = await res.json();
     if (data.success) {
+      if (typeof window !== "undefined") {
+        localStorage.removeItem(getDraftKey(selectedPatientId));
+      }
       toast.success("Visit saved");
       router.push("/visits");
     } else {
@@ -311,8 +455,46 @@ export function VisitForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-6">
+    <form id="visit-creation-form" key={formKey} onSubmit={handleSubmit} onChange={handleFormChange} className="grid gap-6">
       <FormStepWheel steps={visitSteps} activeIndex={activeStepIndex} setActiveIndex={setActiveStepIndex} />
+
+      {showRestoreBanner && draftTime && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 animate-fade-in">
+          <div className="flex items-start gap-3">
+            <ClipboardList className="text-amber-600 mt-0.5 shrink-0" size={20} />
+            <div>
+              <div className="font-bold text-amber-950">Draft visit found!</div>
+              <p className="text-sm mt-0.5 text-amber-800">
+                We found an unsaved draft of this visit/case from {new Date(draftTime).toLocaleString()}. Would you like to restore it and resume where you left off?
+              </p>
+            </div>
+          </div>
+          <div className="flex gap-2 shrink-0 sm:self-center">
+            <Button
+              type="button"
+              variant="secondary"
+              size="sm"
+              onClick={() => {
+                const draftKey = getDraftKey(selectedPatientId);
+                const saved = localStorage.getItem(draftKey);
+                if (saved) performRestore(JSON.parse(saved));
+              }}
+              className="border-amber-300 bg-white text-amber-900 hover:bg-amber-100 hover:text-amber-950 font-bold"
+            >
+              Restore Draft
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={handleDiscardDraft}
+              className="text-amber-800 hover:bg-amber-100 hover:text-amber-950"
+            >
+              Discard
+            </Button>
+          </div>
+        </div>
+      )}
       <div className="grid gap-6">
         <section className="hh-panel p-4">
           <FormSectionHeader
@@ -353,11 +535,11 @@ export function VisitForm({
           </label>
           <label>
             <span className="hh-label">Visit date</span>
-            <input className="hh-input" name="visit_date" type="date" defaultValue={today} required />
+            <input className="hh-input" name="visit_date" type="date" defaultValue={initialValues["visit_date"] || today} required />
           </label>
           <label>
             <span className="hh-label">Visit time</span>
-            <input className="hh-input" name="visit_time" type="time" />
+            <input className="hh-input" name="visit_time" type="time" defaultValue={initialValues["visit_time"] || ""} />
           </label>
           <label className="md:col-span-2">
             <span className="hh-label">{isFollowUp ? "Previous complaint / case" : "Main complaint"}</span>
@@ -440,14 +622,29 @@ export function VisitForm({
         <section className={activeStep.id === "digestive" ? "hh-panel p-5" : "hidden"}>
           <FormSectionHeader className="mb-4" icon={ClipboardList} title="Digestive review" description="GI, appetite, thirst, cravings, and aggravation." tone="clinical" />
           <div className="grid gap-4 md:grid-cols-2">
-            <label><span className="hh-label">Gastrointestinal</span><textarea className="hh-input min-h-24" name="gastrointestinal" placeholder="Indigestion, heartburn, cramps, flatulence, aversions" /></label>
-            <SelectField name="appetite_status" label="Appetite" options={["", "Increased", "Decreased", "Normal"]} />
-            <label><span className="hh-label">Appetite note</span><input className="hh-input" name="appetite_note" /></label>
-            <SelectField name="thirst_status" label="Thirst" options={["", "Increased", "Decreased", "Normal"]} />
-            <label><span className="hh-label">Thirst note</span><input className="hh-input" name="thirst_note" /></label>
-            <SelectField name="cravings_present" label="Cravings" options={["", "No", "Yes"]} />
-            <label><span className="hh-label">Cravings note</span><input className="hh-input" name="cravings_note" /></label>
-            <label><span className="hh-label">Aggravation</span><textarea className="hh-input min-h-20" name="aggravation" /></label>
+            <label>
+              <span className="hh-label">Gastrointestinal</span>
+              <textarea className="hh-input min-h-24" name="gastrointestinal" placeholder="Indigestion, heartburn, cramps, flatulence, aversions" defaultValue={initialValues["gastrointestinal"] || ""} />
+            </label>
+            <SelectField name="appetite_status" label="Appetite" options={["", "Increased", "Decreased", "Normal"]} defaultValue={initialValues["appetite_status"] || ""} />
+            <label>
+              <span className="hh-label">Appetite note</span>
+              <input className="hh-input" name="appetite_note" defaultValue={initialValues["appetite_note"] || ""} />
+            </label>
+            <SelectField name="thirst_status" label="Thirst" options={["", "Increased", "Decreased", "Normal"]} defaultValue={initialValues["thirst_status"] || ""} />
+            <label>
+              <span className="hh-label">Thirst note</span>
+              <input className="hh-input" name="thirst_note" defaultValue={initialValues["thirst_note"] || ""} />
+            </label>
+            <SelectField name="cravings_present" label="Cravings" options={["", "No", "Yes"]} defaultValue={initialValues["cravings_present"] || ""} />
+            <label>
+              <span className="hh-label">Cravings note</span>
+              <input className="hh-input" name="cravings_note" defaultValue={initialValues["cravings_note"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Aggravation</span>
+              <textarea className="hh-input min-h-20" name="aggravation" defaultValue={initialValues["aggravation"] || ""} />
+            </label>
           </div>
         </section>
       )}
@@ -456,11 +653,23 @@ export function VisitForm({
         <section className={activeStep.id === "elimination" ? "hh-panel p-5" : "hidden"}>
           <FormSectionHeader className="mb-4" icon={HeartPulse} title="Bowel and urinary review" description="Bowel function, urination frequency, urgency, and pain." tone="vitals" />
           <div className="grid gap-4 md:grid-cols-2">
-            <label><span className="hh-label">Bowel function</span><textarea className="hh-input min-h-24" name="bowel_function" placeholder="Constipation, diarrhea, hemorrhoids" /></label>
-            <label><span className="hh-label">Urination frequency per day</span><input className="hh-input" name="urination_frequency_per_day" type="number" min="0" /></label>
-            <label><span className="hh-label">Urination urgency</span><input className="hh-input" name="urination_urgency" /></label>
-            <SelectField name="urination_pain" label="Urination pain" options={["", "No", "Yes"]} />
-            <label><span className="hh-label">Urination pain note</span><input className="hh-input" name="urination_pain_note" /></label>
+            <label>
+              <span className="hh-label">Bowel function</span>
+              <textarea className="hh-input min-h-24" name="bowel_function" placeholder="Constipation, diarrhea, hemorrhoids" defaultValue={initialValues["bowel_function"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Urination frequency per day</span>
+              <input className="hh-input" name="urination_frequency_per_day" type="number" min="0" defaultValue={initialValues["urination_frequency_per_day"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Urination urgency</span>
+              <input className="hh-input" name="urination_urgency" defaultValue={initialValues["urination_urgency"] || ""} />
+            </label>
+            <SelectField name="urination_pain" label="Urination pain" options={["", "No", "Yes"]} defaultValue={initialValues["urination_pain"] || ""} />
+            <label>
+              <span className="hh-label">Urination pain note</span>
+              <input className="hh-input" name="urination_pain_note" defaultValue={initialValues["urination_pain_note"] || ""} />
+            </label>
           </div>
         </section>
       )}
@@ -471,39 +680,96 @@ export function VisitForm({
           <div className="grid gap-4 md:grid-cols-2">
             {shouldCaptureReproductiveReview && (
               <>
-                <label><span className="hh-label">Menstruation duration of cycle (days)</span><input className="hh-input" name="menstruation_duration_days" type="number" min="0" /></label>
-                <SelectField name="menstruation_regular" label="Regular cycle" options={["", "Yes", "No"]} />
-                <label><span className="hh-label">Irregular cycle note</span><input className="hh-input" name="menstruation_regular_note" /></label>
-                <SelectField name="menstruation_volume" label="Volume" options={["", "Light", "Heavy", "Normal"]} />
-                <label><span className="hh-label">Volume note</span><input className="hh-input" name="menstruation_volume_note" /></label>
-                <SelectField name="menstruation_color" label="Color" options={["", "Bright red", "Red-red", "Dark red", "Other"]} />
-                <label><span className="hh-label">Color other / note</span><input className="hh-input" name="menstruation_color_other" /></label>
-                <SelectField name="menstruation_consistency" label="Consistency concern" options={["", "No", "Yes"]} />
-                <label><span className="hh-label">Consistency note</span><input className="hh-input" name="menstruation_consistency_note" /></label>
-                <ScaleField name="menstruation_pain_scale" label="Pain scale" minLabel="No pain" maxLabel="Worst pain" />
-                <label><span className="hh-label">Pain note</span><input className="hh-input" name="menstruation_pain_note" /></label>
-                <label><span className="hh-label">Concomitants</span><input className="hh-input" name="concomitants" /></label>
-                <label><span className="hh-label">Menarche age</span><input className="hh-input" name="menarche_age" type="number" min="0" /></label>
-                <label><span className="hh-label">PMS symptoms</span><textarea className="hh-input min-h-20" name="pms_symptoms" /></label>
-                <label><span className="hh-label">Pregnancies</span><input className="hh-input" name="pregnancies" type="number" min="0" /></label>
-                <label><span className="hh-label">Menopause</span><textarea className="hh-input min-h-20" name="menopause" /></label>
-                <SelectField name="genitals_eruption" label="Genital eruption" options={["", "No", "Yes"]} />
-                <label><span className="hh-label">Eruption note</span><input className="hh-input" name="genitals_eruption_note" /></label>
-                <SelectField name="genitals_discharge" label="Genital discharge" options={["", "No", "Yes"]} />
-                <label><span className="hh-label">Discharge note</span><input className="hh-input" name="genitals_discharge_note" /></label>
-                <SelectField name="genitals_infections" label="Genital infections" options={["", "No", "Yes"]} />
-                <label><span className="hh-label">Sexual activity</span><textarea className="hh-input min-h-20" name="sexual_activity" placeholder="Libido, STI history, relevant notes" /></label>
+                <label>
+                  <span className="hh-label">Menstruation duration of cycle (days)</span>
+                  <input className="hh-input" name="menstruation_duration_days" type="number" min="0" defaultValue={initialValues["menstruation_duration_days"] || ""} />
+                </label>
+                <SelectField name="menstruation_regular" label="Regular cycle" options={["", "Yes", "No"]} defaultValue={initialValues["menstruation_regular"] || ""} />
+                <label>
+                  <span className="hh-label">Irregular cycle note</span>
+                  <input className="hh-input" name="menstruation_regular_note" defaultValue={initialValues["menstruation_regular_note"] || ""} />
+                </label>
+                <SelectField name="menstruation_volume" label="Volume" options={["", "Light", "Heavy", "Normal"]} defaultValue={initialValues["menstruation_volume"] || ""} />
+                <label>
+                  <span className="hh-label">Volume note</span>
+                  <input className="hh-input" name="menstruation_volume_note" defaultValue={initialValues["menstruation_volume_note"] || ""} />
+                </label>
+                <SelectField name="menstruation_color" label="Color" options={["", "Bright red", "Red-red", "Dark red", "Other"]} defaultValue={initialValues["menstruation_color"] || ""} />
+                <label>
+                  <span className="hh-label">Color other / note</span>
+                  <input className="hh-input" name="menstruation_color_other" defaultValue={initialValues["menstruation_color_other"] || ""} />
+                </label>
+                <SelectField name="menstruation_consistency" label="Consistency concern" options={["", "No", "Yes"]} defaultValue={initialValues["menstruation_consistency"] || ""} />
+                <label>
+                  <span className="hh-label">Consistency note</span>
+                  <input className="hh-input" name="menstruation_consistency_note" defaultValue={initialValues["menstruation_consistency_note"] || ""} />
+                </label>
+                <ScaleField name="menstruation_pain_scale" label="Pain scale" minLabel="No pain" maxLabel="Worst pain" defaultValue={initialValues["menstruation_pain_scale"] ? Number(initialValues["menstruation_pain_scale"]) : 5} />
+                <label>
+                  <span className="hh-label">Pain note</span>
+                  <input className="hh-input" name="menstruation_pain_note" defaultValue={initialValues["menstruation_pain_note"] || ""} />
+                </label>
+                <label>
+                  <span className="hh-label">Concomitants</span>
+                  <input className="hh-input" name="concomitants" defaultValue={initialValues["concomitants"] || ""} />
+                </label>
+                <label>
+                  <span className="hh-label">Menarche age</span>
+                  <input className="hh-input" name="menarche_age" type="number" min="0" defaultValue={initialValues["menarche_age"] || ""} />
+                </label>
+                <label>
+                  <span className="hh-label">PMS symptoms</span>
+                  <textarea className="hh-input min-h-20" name="pms_symptoms" defaultValue={initialValues["pms_symptoms"] || ""} />
+                </label>
+                <label>
+                  <span className="hh-label">Pregnancies</span>
+                  <input className="hh-input" name="pregnancies" type="number" min="0" defaultValue={initialValues["pregnancies"] || ""} />
+                </label>
+                <label>
+                  <span className="hh-label">Menopause</span>
+                  <textarea className="hh-input min-h-20" name="menopause" defaultValue={initialValues["menopause"] || ""} />
+                </label>
+                <SelectField name="genitals_eruption" label="Genital eruption" options={["", "No", "Yes"]} defaultValue={initialValues["genitals_eruption"] || ""} />
+                <label>
+                  <span className="hh-label">Eruption note</span>
+                  <input className="hh-input" name="genitals_eruption_note" defaultValue={initialValues["genitals_eruption_note"] || ""} />
+                </label>
+                <SelectField name="genitals_discharge" label="Genital discharge" options={["", "No", "Yes"]} defaultValue={initialValues["genitals_discharge"] || ""} />
+                <label>
+                  <span className="hh-label">Discharge note</span>
+                  <input className="hh-input" name="genitals_discharge_note" defaultValue={initialValues["genitals_discharge_note"] || ""} />
+                </label>
+                <SelectField name="genitals_infections" label="Genital infections" options={["", "No", "Yes"]} defaultValue={initialValues["genitals_infections"] || ""} />
+                <label>
+                  <span className="hh-label">Sexual activity</span>
+                  <textarea className="hh-input min-h-20" name="sexual_activity" placeholder="Libido, STI history, relevant notes" defaultValue={initialValues["sexual_activity"] || ""} />
+                </label>
               </>
             )}
-            <SelectField name="sleep_pattern" label="Sleep pattern" options={["", "Regular", "Irregular"]} />
-            <label><span className="hh-label">Sleep pattern note</span><input className="hh-input" name="sleep_pattern_note" /></label>
-            <label><span className="hh-label">Sleep quality (hours per day)</span><input className="hh-input" name="sleep_quality_hours" type="number" min="0" step="0.5" /></label>
-            <SelectField name="sleep_position" label="Sleep position" options={["", "Back", "Stomach", "Left", "Right"]} />
-            <label><span className="hh-label">Dreams</span><textarea className="hh-input min-h-20" name="dreams" /></label>
-            <SelectField name="energy_status" label="Energy" options={["", "Increased", "Decreased", "Normal"]} />
-            <SelectField name="weather_preference" label="Weather preference" options={["", "Cold", "Hot"]} />
-            <label><span className="hh-label">Weather note</span><input className="hh-input" name="weather_note" /></label>
-            <label className="md:col-span-2"><span className="hh-label">Mental / personality review</span><textarea className="hh-input min-h-28" name="mental_state" placeholder="Self-description, fears, personality, anxiety, worries, anger, relationships" /></label>
+            <SelectField name="sleep_pattern" label="Sleep pattern" options={["", "Regular", "Irregular"]} defaultValue={initialValues["sleep_pattern"] || ""} />
+            <label>
+              <span className="hh-label">Sleep pattern note</span>
+              <input className="hh-input" name="sleep_pattern_note" defaultValue={initialValues["sleep_pattern_note"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Sleep quality (hours per day)</span>
+              <input className="hh-input" name="sleep_quality_hours" type="number" min="0" step="0.5" defaultValue={initialValues["sleep_quality_hours"] || ""} />
+            </label>
+            <SelectField name="sleep_position" label="Sleep position" options={["", "Back", "Stomach", "Left", "Right"]} defaultValue={initialValues["sleep_position"] || ""} />
+            <label>
+              <span className="hh-label">Dreams</span>
+              <textarea className="hh-input min-h-20" name="dreams" defaultValue={initialValues["dreams"] || ""} />
+            </label>
+            <SelectField name="energy_status" label="Energy" options={["", "Increased", "Decreased", "Normal"]} defaultValue={initialValues["energy_status"] || ""} />
+            <SelectField name="weather_preference" label="Weather preference" options={["", "Cold", "Hot"]} defaultValue={initialValues["weather_preference"] || ""} />
+            <label>
+              <span className="hh-label">Weather note</span>
+              <input className="hh-input" name="weather_note" defaultValue={initialValues["weather_note"] || ""} />
+            </label>
+            <label className="md:col-span-2">
+              <span className="hh-label">Mental / personality review</span>
+              <textarea className="hh-input min-h-28" name="mental_state" placeholder="Self-description, fears, personality, anxiety, worries, anger, relationships" defaultValue={initialValues["mental_state"] || ""} />
+            </label>
           </div>
         </section>
       )}
@@ -557,24 +823,57 @@ export function VisitForm({
         <FormSectionHeader className="mb-4" icon={FileText} title={isFollowUp ? "Evaluation (follow up)" : "Clinical notes"} description={isFollowUp ? "Record response to previous remedy and changes since the last consult." : "Capture examination, diagnosis, remedy, and recommendations."} tone="notes" />
         {isFollowUp ? (
           <div className="grid gap-4 md:grid-cols-2">
-            <label><span className="hh-label">Symptoms of previous consult</span><textarea className="hh-input min-h-28" name="previous_consult_symptoms" /></label>
-            <label><span className="hh-label">Evaluation on previous complaint</span><textarea className="hh-input min-h-28" name="evaluation_previous_complaint" placeholder="New symptoms that may have appeared since remedy" /></label>
-            <ScaleWithNote name="energy_since_remedy" scoreName="energy_since_remedy_score" label="Energy since remedy" minLabel="Worse" maxLabel="Much better" placeholder="Any changes since remedy: how, when, and how much" />
-            <ScaleWithNote name="appetite_since_remedy" scoreName="appetite_since_remedy_score" label="Appetite since remedy" minLabel="Worse" maxLabel="Much better" />
-            <ScaleWithNote name="sleep_since_remedy" scoreName="sleep_since_remedy_score" label="Sleep since remedy" minLabel="Worse" maxLabel="Much better" />
-            <ScaleWithNote name="mental_since_remedy" scoreName="mental_since_remedy_score" label="Mental state since remedy" minLabel="Worse" maxLabel="Much better" placeholder="How have they been feeling after the remedy?" />
-            <label><span className="hh-label">Dietary changes</span><textarea className="hh-input min-h-20" name="dietary_changes" /></label>
-            <label><span className="hh-label">Lifestyle changes</span><textarea className="hh-input min-h-20" name="lifestyle_changes" /></label>
+            <label>
+              <span className="hh-label">Symptoms of previous consult</span>
+              <textarea className="hh-input min-h-28" name="previous_consult_symptoms" defaultValue={initialValues["previous_consult_symptoms"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Evaluation on previous complaint</span>
+              <textarea className="hh-input min-h-28" name="evaluation_previous_complaint" placeholder="New symptoms that may have appeared since remedy" defaultValue={initialValues["evaluation_previous_complaint"] || ""} />
+            </label>
+            <ScaleWithNote name="energy_since_remedy" scoreName="energy_since_remedy_score" label="Energy since remedy" minLabel="Worse" maxLabel="Much better" placeholder="Any changes since remedy: how, when, and how much" scoreDefaultValue={initialValues["energy_since_remedy_score"] ? Number(initialValues["energy_since_remedy_score"]) : 5} noteDefaultValue={initialValues["energy_since_remedy"] || ""} />
+            <ScaleWithNote name="appetite_since_remedy" scoreName="appetite_since_remedy_score" label="Appetite since remedy" minLabel="Worse" maxLabel="Much better" scoreDefaultValue={initialValues["appetite_since_remedy_score"] ? Number(initialValues["appetite_since_remedy_score"]) : 5} noteDefaultValue={initialValues["appetite_since_remedy"] || ""} />
+            <ScaleWithNote name="sleep_since_remedy" scoreName="sleep_since_remedy_score" label="Sleep since remedy" minLabel="Worse" maxLabel="Much better" scoreDefaultValue={initialValues["sleep_since_remedy_score"] ? Number(initialValues["sleep_since_remedy_score"]) : 5} noteDefaultValue={initialValues["sleep_since_remedy"] || ""} />
+            <ScaleWithNote name="mental_since_remedy" scoreName="mental_since_remedy_score" label="Mental state since remedy" minLabel="Worse" maxLabel="Much better" placeholder="How have they been feeling after the remedy?" scoreDefaultValue={initialValues["mental_since_remedy_score"] ? Number(initialValues["mental_since_remedy_score"]) : 5} noteDefaultValue={initialValues["mental_since_remedy"] || ""} />
+            <label>
+              <span className="hh-label">Dietary changes</span>
+              <textarea className="hh-input min-h-20" name="dietary_changes" defaultValue={initialValues["dietary_changes"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Lifestyle changes</span>
+              <textarea className="hh-input min-h-20" name="lifestyle_changes" defaultValue={initialValues["lifestyle_changes"] || ""} />
+            </label>
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2">
-            <label><span className="hh-label">Initial complaints</span><textarea className="hh-input min-h-28" name="initial_complaints" /></label>
-            <label><span className="hh-label">Physical examination</span><textarea className="hh-input min-h-28" name="physical_examination" /></label>
-            <label><span className="hh-label">Diagnosis</span><textarea className="hh-input min-h-28" name="diagnosis" /></label>
-            <label><span className="hh-label">Remedy</span><textarea className="hh-input min-h-28" name="remedy" /></label>
-            <label><span className="hh-label">Reason for remedy</span><textarea className="hh-input min-h-28" name="reason_for_remedy" /></label>
-            <label><span className="hh-label">Dietary recommendation</span><textarea className="hh-input min-h-28" name="dietary_recommendation" /></label>
-            <label><span className="hh-label">Lifestyle recommendation</span><textarea className="hh-input min-h-28" name="lifestyle_recommendation" /></label>
+            <label>
+              <span className="hh-label">Initial complaints</span>
+              <textarea className="hh-input min-h-28" name="initial_complaints" defaultValue={initialValues["initial_complaints"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Physical examination</span>
+              <textarea className="hh-input min-h-28" name="physical_examination" defaultValue={initialValues["physical_examination"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Diagnosis</span>
+              <textarea className="hh-input min-h-28" name="diagnosis" defaultValue={initialValues["diagnosis"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Remedy</span>
+              <textarea className="hh-input min-h-28" name="remedy" defaultValue={initialValues["remedy"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Reason for remedy</span>
+              <textarea className="hh-input min-h-28" name="reason_for_remedy" defaultValue={initialValues["reason_for_remedy"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Dietary recommendation</span>
+              <textarea className="hh-input min-h-28" name="dietary_recommendation" defaultValue={initialValues["dietary_recommendation"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Lifestyle recommendation</span>
+              <textarea className="hh-input min-h-28" name="lifestyle_recommendation" defaultValue={initialValues["lifestyle_recommendation"] || ""} />
+            </label>
           </div>
         )}
       </section>
@@ -583,43 +882,77 @@ export function VisitForm({
         <section className={activeStep.id === "decision" ? "hh-panel p-5" : "hidden"}>
           <FormSectionHeader className="mb-4" icon={FileText} title="New clinical decision" description="Record the updated diagnosis, remedy, and recommendations." tone="notes" />
           <div className="grid gap-4 md:grid-cols-2">
-            <label><span className="hh-label">Physical examination</span><textarea className="hh-input min-h-28" name="physical_examination" /></label>
-            <label><span className="hh-label">New diagnosis</span><textarea className="hh-input min-h-28" name="diagnosis" /></label>
-            <label><span className="hh-label">New remedy</span><textarea className="hh-input min-h-28" name="remedy" /></label>
-            <label><span className="hh-label">Reason for remedy</span><textarea className="hh-input min-h-28" name="reason_for_remedy" /></label>
-            <label><span className="hh-label">Dietary recommendation</span><textarea className="hh-input min-h-28" name="dietary_recommendation" /></label>
-            <label><span className="hh-label">Lifestyle recommendation</span><textarea className="hh-input min-h-28" name="lifestyle_recommendation" /></label>
+            <label>
+              <span className="hh-label">Physical examination</span>
+              <textarea className="hh-input min-h-28" name="physical_examination" defaultValue={initialValues["physical_examination"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">New diagnosis</span>
+              <textarea className="hh-input min-h-28" name="diagnosis" defaultValue={initialValues["diagnosis"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">New remedy</span>
+              <textarea className="hh-input min-h-28" name="remedy" defaultValue={initialValues["remedy"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Reason for remedy</span>
+              <textarea className="hh-input min-h-28" name="reason_for_remedy" defaultValue={initialValues["reason_for_remedy"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Dietary recommendation</span>
+              <textarea className="hh-input min-h-28" name="dietary_recommendation" defaultValue={initialValues["dietary_recommendation"] || ""} />
+            </label>
+            <label>
+              <span className="hh-label">Lifestyle recommendation</span>
+              <textarea className="hh-input min-h-28" name="lifestyle_recommendation" defaultValue={initialValues["lifestyle_recommendation"] || ""} />
+            </label>
           </div>
         </section>
       )}
 
-      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
+      <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between sm:items-center">
         <Button type="button" variant="secondary" onClick={() => setActiveStepIndex((value) => Math.max(0, value - 1))} disabled={isFirstStep}>
           <ChevronLeft size={17} />
           Back
         </Button>
-        {isLastStep ? (
-          <LoadingButton type="submit" loading={loading} loadingText="Saving visit...">
-            {!loading && <Save size={17} />}
-            Save visit
-          </LoadingButton>
-        ) : (
-          <Button type="button" onClick={() => setActiveStepIndex((value) => Math.min(visitSteps.length - 1, value + 1))}>
-            Continue
-            <ChevronRight size={17} />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          {lastSavedText && (
+            <span className="text-xs text-[#53605a] italic text-right font-medium mr-1 animate-pulse">
+              {lastSavedText}
+            </span>
+          )}
+          <Button
+            type="button"
+            variant="secondary"
+            onClick={handleManualSave}
+            className="border-[var(--hh-purple)] text-[var(--hh-purple)] hover:bg-[var(--hh-purple-light)]"
+          >
+            <Save size={17} className="mr-2" />
+            Save Draft
           </Button>
-        )}
+          {isLastStep ? (
+            <LoadingButton type="submit" loading={loading} loadingText="Saving visit...">
+              {!loading && <Save size={17} />}
+              Save visit
+            </LoadingButton>
+          ) : (
+            <Button type="button" onClick={() => setActiveStepIndex((value) => Math.min(visitSteps.length - 1, value + 1))}>
+              Continue
+              <ChevronRight size={17} />
+            </Button>
+          )}
+        </div>
       </div>
       </div>
     </form>
   );
 }
 
-function SelectField({ name, label, options }: { name: string; label: string; options: string[] }) {
+function SelectField({ name, label, options, defaultValue }: { name: string; label: string; options: string[]; defaultValue?: string }) {
   return (
     <label>
       <span className="hh-label">{label}</span>
-      <select className="hh-input" name={name}>
+      <select className="hh-input" name={name} defaultValue={defaultValue}>
         {options.map((option) => (
           <option key={option || "blank"} value={option.toLowerCase().replaceAll(" ", "_")}>
             {option || "Select"}
@@ -645,6 +978,10 @@ function ScaleField({
 }) {
   const [value, setValue] = useState(defaultValue);
 
+  useEffect(() => {
+    setValue(defaultValue);
+  }, [defaultValue]);
+
   return (
     <div className="grid gap-2 rounded-lg border border-[var(--hh-border)] bg-[#fbfdfc] p-3">
       <input type="hidden" name={name} value={value} />
@@ -669,7 +1006,9 @@ function ScaleWithNote({
   label,
   minLabel,
   maxLabel,
-  placeholder
+  placeholder,
+  scoreDefaultValue = 5,
+  noteDefaultValue = ""
 }: {
   name: string;
   scoreName: string;
@@ -677,13 +1016,15 @@ function ScaleWithNote({
   minLabel: string;
   maxLabel: string;
   placeholder?: string;
+  scoreDefaultValue?: number;
+  noteDefaultValue?: string;
 }) {
   return (
     <div className="grid gap-3">
-      <ScaleField name={scoreName} label={`${label} score`} minLabel={minLabel} maxLabel={maxLabel} />
+      <ScaleField name={scoreName} label={`${label} score`} minLabel={minLabel} maxLabel={maxLabel} defaultValue={scoreDefaultValue} />
       <label>
         <span className="hh-label">{label} notes</span>
-        <textarea className="hh-input min-h-20" name={name} placeholder={placeholder} />
+        <textarea className="hh-input min-h-20" name={name} placeholder={placeholder} defaultValue={noteDefaultValue} />
       </label>
     </div>
   );

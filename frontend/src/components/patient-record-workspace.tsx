@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } 
 import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
 import { showActionError } from "@/lib/action-error";
 import { relationshipLabel } from "@/lib/relationships";
+import { getDraftKey, isDraftExpired } from "@/lib/draft-utils";
 import type { Case, Patient, PatientDocument, PatientProfile, PatientWorkflowAction, Visit, Vital } from "@/types/clinic";
 
 const recordTabs = [
@@ -68,6 +69,29 @@ export function PatientRecordWorkspace({ patient, canCreateVisit, initialCases }
   const [activeTab, setActiveTab] = useState<RecordTab>("overview");
   const [profile, setProfile] = useState(patient.profile);
   const [documents, setDocuments] = useState(patient.documents || []);
+  const [draftTime, setDraftTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const draftKey = getDraftKey(String(patient.id));
+    const saved = localStorage.getItem(draftKey);
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (parsed && parsed.timestamp && !isDraftExpired(parsed.timestamp)) {
+          setDraftTime(parsed.timestamp);
+        } else if (parsed && isDraftExpired(parsed.timestamp)) {
+          localStorage.removeItem(draftKey);
+          setDraftTime(null);
+        }
+      } catch (err) {
+        console.error("Failed to parse patient draft:", err);
+      }
+    } else {
+      setDraftTime(null);
+    }
+  }, [patient]);
+
   const latestVisit = patient.visits?.[0];
   const latestVitals = allVitals(patient)[0];
   const consentSigned = documents.some((d) => d.document_type === "consent_form" && (d.status === "signed" || d.status === "verified"));
@@ -103,6 +127,40 @@ export function PatientRecordWorkspace({ patient, canCreateVisit, initialCases }
       </div>
 
       <div className="flex flex-wrap gap-2 border-b border-[var(--hh-border)] bg-white px-4 py-3 sm:px-6">
+        {draftTime && (
+          <div className="flex w-full flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm animate-fade-in mb-2">
+            <div className="flex items-start gap-3">
+              <ClipboardList className="text-amber-600 mt-0.5 shrink-0" size={20} />
+              <div>
+                <div className="font-bold text-amber-950">Active visit draft in progress!</div>
+                <p className="mt-0.5 text-[#78350f] text-xs">
+                  We found an unsaved visit/case draft for this patient from {new Date(draftTime).toLocaleString()}.
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 shrink-0 sm:self-center">
+              <Button asChild size="sm" className="border-amber-300 bg-amber-600 text-white hover:bg-amber-700 font-bold shadow-sm">
+                <Link href={`/visits/new?patient=${patient.id}&restore=1`}>
+                  Resume Draft
+                </Link>
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  const draftKey = getDraftKey(String(patient.id));
+                  localStorage.removeItem(draftKey);
+                  setDraftTime(null);
+                  toast.success("Draft discarded");
+                }}
+                className="text-amber-800 hover:bg-amber-100 hover:text-amber-950 font-semibold"
+              >
+                Discard
+              </Button>
+            </div>
+          </div>
+        )}
         {nextAction && (
           <div className="flex w-full items-center gap-2 rounded-lg border border-[#d9e3dd] bg-[#f7faf8] px-4 py-2 text-sm text-[#475951]">
             <ListChecks size={16} className="text-[var(--hh-purple)]" />

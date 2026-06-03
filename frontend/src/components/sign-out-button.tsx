@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { LoadingButton } from "@/components/harmony-loading";
+import { clearAllLocalDrafts } from "@/lib/draft-utils";
 
 export function SignOutButton() {
   const router = useRouter();
@@ -11,6 +12,7 @@ export function SignOutButton() {
 
   async function handleLogout() {
     setLoading(true);
+    clearAllLocalDrafts();
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
   }

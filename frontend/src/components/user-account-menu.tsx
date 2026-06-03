@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import { cn } from "@/lib/utils";
+import { clearAllLocalDrafts } from "@/lib/draft-utils";
 
 type UserAccountMenuProps = {
   avatarUrl?: string;
@@ -20,6 +21,7 @@ export function UserAccountMenu({ avatarUrl, name, title }: UserAccountMenuProps
 
   async function signOut() {
     setSigningOut(true);
+    clearAllLocalDrafts();
     await fetch("/api/auth/logout", { method: "POST" });
     router.push("/login");
     router.refresh();
