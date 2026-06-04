@@ -64,7 +64,7 @@ def find_patient_by_identifier(identifier, identifier_type=""):
         if digits:
             query |= Q(primary_phone__icontains=digits[-8:]) | Q(secondary_phone__icontains=digits[-8:])
 
-    return Patient.objects.filter(query).order_by("-created_at").first()
+    return Patient.objects.filter(query, is_deleted=False).order_by("-created_at").first()
 
 
 def next_queue_number(service_date):
@@ -227,7 +227,6 @@ def transition_active_patient_journey(patient, stage, request=None, note="", vis
 
 
 class PatientViewSet(viewsets.ModelViewSet):
-    queryset = Patient.objects.select_related("profile").prefetch_related("conditions", "documents", "visits__vitals")
     search_fields = (
         "full_name_display",
         "patient_code",
@@ -238,6 +237,15 @@ class PatientViewSet(viewsets.ModelViewSet):
         "next_of_kin_phone",
     )
     ordering_fields = ("created_at", "full_name_display", "patient_code")
+
+    def get_queryset(self):
+        qs = Patient.objects.select_related("profile").prefetch_related("conditions", "documents", "visits__vitals")
+        if self.request is None:
+            return qs.filter(is_deleted=False)
+        include_deleted = self.request.query_params.get("include_deleted") == "true"
+        if include_deleted or self.action in ["restore", "deleted_list"]:
+            return qs
+        return qs.filter(is_deleted=False)
 
     def get_object(self):
         lookup_value = self.kwargs.get(self.lookup_field or "pk")
@@ -292,15 +300,45 @@ class PatientViewSet(viewsets.ModelViewSet):
     def perform_destroy(self, instance):
         before_data = snapshot_instance(instance)
         entity_id = instance.pk
-        instance.delete()
+        instance.is_deleted = True
+        from django.utils import timezone
+        instance.deleted_at = timezone.now()
+        instance.save()
         write_audit_log(
             request=self.request,
             action="delete",
             entity_type="patient",
             entity_id=entity_id,
             before_data=before_data,
-            details="Patient record deleted.",
+            after_data=snapshot_instance(instance),
+            details="Patient record soft-deleted.",
         )
+
+    @action(detail=True, methods=["post"], url_path="restore")
+    def restore(self, request, pk=None):
+        patient = self.get_object()
+        patient.is_deleted = False
+        patient.deleted_at = None
+        patient.save()
+        write_audit_log(
+            request=self.request,
+            action="update",
+            instance=patient,
+            after_data=snapshot_instance(patient),
+            details="Patient record restored.",
+        )
+        return Response({"status": "success", "message": "Patient restored successfully."})
+
+    @action(detail=False, methods=["get"], url_path="deleted")
+    def deleted_list(self, request):
+        queryset = Patient.objects.filter(is_deleted=True).select_related("profile").prefetch_related("conditions")
+        queryset = self.filter_queryset(queryset)
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = PatientListSerializer(page, many=True, context={"request": request})
+            return self.get_paginated_response(serializer.data)
+        serializer = PatientListSerializer(queryset, many=True, context={"request": request})
+        return Response(serializer.data)
 
     @action(detail=True, methods=["get", "post"])
     def visits(self, request, pk=None):
@@ -359,9 +397,10 @@ class PatientViewSet(viewsets.ModelViewSet):
     def consent_forms(self, request):
         renewal_days = getattr(settings, "CONSENT_RENEWAL_DAYS", 365)
         cutoff = timezone.now().date() - timedelta(days=renewal_days)
-        pending = Patient.objects.filter(consent_status__in=("pending", "generated")).order_by("-created_at")
+        pending = Patient.objects.filter(consent_status__in=("pending", "generated"), is_deleted=False).order_by("-created_at")
         needs_renewal = Patient.objects.filter(
             consent_status="signed",
+            is_deleted=False,
             documents__document_type=PatientDocument.DocumentType.CONSENT_FORM,
             documents__status=PatientDocument.Status.SIGNED,
             documents__signed_at__date__lt=cutoff,
@@ -1172,7 +1211,7 @@ def dashboard_stats(request):
     today = timezone.localdate()
     return Response(
         {
-            "total_patients": Patient.objects.count(),
+            "total_patients": Patient.objects.filter(is_deleted=False).count(),
             "today_visits": Visit.objects.filter(created_at__date=today).count(),
             "pending_drafts": ElevatedAccessRequest.objects.filter(status=ElevatedAccessRequest.Status.PENDING).count(),
             "my_drafts": FormDraft.objects.filter(owner_user=request.user, status=FormDraft.Status.DRAFT).count(),

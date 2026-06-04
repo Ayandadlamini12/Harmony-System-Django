@@ -56,6 +56,8 @@ class Patient(TimeStampedModel):
     village = models.CharField(max_length=120, blank=True)
     status = models.CharField(max_length=30, default="active")
     consent_status = models.CharField(max_length=30, choices=ConsentStatus.choices, default=ConsentStatus.PENDING)
+    is_deleted = models.BooleanField(default=False)
+    deleted_at = models.DateTimeField(null=True, blank=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,

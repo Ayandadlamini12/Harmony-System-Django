@@ -46,6 +46,8 @@ export type Patient = {
   clinical_access?: "active" | "approval_required";
   current_journey?: PatientJourneySummary | null;
   patient_actions?: PatientWorkflowAction[];
+  is_deleted?: boolean;
+  deleted_at?: string | null;
 };
 
 export type PatientWorkflowAction = {

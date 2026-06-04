@@ -6,6 +6,9 @@ import { getPatients } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
 import { TablePagination } from "@/components/table-pagination";
 import { SeedButton } from "@/components/seed-button";
+import { PatientSearchForm } from "@/components/patient-search-form";
+
+export const dynamic = "force-dynamic";
 
 export default async function PatientListPage({
   searchParams
@@ -38,27 +41,7 @@ export default async function PatientListPage({
         </div>
       }
     >
-      <form className="mb-6 flex max-w-md items-center gap-2">
-        <div className="relative flex-1">
-          <input
-            className="hh-input pr-16"
-            name="search"
-            defaultValue={params.search || ""}
-            placeholder="Search by name, code, ID, phone..."
-          />
-          {params.search && (
-            <Link
-              href="/patients"
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#225c2c] hover:underline"
-            >
-              Clear
-            </Link>
-          )}
-        </div>
-        <button className="hh-button min-h-[2.5rem] px-5 bg-[#225c2c] hover:bg-[#1a4a22]" type="submit">
-          Search
-        </button>
-      </form>
+      <PatientSearchForm />
 
       <div className="hh-panel overflow-hidden">
         <div className="overflow-x-auto">

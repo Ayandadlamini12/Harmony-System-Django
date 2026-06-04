@@ -194,6 +194,24 @@ export function getConsentForms() {
   return apiGet<Patient[]>("/patients/consent-forms/", []);
 }
 
+export function getDeletedPatients(search = "") {
+  if (search.includes("=")) {
+    return apiGet<Paginated<Patient>>(`/patients/deleted/?${search}`, {
+      count: 0,
+      next: null,
+      previous: null,
+      results: []
+    });
+  }
+  const query = search ? `?search=${encodeURIComponent(search)}` : "";
+  return apiGet<Paginated<Patient>>(`/patients/deleted/${query}`, {
+    count: 0,
+    next: null,
+    previous: null,
+    results: []
+  });
+}
+
 export function getEmployeeEnrollmentRequests(status = "") {
   const query = status ? `?status=${encodeURIComponent(status)}` : "";
   return apiGet<Paginated<EmployeeEnrollmentRequest>>(`/employee-enrollment-requests/${query}`, {

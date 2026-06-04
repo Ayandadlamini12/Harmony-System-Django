@@ -4,6 +4,8 @@ import { AppShell } from "@/components/app-shell";
 import { getVisits } from "@/lib/api";
 import { TablePagination } from "@/components/table-pagination";
 
+export const dynamic = "force-dynamic";
+
 function label(type: string) {
   const map: Record<string, string> = { new_consultation: "New consultation", follow_up: "Follow up", review: "Review" };
   return map[type] || type;

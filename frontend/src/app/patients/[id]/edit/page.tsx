@@ -13,6 +13,7 @@ import { PatientContactFields } from "@/components/patient-contact-fields";
 import { getPatient } from "@/lib/api";
 
 import { updatePatient } from "./actions";
+import { DeletePatientButton } from "@/components/delete-patient-button";
 
 const fieldClass = "block";
 const gridClass = "grid gap-4 md:grid-cols-2 xl:grid-cols-3";
@@ -124,9 +125,14 @@ export default async function EditPatientPage({
           </section>
         )}
 
-        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
-          <Button asChild variant="secondary"><Link href={`/patients/${patient.public_id}`}>Cancel</Link></Button>
-          <Button type="submit">Save changes</Button>
+        <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between items-center border-t border-[var(--hh-border)] pt-5">
+          <div>
+            <DeletePatientButton patientId={patient.public_id} name={patient.full_name_display} />
+          </div>
+          <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end w-full sm:w-auto">
+            <Button asChild variant="secondary"><Link href={`/patients/${patient.public_id}`}>Cancel</Link></Button>
+            <Button type="submit">Save changes</Button>
+          </div>
         </div>
       </form>
     </AppShell>
