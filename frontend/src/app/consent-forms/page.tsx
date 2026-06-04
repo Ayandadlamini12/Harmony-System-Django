@@ -28,38 +28,38 @@ export default async function ConsentFormsPage() {
     <AppShell title="Consent Forms">
       <div className="hh-panel overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-[#f7faf8] text-xs uppercase text-[#66736d]">
+          <table className="hh-compact-table w-full text-left">
+            <thead>
               <tr>
-                <th className="px-5 py-3">Patient</th>
-                <th className="px-5 py-3">Code</th>
-                <th className="px-5 py-3">Phone</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3">Consent</th>
-                <th className="px-5 py-3 text-right">Actions</th>
+                <th>Patient</th>
+                <th>Code</th>
+                <th>Phone</th>
+                <th>Status</th>
+                <th>Consent</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {patients.map((patient) => (
-                <tr key={patient.id} className="border-t border-[var(--hh-border)]">
-                  <td className="px-5 py-4">
+                <tr key={patient.id}>
+                  <td>
                     <Link href={`/patients/${patient.public_id}`} className="font-bold text-[var(--hh-purple)] hover:underline">
                       {patient.full_name_display}
                     </Link>
                   </td>
-                  <td className="px-5 py-4 font-mono text-xs text-[var(--hh-purple)]">{patient.patient_code}</td>
-                  <td className="px-5 py-4 text-[#66736d]">{patient.primary_phone || "--"}</td>
-                  <td className="px-5 py-4">
-                    <span className="rounded-full bg-[var(--hh-green-light)] px-2 py-1 text-xs font-bold text-[var(--hh-green-dark)]">
+                  <td className="font-mono text-xs text-[var(--hh-purple)]">{patient.patient_code}</td>
+                  <td className="text-[#66736d]">{patient.primary_phone || "--"}</td>
+                  <td>
+                    <span className="rounded-full bg-[var(--hh-green-light)] px-2 py-0.5 text-xs font-bold text-[var(--hh-green-dark)]">
                       {patient.status}
                     </span>
                   </td>
-                  <td className="px-5 py-4">
+                  <td>
                     <Badge className={consentStatusColors[patient.consent_status || "pending"]}>
                       {consentStatusLabels[patient.consent_status || "pending"]}
                     </Badge>
                   </td>
-                  <td className="px-5 py-4">
+                  <td>
                     <div className="flex justify-end gap-2">
                       <Button asChild variant="secondary" size="sm">
                         <Link href={`/patients/${patient.public_id}`}>Open Record</Link>
@@ -80,7 +80,7 @@ export default async function ConsentFormsPage() {
               ))}
               {patients.length === 0 && (
                 <tr>
-                  <td className="px-5 py-10 text-center text-[#66736d]" colSpan={6}>
+                  <td className="py-10 text-center text-[#66736d]" colSpan={6}>
                     All patients have up-to-date consent forms.
                   </td>
                 </tr>

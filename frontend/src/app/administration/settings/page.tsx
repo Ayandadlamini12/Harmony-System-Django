@@ -155,26 +155,26 @@ export default async function AdministrationSettingsPage({
           </div>
           {logs.results.length ? (
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[860px] text-left text-sm">
-                <thead className="text-xs uppercase text-[#66736d]">
+              <table className="hh-compact-table w-full min-w-[860px] text-left">
+                <thead>
                   <tr>
-                    <th className="px-5 py-3">Status</th>
-                    <th className="px-5 py-3">Template</th>
-                    <th className="px-5 py-3">Recipient</th>
-                    <th className="px-5 py-3">Subject</th>
-                    <th className="px-5 py-3">Provider</th>
-                    <th className="px-5 py-3">Created</th>
+                    <th>Status</th>
+                    <th>Template</th>
+                    <th>Recipient</th>
+                    <th>Subject</th>
+                    <th>Provider</th>
+                    <th>Created</th>
                   </tr>
                 </thead>
                 <tbody>
                   {logs.results.slice(0, 10).map((log) => (
-                    <tr key={log.id} className="border-t border-[var(--hh-border-strong)]">
-                      <td className="px-5 py-3 font-bold capitalize">{log.status}</td>
-                      <td className="px-5 py-3 font-mono text-xs">{log.template_key}</td>
-                      <td className="px-5 py-3">{log.to?.join(", ") || "--"}</td>
-                      <td className="px-5 py-3">{log.subject}</td>
-                      <td className="px-5 py-3">{log.provider === "brevo_api" ? "Brevo API" : "SMTP"}</td>
-                      <td className="px-5 py-3">{new Date(log.created_at).toLocaleString()}</td>
+                    <tr key={log.id}>
+                      <td className="font-bold capitalize">{log.status}</td>
+                      <td className="font-mono text-xs">{log.template_key}</td>
+                      <td>{log.to?.join(", ") || "--"}</td>
+                      <td>{log.subject}</td>
+                      <td>{log.provider === "brevo_api" ? "Brevo API" : "SMTP"}</td>
+                      <td>{new Date(log.created_at).toLocaleString()}</td>
                     </tr>
                   ))}
                 </tbody>

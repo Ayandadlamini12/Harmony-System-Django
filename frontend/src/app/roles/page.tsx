@@ -56,19 +56,19 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
               <h3 className="font-bold text-[var(--hh-purple-dark)]">{category}</h3>
             </div>
             <div className="overflow-x-auto">
-              <table className="w-full min-w-[820px] text-left text-sm">
-                <thead className="text-xs uppercase text-[#66736d]">
+              <table className="hh-compact-table w-full min-w-[820px] text-left">
+                <thead>
                   <tr>
-                    <th className="w-[42%] px-5 py-3">Module</th>
+                    <th className="w-[42%]">Module</th>
                     {matrix.roles.map((role) => (
-                      <th key={role} className="px-5 py-3 text-center">{roleLabels[role] || role}</th>
+                      <th key={role} className="text-center">{roleLabels[role] || role}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody>
                   {matrix.modules.filter((module) => module.category === category).map((module) => (
-                    <tr key={module.key} className="border-t border-[var(--hh-border)]">
-                      <td className="px-5 py-4">
+                    <tr key={module.key}>
+                      <td>
                         <div className="font-bold">{module.label}</div>
                         <div className="mt-1 text-xs leading-5 text-[#66736d]">{module.description}</div>
                         <div className="mt-2 font-mono text-[11px] text-[#66736d]">{module.key}</div>
@@ -77,7 +77,7 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
                         const locked = Boolean(module.locked_admin && role === "admin");
                         const checked = matrix.permissions[role]?.[module.key] ?? module.default_roles.includes(role);
                         return (
-                          <td key={`${role}-${module.key}`} className="px-5 py-4 text-center">
+                          <td key={`${role}-${module.key}`} className="text-center">
                             <label className="inline-flex cursor-pointer items-center justify-center">
                               <input
                                 className="peer sr-only"
@@ -86,8 +86,8 @@ export default async function RolesPage({ searchParams }: { searchParams: Promis
                                 name={`permission_${role}_${module.key}`}
                                 type="checkbox"
                               />
-                              <span className="inline-flex h-10 min-w-24 items-center justify-center gap-2 rounded-lg border border-[var(--hh-border)] bg-white px-3 text-xs font-bold text-[#66736d] peer-checked:border-[var(--hh-purple)] peer-checked:bg-[#f7f0fb] peer-checked:text-[var(--hh-purple)] peer-disabled:cursor-not-allowed peer-disabled:opacity-80">
-                                {locked ? <LockKeyhole size={14} /> : <Check size={14} />}
+                              <span className="inline-flex h-8 min-w-20 items-center justify-center gap-2 rounded-lg border border-[var(--hh-border)] bg-white px-2.5 text-[11px] font-bold text-[#66736d] peer-checked:border-[var(--hh-purple)] peer-checked:bg-[#f7f0fb] peer-checked:text-[var(--hh-purple)] peer-disabled:cursor-not-allowed peer-disabled:opacity-80">
+                                {locked ? <LockKeyhole size={12} /> : <Check size={12} />}
                                 {locked ? "Locked" : "Enabled"}
                               </span>
                             </label>

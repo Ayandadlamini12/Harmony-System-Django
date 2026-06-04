@@ -184,29 +184,29 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
             <h2 className="text-sm font-bold uppercase text-[#66736d]">Recent patients</h2>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="bg-[#f7faf8] text-xs uppercase text-[#66736d]">
+            <table className="hh-compact-table w-full text-left">
+              <thead>
                 <tr>
-                  <th className="px-5 py-3">Patient</th>
-                  <th className="px-5 py-3">Code</th>
-                  <th className="px-5 py-3">Contact</th>
-                  <th className="px-5 py-3">Status</th>
+                  <th>Patient</th>
+                  <th>Code</th>
+                  <th>Contact</th>
+                  <th>Status</th>
                 </tr>
               </thead>
               <tbody>
                 {patients.results.map((patient) => (
-                  <tr key={patient.id} className="border-t border-[var(--hh-border)]">
-                    <td className="px-5 py-4 font-semibold">{patient.full_name_display}</td>
-                    <td className="px-5 py-4 font-mono text-xs text-[var(--hh-purple)]">{patient.patient_code}</td>
-                    <td className="px-5 py-4 text-[#66736d]">{patient.primary_phone || "No phone"}</td>
-                    <td className="px-5 py-4">
-                      <span className="rounded-full bg-[var(--hh-green-light)] px-2 py-1 text-xs font-bold text-[var(--hh-green-dark)]">{patient.status}</span>
+                  <tr key={patient.id}>
+                    <td className="font-semibold">{patient.full_name_display}</td>
+                    <td className="font-mono text-xs text-[var(--hh-purple)]">{patient.patient_code}</td>
+                    <td className="text-[#66736d]">{patient.primary_phone || "No phone"}</td>
+                    <td>
+                      <span className="rounded-full bg-[var(--hh-green-light)] px-2 py-0.5 text-xs font-bold text-[var(--hh-green-dark)]">{patient.status}</span>
                     </td>
                   </tr>
                 ))}
                 {patients.results.length === 0 && (
                   <tr>
-                    <td className="px-5 py-8 text-[#66736d]" colSpan={4}>No patient records loaded yet.</td>
+                    <td className="py-8 text-[#66736d]" colSpan={4}>No patient records loaded yet.</td>
                   </tr>
                 )}
               </tbody>

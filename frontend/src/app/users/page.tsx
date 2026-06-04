@@ -89,36 +89,36 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
 
       <div className="hh-panel overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-[#f7faf8] text-xs uppercase text-[#66736d]">
+          <table className="hh-compact-table w-full text-left">
+            <thead>
               <tr>
-                <th className="px-5 py-3">User</th>
-                <th className="px-5 py-3">User ID</th>
-                <th className="px-5 py-3">Role</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3 text-right">Actions</th>
+                <th>User</th>
+                <th>User ID</th>
+                <th>Role</th>
+                <th>Status</th>
+                <th className="text-right">Actions</th>
               </tr>
             </thead>
             <tbody>
               {data.results.map((user) => (
-                <tr key={user.id} className="border-t border-[var(--hh-border)]">
-                  <td className="px-5 py-4">
+                <tr key={user.id}>
+                  <td>
                     <div className="font-bold">{user.name || user.username}</div>
                     <div className="text-xs text-[#66736d]">{user.email || "No email"}</div>
                   </td>
-                  <td className="px-5 py-4 text-[#66736d]">{user.username}</td>
-                  <td className="px-5 py-4">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#f5edfa] px-2 py-1 text-xs font-bold capitalize text-[var(--hh-purple)]">
+                  <td className="text-[#66736d]">{user.username}</td>
+                  <td>
+                    <span className="inline-flex items-center gap-1 rounded-full bg-[#f5edfa] px-2 py-0.5 text-xs font-bold capitalize text-[var(--hh-purple)]">
                       <ShieldCheck size={12} />
                       {roleLabels[user.role] || user.role}
                     </span>
                   </td>
-                  <td className="px-5 py-4">
-                    <span className={`rounded-full px-2 py-1 text-xs font-bold ${user.is_active ? "bg-[var(--hh-green-light)] text-[var(--hh-green-dark)]" : "bg-red-100 text-red-700"}`}>
+                  <td>
+                    <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${user.is_active ? "bg-[var(--hh-green-light)] text-[var(--hh-green-dark)]" : "bg-red-100 text-red-700"}`}>
                       {user.is_active ? "Active" : "Inactive"}
                     </span>
                   </td>
-                  <td className="px-5 py-4">
+                  <td>
                     <div className="flex justify-end gap-2">
                       <Button asChild variant="secondary" size="sm"><Link href={`/users?search=edit:${user.id}`}>Edit</Link></Button>
                       <form action={toggleUserStatus.bind(null, user.id)} method="post">
@@ -132,7 +132,7 @@ export default async function UsersPage({ searchParams }: { searchParams: Promis
               ))}
               {data.results.length === 0 && (
                 <tr>
-                  <td className="px-5 py-10 text-center text-[#66736d]" colSpan={5}>No users found.</td>
+                  <td className="py-10 text-center text-[#66736d]" colSpan={5}>No users found.</td>
                 </tr>
               )}
             </tbody>
