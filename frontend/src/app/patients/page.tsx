@@ -4,82 +4,145 @@ import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { getPatients } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
+import { TablePagination } from "@/components/table-pagination";
+import { SeedButton } from "@/components/seed-button";
 
-export default async function PatientListPage({ searchParams }: { searchParams: Promise<{ search?: string }> }) {
+export default async function PatientListPage({
+  searchParams
+}: {
+  searchParams: Promise<{ search?: string; page?: string }>;
+}) {
   const session = await getSessionUser();
-
   const params = await searchParams;
-  const patients = await getPatients(params.search || "");
+
+  // Compile combined query parameters for search and page
+  const queryParts: string[] = [];
+  if (params.search) queryParts.push(`search=${encodeURIComponent(params.search)}`);
+  if (params.page) queryParts.push(`page=${encodeURIComponent(params.page)}`);
+  const queryStr = queryParts.join("&");
+
+  const patients = await getPatients(queryStr);
   const canRegister = session.role === "admin" || session.role === "receptionist";
 
   return (
     <AppShell
       title="Patient directory"
-      action={canRegister ? <Link className="hh-button" href="/patients/new">Register patient</Link> : undefined}
+      action={
+        <div className="flex items-center gap-3">
+          {canRegister && <SeedButton />}
+          {canRegister && (
+            <Link className="hh-button" href="/patients/new">
+              Register patient
+            </Link>
+          )}
+        </div>
+      }
     >
-      <form className="mb-5 max-w-md">
-        <input className="hh-input" name="search" defaultValue={params.search || ""} placeholder="Search by name, code, ID, email, or phone" />
+      <form className="mb-6 flex max-w-md items-center gap-2">
+        <div className="relative flex-1">
+          <input
+            className="hh-input pr-16"
+            name="search"
+            defaultValue={params.search || ""}
+            placeholder="Search by name, code, ID, phone..."
+          />
+          {params.search && (
+            <Link
+              href="/patients"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-[#225c2c] hover:underline"
+            >
+              Clear
+            </Link>
+          )}
+        </div>
+        <button className="hh-button min-h-[2.5rem] px-5 bg-[#225c2c] hover:bg-[#1a4a22]" type="submit">
+          Search
+        </button>
       </form>
 
       <div className="hh-panel overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left text-sm">
-            <thead className="bg-[#f7faf8] text-xs uppercase text-[#66736d]">
+          <table className="hh-compact-table w-full text-left">
+            <thead>
               <tr>
-                <th className="px-5 py-3">Patient</th>
-                <th className="px-5 py-3">Code</th>
-                <th className="px-5 py-3">Gender</th>
-                <th className="px-5 py-3">Contact</th>
-                <th className="px-5 py-3">Last visit</th>
-                <th className="px-5 py-3">Today&apos;s flow</th>
-                <th className="px-5 py-3">Status</th>
-                <th className="px-5 py-3 text-right">Manage</th>
+                <th>Patient</th>
+                <th>Code</th>
+                <th>Gender</th>
+                <th>Contact</th>
+                <th>Last visit</th>
+                <th>Today&apos;s flow</th>
+                <th>Status</th>
+                <th className="text-right">Manage</th>
               </tr>
             </thead>
             <tbody>
               {patients.results.map((patient) => (
-                <tr key={patient.id} className="border-t border-[var(--hh-border)]">
-                  <td className="px-5 py-4">
-                    <Link href={`/patients/${patient.public_id}`} className="font-bold text-[var(--hh-purple)] hover:underline">{patient.full_name_display}</Link>
-                    <div className="text-xs text-[#66736d]">{patient.national_id || "No national/passport ID"}</div>
-                    {patient.email && <div className="text-xs text-[#66736d]">{patient.email}</div>}
+                <tr key={patient.id}>
+                  <td>
+                    <Link
+                      href={`/patients/${patient.public_id}`}
+                      className="font-bold text-[var(--hh-purple)] hover:underline"
+                    >
+                      {patient.full_name_display}
+                    </Link>
+                    <div className="text-[11px] text-[#66736d]">
+                      {patient.national_id || "No national/passport ID"}
+                    </div>
+                    {patient.email && <div className="text-[11px] text-[#66736d]">{patient.email}</div>}
                   </td>
-                  <td className="px-5 py-4 font-mono text-xs text-[var(--hh-purple)]">{patient.patient_code}</td>
-                  <td className="px-5 py-4 capitalize">{patient.gender.replaceAll("_", " ")}</td>
-                  <td className="px-5 py-4 text-[#66736d]">{patient.primary_phone || "No phone"}</td>
-                  <td className="px-5 py-4 text-[#66736d]">{patient.last_visit_date || "--"}</td>
-                  <td className="px-5 py-4">
+                  <td className="font-mono text-xs text-[var(--hh-purple)]">{patient.patient_code}</td>
+                  <td className="capitalize">{patient.gender.replaceAll("_", " ")}</td>
+                  <td className="text-[#66736d]">{patient.primary_phone || "No phone"}</td>
+                  <td className="text-[#66736d]">{patient.last_visit_date || "--"}</td>
+                  <td>
                     {patient.current_journey ? (
-                      <div className="grid gap-1">
-                        <span className="font-bold text-[var(--hh-purple)]">{patient.current_journey.current_stage_label}</span>
-                        <span className="text-xs text-[#66736d]">
-                          {patient.current_journey.queue_number ? `Queue #${patient.current_journey.queue_number}` : patient.current_journey.flow_type_label}
+                      <div className="grid gap-0.5">
+                        <span className="font-bold text-[var(--hh-purple)]">
+                          {patient.current_journey.current_stage_label}
+                        </span>
+                        <span className="text-[10px] text-[#66736d]">
+                          {patient.current_journey.queue_number
+                            ? `Queue #${patient.current_journey.queue_number}`
+                            : patient.current_journey.flow_type_label}
                         </span>
                       </div>
                     ) : (
                       <span className="text-[#66736d]">--</span>
                     )}
                   </td>
-                  <td className="px-5 py-4">
-                    <span className="rounded-full bg-[var(--hh-green-light)] px-2 py-1 text-xs font-bold text-[var(--hh-green-dark)]">{patient.status}</span>
+                  <td>
+                    <span className="rounded-full bg-[var(--hh-green-light)] px-2 py-0.5 text-xs font-bold text-[var(--hh-green-dark)]">
+                      {patient.status}
+                    </span>
                   </td>
-                  <td className="px-5 py-4">
-                    <div className="flex justify-end gap-2">
-                      <Button asChild variant="secondary" size="sm"><Link href={`/patients/${patient.public_id}`}>Open</Link></Button>
-                      <Button asChild variant="secondary" size="sm"><Link href={`/patients/${patient.public_id}/edit`}>Edit</Link></Button>
-                      {session.role !== "receptionist" && <Button asChild size="sm"><Link href={`/visits/new?patient=${patient.id}`}>Visit</Link></Button>}
+                  <td>
+                    <div className="flex justify-end gap-1.5">
+                      <Button asChild variant="secondary" className="h-7 px-2.5 text-xs shadow-sm">
+                        <Link href={`/patients/${patient.public_id}`}>Open</Link>
+                      </Button>
+                      <Button asChild variant="secondary" className="h-7 px-2.5 text-xs shadow-sm">
+                        <Link href={`/patients/${patient.public_id}/edit`}>Edit</Link>
+                      </Button>
+                      {session.role !== "receptionist" && (
+                        <Button asChild className="h-7 px-2.5 text-xs shadow-sm bg-[#225c2c] hover:bg-[#1a4a22]">
+                          <Link href={`/visits/new?patient=${patient.id}`}>Visit</Link>
+                        </Button>
+                      )}
                     </div>
                   </td>
                 </tr>
               ))}
               {patients.results.length === 0 && (
                 <tr>
-                  <td className="px-5 py-10 text-center text-[#66736d]" colSpan={8}>No patients found.</td>
+                  <td className="py-10 text-center text-[#66736d]" colSpan={8}>
+                    No patients found.
+                  </td>
                 </tr>
               )}
             </tbody>
           </table>
         </div>
+        <TablePagination count={patients.count} />
       </div>
     </AppShell>
   );

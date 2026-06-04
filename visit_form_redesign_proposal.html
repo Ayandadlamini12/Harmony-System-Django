@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Harmony Health — Visit Form Streamlining Proposal</title>
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --hh-purple: #7030A0;
+      --hh-purple-dark: #481D64;
+      --hh-purple-light: #F4EEF8;
+      --hh-green: #50B860;
+      --hh-green-light: #E8F5E9;
+      --hh-green-dark: #2E7D32;
+      --hh-red: #E74C3C;
+      --hh-text: #2B2F38;
+      --hh-soft: #F3F8F4;
+      --hh-surface: #FFFFFF;
+      --hh-section: #F7FBF8;
+      --hh-border: #B8CABE;
+      --hh-border-strong: #9EB4A8;
+      --shadow-premium: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.03), 0 20px 25px -5px rgba(0, 0, 0, 0.01), 0 30px 50px -10px rgba(0, 0, 0, 0.02);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--hh-text);
+      background: 
+        radial-gradient(circle at top left, rgba(80, 184, 96, 0.06), transparent 45rem),
+        radial-gradient(circle at top right, rgba(112, 48, 160, 0.05), transparent 45rem),
+        linear-gradient(180deg, #f7fbf8 0%, var(--hh-soft) 100%);
+      line-height: 1.6;
+      padding-bottom: 5rem;
+    }
+
+    .container {
+      max-width: 64rem;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--hh-purple-dark) 0%, #2E1242 100%);
+      color: #fff;
+      padding: 3rem 2.5rem;
+      border-radius: 20px;
+      margin-bottom: 2.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(72, 29, 100, 0.15);
+    }
+
+    header::before {
+      content: "";
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 40rem;
+      height: 40rem;
+      background: radial-gradient(circle, rgba(80, 184, 96, 0.15) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .header-logo svg {
+      color: var(--hh-green);
+    }
+
+    .header-logo span {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 1.5rem;
+      letter-spacing: -0.03em;
+    }
+
+    .header-badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+      color: var(--hh-green-light);
+    }
+
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.5rem;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.02em;
+    }
+
+    .lead {
+      font-size: 1.1rem;
+      color: rgba(255, 255, 255, 0.85);
+      max-width: 42rem;
+    }
+
+    h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--hh-purple-dark);
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .card {
+      background: var(--hh-surface);
+      border: 1px solid #e1ebe2;
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2.5rem;
+      box-shadow: var(--shadow-premium);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      margin-bottom: 2.5rem;
+    }
+
+    @media (min-width: 768deg) {
+      .grid-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .flow-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+    }
+
+    .badge-before {
+      background: #FEE2E2;
+      color: #991B1B;
+      border: 1px solid #FECACA;
+    }
+
+    .badge-after {
+      background: var(--hh-green-light);
+      color: var(--hh-green-dark);
+      border: 1px solid #C8E6C9;
+    }
+
+    /* Comparison Styling */
+    .compare-section {
+      border-left: 4px solid var(--hh-red);
+      padding-left: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .compare-section.streamlined {
+      border-left-color: var(--hh-green);
+    }
+
+    .compare-title {
+      font-weight: 700;
+      font-size: 1rem;
+      margin-bottom: 0.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .compare-desc {
+      font-size: 0.875rem;
+      color: #53605a;
+    }
+
+    /* Interactive Table Demo Styling */
+    .sandbox-header {
+      background: var(--hh-purple-light);
+      border: 1px solid #E4D3F5;
+      padding: 1rem 1.25rem;
+      border-radius: 12px 12px 0 0;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .sandbox-title {
+      font-size: 0.875rem;
+      font-weight: 700;
+      color: var(--hh-purple-dark);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .sandbox-tag {
+      font-size: 0.75rem;
+      background: var(--hh-purple);
+      color: #fff;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+
+    .table-container {
+      border: 1px solid var(--hh-border);
+      border-top: none;
+      border-radius: 0 0 12px 12px;
+      overflow: hidden;
+      background: #fff;
+    }
+
+    .hh-table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+    }
+
+    .hh-table th {
+      background: var(--hh-section);
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #53605a;
+      padding: 0.75rem 1rem;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--hh-border);
+    }
+
+    .hh-table td {
+      padding: 1rem;
+      border-bottom: 1px solid #e8f0eb;
+      font-size: 0.875rem;
+      vertical-align: middle;
+    }
+
+    .hh-table tbody tr:hover {
+      background: #fcfdfe;
+    }
+
+    .table-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      background: #fff;
+      border: 1px solid var(--hh-border);
+      border-radius: 6px;
+      padding: 0.4rem 0.75rem;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--hh-text);
+      cursor: pointer;
+      transition: all 150ms ease;
+    }
+
+    .table-btn:hover {
+      border-color: var(--hh-purple);
+      color: var(--hh-purple);
+      background: var(--hh-purple-light);
+      box-shadow: 0 2px 4px rgba(112, 48, 160, 0.08);
+    }
+
+    .table-btn svg {
+      color: var(--hh-purple);
+    }
+
+    .text-muted {
+      color: #66736d;
+    }
+
+    /* Modal / Popups */
+    .modal-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(31, 18, 43, 0.4);
+      backdrop-filter: blur(4px);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 250ms ease;
+    }
+
+    .modal-overlay.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+
+    .modal {
+      background: #fff;
+      border-radius: 16px;
+      width: 90%;
+      max-width: 28rem;
+      box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+      border: 1px solid #c7d7cd;
+      transform: scale(0.95);
+      transition: transform 250ms cubic-bezier(0.16, 1, 0.3, 1);
+      overflow: hidden;
+    }
+
+    .modal-overlay.active .modal {
+      transform: scale(1);
+    }
+
+    .modal-header {
+      background: linear-gradient(135deg, var(--hh-purple-dark) 0%, var(--hh-purple) 100%);
+      color: #fff;
+      padding: 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .modal-header h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .modal-close {
+      background: none;
+      border: none;
+      color: rgba(255, 255, 255, 0.8);
+      font-size: 1.5rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      border-radius: 9999px;
+      transition: all 150ms ease;
+    }
+
+    .modal-close:hover {
+      background: rgba(255, 255, 255, 0.15);
+      color: #fff;
+    }
+
+    .modal-body {
+      padding: 1.5rem;
+    }
+
+    .modal-section {
+      margin-bottom: 1.25rem;
+    }
+
+    .modal-section:last-child {
+      margin-bottom: 0;
+    }
+
+    .modal-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #53605a;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.35rem;
+    }
+
+    .modal-value {
+      background: #f7faf8;
+      border: 1px solid var(--hh-border);
+      border-radius: 8px;
+      padding: 0.75rem 1rem;
+      font-size: 0.875rem;
+      color: var(--hh-text);
+      white-space: pre-wrap;
+    }
+
+    .modal-pill-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+
+    .modal-pill {
+      background: var(--hh-purple-light);
+      border: 1px solid #E4D3F5;
+      padding: 0.3rem 0.6rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: var(--hh-purple-dark);
+    }
+
+    .modal-pill.resolved {
+      background: var(--hh-green-light);
+      border-color: #C8E6C9;
+      color: var(--hh-green-dark);
+    }
+
+    .btn-print {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--hh-green);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.65rem 1.25rem;
+      font-weight: 700;
+      font-size: 0.875rem;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(80, 184, 96, 0.15);
+      transition: all 150ms ease;
+    }
+
+    .btn-print:hover {
+      background: var(--hh-green-dark);
+      box-shadow: 0 4px 12px rgba(46, 125, 50, 0.25);
+    }
+
+    .footer-actions {
+      display: flex;
+      justify-content: center;
+      margin-top: 1.5rem;
+    }
+
+    /* Print Specific Styling */
+    @media print {
+      body {
+        background: none;
+        color: #000;
+        padding-bottom: 0;
+      }
+
+      .container {
+        padding: 0;
+        max-width: 100%;
+      }
+
+      header {
+        background: none !important;
+        color: #000 !important;
+        border: 2px solid #000;
+        border-radius: 0;
+        box-shadow: none !important;
+        padding: 2rem;
+        page-break-after: avoid;
+      }
+
+      header h1, header .lead, header span {
+        color: #000 !important;
+      }
+
+      .header-badge {
+        display: none !important;
+      }
+
+      .card {
+        border-radius: 0;
+        box-shadow: none !important;
+        border: 1px solid #999;
+        page-break-inside: avoid;
+      }
+
+      .btn-print, .footer-actions, .sandbox-header .sandbox-tag {
+        display: none !important;
+      }
+
+      .table-btn {
+        border: 1px solid #000 !important;
+        color: #000 !important;
+      }
+
+      .table-btn svg {
+        display: none !important;
+      }
+
+      .table-btn::after {
+        content: " (See Appendix / Summary)";
+      }
+
+      .modal-overlay {
+        position: relative !important;
+        display: block !important;
+        background: none !important;
+        backdrop-filter: none !important;
+        opacity: 1 !important;
+        pointer-events: auto !important;
+        page-break-before: always;
+        z-index: auto;
+      }
+
+      .modal {
+        transform: none !important;
+        max-width: 100% !important;
+        width: 100% !important;
+        box-shadow: none !important;
+        border: 1px solid #000 !important;
+        border-radius: 0 !important;
+      }
+
+      .modal-header {
+        background: #f0f0f0 !important;
+        color: #000 !important;
+        border-bottom: 1px solid #000 !important;
+      }
+
+      .modal-close {
+        display: none !important;
+      }
+
+      .modal-value {
+        background: none !important;
+        border: 1px solid #666 !important;
+        border-radius: 0 !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- HEADER -->
+    <header>
+      <div class="header-badge">Proposal & Specifications</div>
+      <div class="header-logo">
+        <!-- SVG Heart Logo -->
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+        </svg>
+        <span>Harmony Health System</span>
+      </div>
+      <h1>Visit Form Streamlining Specs</h1>
+      <p class="lead">Eliminating clinical redundancies, adding overarching practitioner reviews, and implementing modal detail popups inside the Follow-up Context Table.</p>
+    </header>
+
+    <!-- SPEC CARD 1: COMPARISON -->
+    <div class="card">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[var(--hh-purple)]">
+          <path d="M16 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V8Z"/>
+          <path d="M15 3v5h6"/>
+          <path d="M9 14h6"/>
+          <path d="M9 10h3"/>
+        </svg>
+        Redundancy Streamlining Summary
+      </h2>
+      <p style="margin-bottom: 1.5rem; color: #53605a;">To save clinical time and eliminate screen clutter, we are removing redundant fields from Step 5 ("Clinical notes/Evaluation") of the comprehensive visit wizard. All data is carried forward contextually.</p>
+      
+      <div class="grid-2">
+        <!-- BEFORE -->
+        <div style="background: #FDF2F2; border: 1px solid #FEE2E2; padding: 1.5rem; border-radius: 12px;">
+          <div class="flow-badge badge-before" style="margin-bottom: 1rem;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+            Current Redundant Form
+          </div>
+          
+          <div class="compare-section">
+            <div class="compare-title">Initial Complaints Textbox <span style="font-size: 0.75rem; font-weight: normal; color: #991B1B;">(New Consult)</span></div>
+            <p class="compare-desc">Redundant because clinicians already typed the "Main complaint" on the very first step of the form.</p>
+          </div>
+
+          <div class="compare-section">
+            <div class="compare-title">Symptoms of Previous Consult <span style="font-size: 0.75rem; font-weight: normal; color: #991B1B;">(Follow-up)</span></div>
+            <p class="compare-desc">Redundant because all open symptoms are automatically carried forward as active, editable items in Step 2.</p>
+          </div>
+
+          <div class="compare-section" style="margin-bottom: 0;">
+            <div class="compare-title">Evaluation on Previous Complaint <span style="font-size: 0.75rem; font-weight: normal; color: #991B1B;">(Follow-up)</span></div>
+            <p class="compare-desc">Redundant textbox forcing doctors to type a summary that is already captured by structured symptoms and rating sliders.</p>
+          </div>
+        </div>
+
+        <!-- AFTER -->
+        <div style="background: #E8F5E9; border: 1px solid #C8E6C9; padding: 1.5rem; border-radius: 12px;">
+          <div class="flow-badge badge-after" style="margin-bottom: 1rem;">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M20 6 9 17l-5-5"/></svg>
+            Proposed Streamlined Form
+          </div>
+          
+          <div class="compare-section streamlined">
+            <div class="compare-title" style="color: var(--hh-green-dark);">1. Form Field Removal</div>
+            <p class="compare-desc">We completely remove all three generic text areas. This saves doctors up to 30 clicks and typing effort per visit.</p>
+          </div>
+
+          <div class="compare-section streamlined">
+            <div class="compare-title" style="color: var(--hh-green-dark);">2. Auto-Compilation Engine</div>
+            <p class="compare-desc">The system automatically compiles structured symptom progress (notes, resolved status) and slider ratings (Energy, Sleep) upon submission.</p>
+          </div>
+
+          <div class="compare-section streamlined" style="margin-bottom: 0;">
+            <div class="compare-title" style="color: var(--hh-green-dark);">3. Overarching Clinician Note</div>
+            <p class="compare-desc">We add a single compact **"Practitioner Evaluation Note"** on the evaluation step, so doctors can write a final custom overview (appended to the summary).</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SPEC CARD 2: INTERACTIVE PLAYGROUND -->
+    <div class="card">
+      <h2>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[var(--hh-purple)]">
+          <circle cx="12" cy="12" r="10"/><path d="m10 15 5-3-5-5v6Z"/>
+        </svg>
+        Live Spec Sandbox (Interactive Demo)
+      </h2>
+      <p style="margin-bottom: 1.5rem; color: #53605a;">This sandbox represents the redesigned **Follow-up Context Table**. To prevent rows from becoming tall and unreadable due to longer prescription lists or compiled summaries, the data is tucked into **modal popups**. Try clicking them below:</p>
+
+      <div class="sandbox-header">
+        <div class="sandbox-title">Redesigned History Table</div>
+        <div class="sandbox-tag">Live Demonstration</div>
+      </div>
+      <div class="table-container">
+        <table class="hh-table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Remedy & Instructions</th>
+              <th>Evaluation & Progress Summary</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td style="font-weight: 600;">03 June 2026</td>
+              <td>
+                <button class="table-btn" onclick="openModal('remedy-1')">
+                  <!-- Pill Bottle Icon -->
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 18h12"/><path d="M12 2v4"/><path d="m19 8-1.5-1.5c-.8-.8-2-1-3-.5L12 7.5c-1-.5-2.2-.3-3 .5L7.5 9c-.8.8-1 2-.5 3L8.5 13.5c-.5 1-.3 2.2.5 3L10.5 18c.8.8 2 1 3 .5l1.5-1.5c1 .5 2.2.3 3-.5l1.5-1.5c.8-.8 1-2 .5-3L19.5 10.5c.5-1 .3-2.2-.5-3Z"/></svg>
+                  Pulsatilla 30C
+                </button>
+              </td>
+              <td>
+                <button class="table-btn" onclick="openModal('eval-1')">
+                  <!-- Eye Icon -->
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 12s3-7 10-7 7 7 7 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  View Progress Summary
+                </button>
+              </td>
+            </tr>
+            <tr>
+              <td style="font-weight: 600;">20 May 2026</td>
+              <td>
+                <button class="table-btn" onclick="openModal('remedy-2')">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 18h12"/><path d="M12 2v4"/><path d="m19 8-1.5-1.5c-.8-.8-2-1-3-.5L12 7.5c-1-.5-2.2-.3-3 .5L7.5 9c-.8.8-1 2-.5 3L8.5 13.5c-.5 1-.3 2.2.5 3L10.5 18c.8.8 2 1 3 .5l1.5-1.5c1 .5 2.2.3 3-.5l1.5-1.5c.8-.8 1-2 .5-3L19.5 10.5c.5-1 .3-2.2-.5-3Z"/></svg>
+                  Nux Vomica 200C
+                </button>
+              </td>
+              <td>
+                <button class="table-btn" onclick="openModal('eval-2')">
+                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M2 12s3-7 10-7 7 7 7 7-3 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  View Progress Summary
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- PRINT CALLOUT -->
+    <div class="footer-actions">
+      <button class="btn-print" onclick="window.print()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 9V2h12v7"/>
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+          <rect x="6" y="14" width="12" height="8"/>
+        </svg>
+        Save Spec as PDF for Presentation
+      </button>
+    </div>
+
+  </div>
+
+  <!-- MODAL DIALOGS -->
+  
+  <!-- MODAL 1: Pulsatilla Remedy Details -->
+  <div class="modal-overlay" id="modal-remedy-1" onclick="closeModalOnOverlay(event, 'remedy-1')">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m10.5 20.5 10-10a4.95 4.5 0 1 0-7-7l-10 10a4.95 4.5 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+          Remedy Details
+        </h3>
+        <button class="modal-close" onclick="closeModal('remedy-1')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <div class="modal-label">Selected Remedy</div>
+          <div class="modal-value" style="font-weight: 700; color: var(--hh-purple-dark);">Pulsatilla 30C</div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-label">Instructions / Frequency</div>
+          <div class="modal-value">3 pellets dry, twice daily. Take first thing in the morning on an empty stomach.</div>
+        </div>
+        <div class="modal-section" style="margin-bottom: 0;">
+          <div class="modal-label">Reason for Remedy</div>
+          <div class="modal-value" style="color: #53605a;">Prescribed to address the yellow catarrh, sinus congestion, and changeable emotional states.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 2: Pulsatilla Evaluation Summary -->
+  <div class="modal-overlay" id="modal-eval-1" onclick="closeModalOnOverlay(event, 'eval-1')">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+          Evaluation Progress Summary
+        </h3>
+        <button class="modal-close" onclick="closeModal('eval-1')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <div class="modal-label">Symptom Outcomes (Step 2)</div>
+          <div class="modal-pill-list" style="margin-bottom: 0.5rem;">
+            <span class="modal-pill resolved">✓ Yellow Catarrh: Resolved</span>
+            <span class="modal-pill resolved">✓ Head Congestion: Resolved</span>
+            <span class="modal-pill">⚡ Mood Fluctuations: Open</span>
+          </div>
+          <div class="modal-value" style="font-size: 0.8rem; color: #53605a;">Catarrh resolved within 48 hours. Mood transitions are less intense but still present in evenings.</div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-label">Vitals & Energy Sliders (Step 5)</div>
+          <div class="modal-value"><strong>Energy Rating:</strong> 8/10 <span class="text-muted">(Improved dramatically)</span><br><strong>Sleep Rating:</strong> 7/10 <span class="text-muted">(Fewer waking spells)</span></div>
+        </div>
+        <div class="modal-section" style="margin-bottom: 0;">
+          <div class="modal-label">Clinician Evaluation Overview</div>
+          <div class="modal-value" style="background: var(--hh-purple-light); border-color: #E4D3F5; font-weight: 500;">Patient responded exceptionally well. The physical acute symptoms have fully cleared. Energy levels are much higher. We will now shift focus to stabilizing the sleep cycles.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 3: Nux Vomica Remedy Details -->
+  <div class="modal-overlay" id="modal-remedy-2" onclick="closeModalOnOverlay(event, 'remedy-2')">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="m10.5 20.5 10-10a4.95 4.5 0 1 0-7-7l-10 10a4.95 4.5 0 1 0 7 7Z"/><path d="m8.5 8.5 7 7"/></svg>
+          Remedy Details
+        </h3>
+        <button class="modal-close" onclick="closeModal('remedy-2')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <div class="modal-label">Selected Remedy</div>
+          <div class="modal-value" style="font-weight: 700; color: var(--hh-purple-dark);">Nux Vomica 200C</div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-label">Instructions / Frequency</div>
+          <div class="modal-value">Take 1 dose (3 pellets) dry at bedtime, for three nights only.</div>
+        </div>
+        <div class="modal-section" style="margin-bottom: 0;">
+          <div class="modal-label">Reason for Remedy</div>
+          <div class="modal-value" style="color: #53605a;">Prescribed to address persistent work-related insomnia, gastrointestinal cramps, and irritability.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL 4: Nux Vomica Evaluation Summary -->
+  <div class="modal-overlay" id="modal-eval-2" onclick="closeModalOnOverlay(event, 'eval-2')">
+    <div class="modal">
+      <div class="modal-header">
+        <h3>
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><path d="M16 13H8"/><path d="M16 17H8"/><path d="M10 9H8"/></svg>
+          Evaluation Progress Summary
+        </h3>
+        <button class="modal-close" onclick="closeModal('eval-2')">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-section">
+          <div class="modal-label">Symptom Outcomes (Step 2)</div>
+          <div class="modal-pill-list" style="margin-bottom: 0.5rem;">
+            <span class="modal-pill resolved">✓ GI Cramping: Resolved</span>
+            <span class="modal-pill">⚡ Late Bedtime Insomnia: Open</span>
+          </div>
+          <div class="modal-value" style="font-size: 0.8rem; color: #53605a;">Spasmodic cramps fully resolved. Insomnia remains an issue on heavy workdays.</div>
+        </div>
+        <div class="modal-section">
+          <div class="modal-label">Vitals & Energy Sliders (Step 5)</div>
+          <div class="modal-value"><strong>Energy Rating:</strong> 6/10 <span class="text-muted">(Moderately rested)</span><br><strong>Sleep Rating:</strong> 5/10 <span class="text-muted">(Difficulty falling asleep)</span></div>
+        </div>
+        <div class="modal-section" style="margin-bottom: 0;">
+          <div class="modal-label">Clinician Evaluation Overview</div>
+          <div class="modal-value" style="background: var(--hh-purple-light); border-color: #E4D3F5; font-weight: 500;">Digestive symptoms cleared. Irritability has significantly lessened. Sleep latency is still long on weeknights. Recommended dietary changes (no caffeine after 2pm) and will reinforce with sleep hygiene.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- MODAL JAVASCRIPT -->
+  <script>
+    function openModal(id) {
+      document.getElementById('modal-' + id).classList.add('active');
+    }
+
+    function closeModal(id) {
+      document.getElementById('modal-' + id).classList.remove('active');
+    }
+
+    function closeModalOnOverlay(event, id) {
+      if (event.target === document.getElementById('modal-' + id)) {
+        closeModal(id);
+      }
+    }
+  </script>
+
+</body>
+</html>

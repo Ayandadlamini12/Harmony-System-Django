@@ -108,3 +108,44 @@ a {
 .hh-table tbody tr {
   border-top: 1px solid #d7e3dc;
 }
+
+/* Compact Premium Table Styling */
+.hh-compact-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.hh-compact-table thead tr {
+  background: #f2fbf4;
+  border-bottom: 2px solid #cce4d1;
+}
+
+.hh-compact-table th {
+  padding: 0.5rem 0.75rem;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: #225c2c;
+  letter-spacing: 0.05em;
+}
+
+.hh-compact-table tbody tr {
+  border-bottom: 1px solid #e2ece5;
+  transition: background-color 100ms ease;
+}
+
+.hh-compact-table tbody tr:hover {
+  background-color: #f7fdf8 !important;
+}
+
+.hh-compact-table tbody tr:nth-child(even) {
+  background-color: #fafdfa;
+}
+
+.hh-compact-table td {
+  padding: 0.45rem 0.75rem;
+  font-size: 13px;
+  color: var(--hh-text);
+  vertical-align: middle;
+}
+

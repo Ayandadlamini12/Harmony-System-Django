@@ -3,14 +3,14 @@ import type { LucideIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const toneClasses = {
-  default: "border-[#d5e3da] bg-[#f7fbf8] text-[var(--hh-purple-dark)]",
+  default: "border-[#cce4d1] bg-[#f2fbf4] text-[#225c2c]",
   identity: "border-[#cce4d1] bg-[#f2fbf4] text-[#225c2c]",
-  contact: "border-[#cce4d1] bg-[#f2fbf4] text-[#1f6f32]",
-  secure: "border-[#e5d4ef] bg-[#f8f0fb] text-[var(--hh-purple-dark)]",
-  clinical: "border-[#d7e3dc] bg-[#f7fbf8] text-[#24302b]",
-  vitals: "border-[#ffd6dc] bg-[#fff5f6] text-[#8f1f32]",
-  appointment: "border-[#dce9d8] bg-[#f4fbf2] text-[#225c2c]",
-  notes: "border-[#d7e3dc] bg-[#fbfdfc] text-[#24302b]"
+  contact: "border-[#cce4d1] bg-[#f2fbf4] text-[#225c2c]",
+  secure: "border-[#cce4d1] bg-[#f2fbf4] text-[#225c2c]",
+  clinical: "border-[#cce4d1] bg-[#f2fbf4] text-[#225c2c]",
+  vitals: "border-[#cce4d1] bg-[#f2fbf4] text-[#225c2c]",
+  appointment: "border-[#cce4d1] bg-[#f2fbf4] text-[#225c2c]",
+  notes: "border-[#cce4d1] bg-[#f2fbf4] text-[#225c2c]"
 };
 
 export type FormSectionTone = keyof typeof toneClasses;

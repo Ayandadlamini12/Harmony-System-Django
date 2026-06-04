@@ -803,4 +803,31 @@ class AuditLog(models.Model):
     def __str__(self) -> str:
         return f"{self.action} {self.entity_type}#{self.entity_id}"
 
+
+class SupportTicket(TimeStampedModel):
+    class TicketStatus(models.TextChoices):
+        OPEN = "open", "Open"
+        RESOLVED = "resolved", "Resolved"
+
+    title = models.CharField(max_length=255)
+    description = models.TextField()
+    status = models.CharField(
+        max_length=30,
+        choices=TicketStatus.choices,
+        default=TicketStatus.OPEN,
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_tickets",
+    )
+
+    class Meta:
+        ordering = ("-created_at",)
+
+    def __str__(self) -> str:
+        return f"{self.title} ({self.status})"
+
 # Create your models here.

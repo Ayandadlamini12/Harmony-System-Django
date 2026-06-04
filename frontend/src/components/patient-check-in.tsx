@@ -264,7 +264,7 @@ export function PatientCheckIn({
               <div className="flex flex-wrap gap-2 text-sm">
                 {confirmation.patientCode && <span className="rounded-full bg-white px-2.5 py-1 font-mono text-[var(--hh-purple)]">{confirmation.patientCode}</span>}
                 <span className="rounded-full bg-white px-2.5 py-1 font-bold">
-                  {confirmation.visitType === "new_consultation" ? "New visit activated" : "Follow-up activated"}
+                  Visit activated
                 </span>
                 <span className="rounded-full bg-white px-2.5 py-1 font-bold">
                   {confirmation.appointmentMatched ? "Appointment check-in" : "Waiting list"}
@@ -350,27 +350,17 @@ export function PatientCheckIn({
                   {lookup.primary_phone && <span>{lookup.primary_phone}</span>}
                 </div>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid gap-3">
                 <LoadingButton
                   disabled={lookup.current_journey?.service_date === todayKey() || activatedPatientIds.has(lookup.patient)}
                   loading={submittingType === `${lookup.patient}-new_consultation`}
                   loadingText="Checking in..."
                   onClick={() => checkIn({ patient: lookup.patient, visitType: "new_consultation" })}
                   type="button"
+                  className="w-full bg-[var(--hh-purple)] hover:bg-[var(--hh-purple-dark)] text-white text-lg py-6 font-bold rounded-lg shadow-md transition-all flex items-center justify-center gap-2"
                 >
-                  <ClipboardPlus size={18} />
-                  Activate new visit
-                </LoadingButton>
-                <LoadingButton
-                  disabled={lookup.current_journey?.service_date === todayKey() || activatedPatientIds.has(lookup.patient)}
-                  loading={submittingType === `${lookup.patient}-follow_up`}
-                  loadingText="Checking in..."
-                  onClick={() => checkIn({ patient: lookup.patient, visitType: "follow_up" })}
-                  type="button"
-                  variant="secondary"
-                >
-                  <RotateCcw size={18} />
-                  Follow up
+                  <ClipboardPlus size={20} />
+                  Check In
                 </LoadingButton>
               </div>
               {(lookup.current_journey?.service_date === todayKey() || activatedPatientIds.has(lookup.patient)) && (
@@ -415,20 +405,10 @@ export function PatientCheckIn({
                   loadingText="Checking in..."
                   onClick={() => checkIn({ patient: patient.id, visitType: "new_consultation" })}
                   type="button"
+                  className="bg-[var(--hh-purple)] hover:bg-[var(--hh-purple-dark)] text-white font-bold"
                 >
                   <ClipboardPlus size={17} />
-                  Activate new visit
-                </LoadingButton>
-                <LoadingButton
-                  disabled={hasTodayActivation(patient, activatedPatientIds)}
-                  loading={submittingType === `${patient.id}-follow_up`}
-                  loadingText="Checking in..."
-                  onClick={() => checkIn({ patient: patient.id, visitType: "follow_up" })}
-                  type="button"
-                  variant="secondary"
-                >
-                  <RotateCcw size={17} />
-                  Follow up
+                  Check In
                 </LoadingButton>
               </div>
             </div>

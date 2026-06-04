@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
 from .document_generation import consent_document_reference, generate_consent_pdf, render_consent_html, save_consent_pdf, sign_consent_document
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, Vital
 from .serializers import (
     AuditLogSerializer,
     AppointmentSerializer,
@@ -32,6 +32,7 @@ from .serializers import (
     PatientJourneySerializer,
     PatientDetailSerializer,
     PatientListSerializer,
+    SupportTicketSerializer,
     VisitSerializer,
     VitalSerializer,
 )
@@ -367,6 +368,16 @@ class PatientViewSet(viewsets.ModelViewSet):
         ).distinct().order_by("-created_at")
         serializer = PatientListSerializer(list(pending) + list(needs_renewal), many=True, context={"request": request})
         return Response(serializer.data)
+
+    @action(detail=False, methods=["post"], url_path="seed")
+    def seed(self, request):
+        try:
+            from seed_patients import run_seeder
+            run_seeder(delete_first=False)
+            return Response({"status": "success", "message": "Demo patients seeded successfully without data loss."}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({"status": "error", "message": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 class PatientDocumentViewSet(viewsets.ReadOnlyModelViewSet):
@@ -1223,5 +1234,24 @@ def patient_import_webhook(request):
         },
         status=status.HTTP_201_CREATED,
     )
+
+
+class SupportTicketViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = SupportTicket.objects.select_related("created_by")
+    serializer_class = SupportTicketSerializer
+    filterset_fields = ("status",)
+    search_fields = (
+        "title",
+        "description",
+        "created_by__first_name",
+        "created_by__last_name",
+        "created_by__username",
+    )
+    ordering_fields = ("created_at", "updated_at")
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)
+
 
 # Create your views here.

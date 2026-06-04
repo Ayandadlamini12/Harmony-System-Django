@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, VisitSymptomProblem, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, VisitSymptomProblem, Vital
 from .workflow import build_patient_workflow_actions
 
 User = get_user_model()
@@ -882,4 +882,36 @@ class ElevatedAccessRequestSerializer(serializers.ModelSerializer):
     def create(self, validated_data):
         request = self.context.get("request")
         validated_data["requested_by"] = request.user
+        return super().create(validated_data)
+
+
+class SupportTicketSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
+    created_by_username = serializers.CharField(source="created_by.username", read_only=True)
+    created_by_email = serializers.CharField(source="created_by.email", read_only=True)
+
+    class Meta:
+        model = SupportTicket
+        fields = (
+            "id",
+            "title",
+            "description",
+            "status",
+            "created_by",
+            "created_by_name",
+            "created_by_username",
+            "created_by_email",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "created_by",
+            "created_at",
+            "updated_at",
+        )
+
+    def create(self, validated_data):
+        request = self.context.get("request")
+        if request and request.user and request.user.is_authenticated:
+            validated_data["created_by"] = request.user
         return super().create(validated_data)

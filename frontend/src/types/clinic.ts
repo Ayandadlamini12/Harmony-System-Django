@@ -485,7 +485,9 @@ export type MessageThread = {
   participants: MessageParticipant[];
   messages: Message[];
   latest_message?: Message | null;
-  unread_count: number;
+  is_active?: boolean;
+  avatar_url?: string | null;
+  unread_count?: number;
   created_at: string;
   updated_at: string;
 };
@@ -495,4 +497,17 @@ export type Paginated<T> = {
   next: string | null;
   previous: string | null;
   results: T[];
+};
+
+export type SupportTicket = {
+  id: number;
+  title: string;
+  description: string;
+  status: "open" | "resolved";
+  created_by?: number | null;
+  created_by_name?: string | null;
+  created_by_username?: string | null;
+  created_by_email?: string | null;
+  created_at: string;
+  updated_at: string;
 };

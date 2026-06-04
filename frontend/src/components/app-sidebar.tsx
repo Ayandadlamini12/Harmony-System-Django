@@ -6,12 +6,14 @@ import {
   Menu,
   Search,
   UserCog,
+  LifeBuoy,
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type React from "react";
 import { useEffect, useState } from "react";
 
+import { SupportTicketDialog } from "@/components/support-ticket-dialog";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { UserAccountMenu } from "@/components/user-account-menu";
@@ -241,7 +243,40 @@ function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: s
           </nav>
         </TooltipProvider>
 
-        <div className="border-t border-[#d7e3dc] bg-white/70 p-3">
+        <div className="border-t border-[#d7e3dc] bg-white/70 p-3 space-y-1">
+          {role === "admin" ? (
+            <Button
+              asChild
+              className={cn(
+                "w-full justify-start gap-3 px-3 text-sm font-bold text-[var(--hh-purple-dark)] hover:bg-[var(--hh-purple-light)] hover:text-[var(--hh-purple)]",
+                collapsed && "justify-center px-0",
+                pathname === "/administration/support-tickets" && "bg-[var(--hh-purple-light)] text-[var(--hh-purple)]"
+              )}
+              variant="ghost"
+            >
+              <Link href="/administration/support-tickets" title={collapsed ? "Support Tickets" : undefined}>
+                <LifeBuoy size={18} />
+                {!collapsed && <span>Support Tickets</span>}
+              </Link>
+            </Button>
+          ) : (
+            <SupportTicketDialog
+              trigger={
+                <Button
+                  className={cn(
+                    "w-full justify-start gap-3 px-3 text-sm font-bold text-[#24302b] hover:bg-slate-100",
+                    collapsed && "justify-center px-0"
+                  )}
+                  variant="ghost"
+                  type="button"
+                >
+                  <LifeBuoy size={18} />
+                  {!collapsed && <span>Contact Support</span>}
+                </Button>
+              }
+            />
+          )}
+
           <Button
             asChild
             className={cn(

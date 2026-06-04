@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import AppointmentViewSet, AuditLogViewSet, CaseViewSet, ElevatedAccessRequestViewSet, FormDraftViewSet, MessageThreadViewSet, PatientCheckInViewSet, PatientDocumentViewSet, PatientJourneyViewSet, PatientViewSet, VisitViewSet, VitalViewSet, dashboard_stats, patient_import_webhook
+from .views import AppointmentViewSet, AuditLogViewSet, CaseViewSet, ElevatedAccessRequestViewSet, FormDraftViewSet, MessageThreadViewSet, PatientCheckInViewSet, PatientDocumentViewSet, PatientJourneyViewSet, PatientViewSet, SupportTicketViewSet, VisitViewSet, VitalViewSet, dashboard_stats, patient_import_webhook
 
 router = DefaultRouter()
 router.register("patients", PatientViewSet, basename="patients")
@@ -16,8 +16,10 @@ router.register("form-drafts", FormDraftViewSet, basename="form-drafts")
 router.register("message-threads", MessageThreadViewSet, basename="message-threads")
 router.register("access-requests", ElevatedAccessRequestViewSet, basename="access-requests")
 router.register("audit-logs", AuditLogViewSet, basename="audit-logs")
+router.register("support-tickets", SupportTicketViewSet, basename="support-tickets")
 
 urlpatterns = [
     path("dashboard/stats/", dashboard_stats, name="dashboard-stats"),
     path("webhooks/patient-import/", patient_import_webhook, name="patient-import-webhook"),
 ] + router.urls
+

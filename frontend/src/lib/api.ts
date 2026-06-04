@@ -1,4 +1,4 @@
-import type { Appointment, Case, ClinicianProfile, DashboardStats, ElevatedAccessRequest, EmployeeEnrollmentRequest, EmailDeliveryLog, FormDraft, MessageRecipient, MessageThread, Paginated, Patient, PatientCheckIn, PatientJourney, RoleModuleMatrix, SystemEmailSettings, User, Visit, Vital } from "@/types/clinic";
+import type { Appointment, Case, ClinicianProfile, DashboardStats, ElevatedAccessRequest, EmployeeEnrollmentRequest, EmailDeliveryLog, FormDraft, MessageRecipient, MessageThread, Paginated, Patient, PatientCheckIn, PatientJourney, RoleModuleMatrix, SupportTicket, SystemEmailSettings, User, Visit, Vital } from "@/types/clinic";
 import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -29,6 +29,14 @@ export function getDashboardStats() {
 }
 
 export function getPatients(search = "") {
+  if (search.includes("=")) {
+    return apiGet<Paginated<Patient>>(`/patients/?${search}`, {
+      count: 0,
+      next: null,
+      previous: null,
+      results: []
+    });
+  }
   const query = search ? `?search=${encodeURIComponent(search)}` : "";
   return apiGet<Paginated<Patient>>(`/patients/${query}`, {
     count: 0,
@@ -64,8 +72,27 @@ export function getCase(id: string | number) {
   return apiGet<Case | null>(`/cases/${id}/`, null);
 }
 
-export function getVisits() {
-  return apiGet<Paginated<Visit>>("/visits/", {
+export function getVisits(search = "") {
+  if (search.includes("=")) {
+    return apiGet<Paginated<Visit>>(`/visits/?${search}`, {
+      count: 0,
+      next: null,
+      previous: null,
+      results: []
+    });
+  }
+  const query = search ? `?search=${encodeURIComponent(search)}` : "";
+  return apiGet<Paginated<Visit>>(`/visits/${query}`, {
+    count: 0,
+    next: null,
+    previous: null,
+    results: []
+  });
+}
+
+export function getSupportTickets(filter = "") {
+  const query = filter ? (filter.includes("=") ? `?${filter}` : `?status=${encodeURIComponent(filter)}`) : "";
+  return apiGet<Paginated<SupportTicket>>(`/support-tickets/${query}`, {
     count: 0,
     next: null,
     previous: null,

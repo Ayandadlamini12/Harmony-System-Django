@@ -1,7 +1,27 @@
 "use client";
 
 import Link from "next/link";
-import { ChevronDown, ChevronUp, Check, ClipboardList, Download, Eye, FileText, HeartPulse, ListChecks, LockKeyhole, PenLine, Printer, ShieldCheck, Stethoscope, UserRound, X } from "lucide-react";
+import {
+  Activity,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  ClipboardList,
+  Download,
+  Eye,
+  FileText,
+  HeartPulse,
+  ListChecks,
+  LockKeyhole,
+  PenLine,
+  Printer,
+  Scale,
+  ShieldCheck,
+  Stethoscope,
+  Thermometer,
+  UserRound,
+  X
+} from "lucide-react";
 import SignaturePad from "signature_pad";
 import type { ReactNode } from "react";
 import { useEffect, useRef, useState } from "react";
@@ -58,11 +78,91 @@ function allVitals(patient: Patient) {
 
 function disabledWorkflowButton(action: PatientWorkflowAction | undefined, icon: ReactNode, label: string) {
   return (
-    <Button variant="secondary" type="button" disabled title={action?.reason || "This action is not available yet."}>
+    <Button variant="secondary" type="button" disabled title={action?.reason || "This action is not available yet."} className="text-xs">
       {icon}
       {label}
     </Button>
   );
+}
+
+// Visual Vitals helpers for clinical ranges and color categorization
+function getBPStatus(sysVal?: string, diaVal?: string) {
+  const sys = parseInt(sysVal || "0", 10);
+  const dia = parseInt(diaVal || "0", 10);
+  if (!sys || !dia) {
+    return { label: "Unknown", color: "text-slate-500", badge: "bg-slate-100 text-slate-700", pct: 0 };
+  }
+  if (sys > 180 || dia > 120) {
+    return { label: "Crisis", color: "text-red-700 font-extrabold", badge: "bg-red-700 text-white animate-pulse", pct: 95 };
+  }
+  if (sys >= 140 || dia >= 90) {
+    return { label: "Stage 2 Hyper", color: "text-red-600", badge: "bg-red-500 text-white", pct: 80 };
+  }
+  if ((sys >= 130 && sys < 140) || (dia >= 80 && dia < 90)) {
+    return { label: "Stage 1 Hyper", color: "text-orange-600", badge: "bg-orange-500 text-white", pct: 60 };
+  }
+  if (sys >= 120 && sys < 130 && dia < 80) {
+    return { label: "Elevated", color: "text-amber-600", badge: "bg-amber-400 text-slate-950", pct: 40 };
+  }
+  return { label: "Optimal", color: "text-emerald-700", badge: "bg-emerald-500 text-white", pct: 20 };
+}
+
+function getPulseStatus(pulse?: number | null) {
+  if (!pulse) {
+    return { label: "Unknown", color: "text-slate-500", badge: "bg-slate-100 text-slate-700", pct: 0 };
+  }
+  if (pulse > 100) {
+    return { label: "Tachycardia", color: "text-rose-600", badge: "bg-rose-500 text-white", pct: 85 };
+  }
+  if (pulse < 60) {
+    return { label: "Bradycardia", color: "text-sky-600", badge: "bg-sky-400 text-white", pct: 15 };
+  }
+  return { label: "Normal", color: "text-emerald-700", badge: "bg-emerald-500 text-white", pct: 50 };
+}
+
+function getTempStatus(tempVal?: string | null) {
+  if (!tempVal) {
+    return { label: "Unknown", color: "text-slate-500", badge: "bg-slate-100 text-slate-700", pct: 0 };
+  }
+  const temp = parseFloat(tempVal);
+  if (isNaN(temp)) {
+    return { label: "Unknown", color: "text-slate-500", badge: "bg-slate-100 text-slate-700", pct: 0 };
+  }
+  if (temp > 38.3) {
+    return { label: "High Fever", color: "text-red-600", badge: "bg-red-500 text-white", pct: 90 };
+  }
+  if (temp >= 37.3) {
+    return { label: "Low Fever", color: "text-amber-600", badge: "bg-amber-400 text-slate-950", pct: 65 };
+  }
+  if (temp < 35.0) {
+    return { label: "Hypothermia", color: "text-sky-600", badge: "bg-sky-400 text-white", pct: 15 };
+  }
+  return { label: "Normal", color: "text-emerald-700", badge: "bg-emerald-500 text-white", pct: 45 };
+}
+
+function getGlucoseStatus(glucoseVal?: string | null, context?: string) {
+  if (!glucoseVal) {
+    return { label: "Unknown", color: "text-slate-500", badge: "bg-slate-100 text-slate-700", pct: 0 };
+  }
+  const val = parseFloat(glucoseVal);
+  if (isNaN(val)) {
+    return { label: "Unknown", color: "text-slate-500", badge: "bg-slate-100 text-slate-700", pct: 0 };
+  }
+  
+  const isFasting = context === "fasting";
+  if (val < 4.0) {
+    return { label: "Hypoglycemia", color: "text-red-600", badge: "bg-red-500 text-white", pct: 10 };
+  }
+  
+  if (isFasting) {
+    if (val >= 7.0) return { label: "Diabetes (Fasting)", color: "text-red-700 font-bold", badge: "bg-red-600 text-white", pct: 85 };
+    if (val >= 5.7) return { label: "Pre-Diabetes", color: "text-amber-600", badge: "bg-amber-400 text-slate-950", pct: 60 };
+    return { label: "Normal (Fasting)", color: "text-emerald-700", badge: "bg-emerald-500 text-white", pct: 35 };
+  } else {
+    if (val >= 11.1) return { label: "High (Post-Prandial)", color: "text-red-700 font-bold", badge: "bg-red-600 text-white", pct: 85 };
+    if (val >= 7.9) return { label: "Elevated", color: "text-amber-600", badge: "bg-amber-400 text-slate-950", pct: 60 };
+    return { label: "Normal (Fed)", color: "text-emerald-700", badge: "bg-emerald-500 text-white", pct: 35 };
+  }
 }
 
 export function PatientRecordWorkspace({ patient, canCreateVisit, initialCases }: { patient: Patient; canCreateVisit: boolean; initialCases: Case[] }) {
@@ -107,28 +207,10 @@ export function PatientRecordWorkspace({ patient, canCreateVisit, initialCases }
 
   return (
     <>
-      <div className="sticky top-16 z-10 border-b border-[var(--hh-border)] bg-white px-4 sm:px-6">
-        <div className="flex gap-1 overflow-x-auto">
-          {recordTabs.map((tab) => (
-            <button
-              key={tab.key}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              className={`min-h-12 shrink-0 border-b-2 px-3 text-sm font-semibold transition-colors ${
-                activeTab === tab.key
-                  ? "border-[var(--hh-purple)] text-[var(--hh-purple)]"
-                  : "border-transparent text-[#3f4d47] hover:border-[var(--hh-border)] hover:text-[#111827]"
-              }`}
-            >
-              {tab.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex flex-wrap gap-2 border-b border-[var(--hh-border)] bg-white px-4 py-3 sm:px-6">
+      {/* Draft Alerts / Notification Banners (Sticky, Full-width at top) */}
+      <div className="space-y-2 mb-4">
         {draftTime && (
-          <div className="flex w-full flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm animate-fade-in mb-2">
+          <div className="flex w-full flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900 shadow-sm animate-fade-in">
             <div className="flex items-start gap-3">
               <ClipboardList className="text-amber-600 mt-0.5 shrink-0" size={20} />
               <div>
@@ -173,169 +255,148 @@ export function PatientRecordWorkspace({ patient, canCreateVisit, initialCases }
             Complete consent form before clinical work
           </div>
         )}
-        {consentAction?.enabled ? (
-          <Button variant="secondary" type="button" onClick={() => setActiveTab("documents")}>
-            <FileText size={16} />
-            {consentAction.completed ? "Consent form" : "Sign consent"}
-          </Button>
-        ) : (
-          disabledWorkflowButton(consentAction, <FileText size={16} />, "Consent form")
-        )}
-        {checkInAction?.enabled ? (
-          <Button asChild variant="secondary">
-            <Link href={checkInAction.href || "/check-ins"}>
-              <ListChecks size={16} />
-              {checkInAction.completed ? "Patient checked in" : "Check in / queue"}
-            </Link>
-          </Button>
-        ) : (
-          disabledWorkflowButton(checkInAction, <ListChecks size={16} />, "Check in / queue")
-        )}
-        {canCreateVisit && visitAction?.enabled ? (
-          <Button asChild>
-            <Link className="!text-white" href={`/visits/new?patient=${patient.id}`}>
-              <ClipboardList size={16} />
-              New visit
-            </Link>
-          </Button>
-        ) : (
-          disabledWorkflowButton(visitAction, <ClipboardList size={16} />, "New visit")
-        )}
-        {canCreateVisit && historyAction?.enabled ? (
-          <PatientMedicalHistoryDialog patient={{ ...patient, profile }} onSaved={(p) => setProfile(p)} />
-        ) : (
-          disabledWorkflowButton(historyAction, <HeartPulse size={16} />, "Medical history")
-        )}
-        {canCreateVisit && confidentialAction?.enabled ? (
-          <Button variant="secondary" type="button" onClick={() => setActiveTab("overview")}>
-            <ShieldCheck size={16} />
-            Confidential records
-          </Button>
-        ) : (
-          disabledWorkflowButton(confidentialAction, <ShieldCheck size={16} />, "Confidential records")
-        )}
-        {canCreateVisit && vitalsAction?.enabled ? <PatientVitalsDialog patient={patient} /> : disabledWorkflowButton(vitalsAction, <HeartPulse size={16} />, "Add vitals")}
-        <Button variant="secondary" type="button">
-          <Printer size={16} />
-          Print summary
-        </Button>
-        <PatientAppointmentDialog patient={patient} />
-        <Button variant="secondary" type="button">
-          <LockKeyhole size={16} />
-          Access log
-        </Button>
       </div>
 
-      <section className="grid gap-5 py-5">
-        {activeTab === "overview" && <OverviewTab patient={patient} latestVisit={latestVisit} latestVitals={latestVitals} profile={profile} />}
-        {activeTab === "cases" && <CasesTab patientId={patient.id} initialCases={initialCases} />}
-        {activeTab === "assessments" && <AssessmentsTab visits={patient.visits || []} cases={initialCases} />}
-        {activeTab === "diagnosis" && <DiagnosisTab visits={patient.visits || []} cases={initialCases} clinicalAccess={patient.clinical_access} />}
-        {activeTab === "remedies" && <RemediesTab visits={patient.visits || []} cases={initialCases} />}
-        {activeTab === "vitals" && <VitalsTab vitals={allVitals(patient)} />}
-        {activeTab === "follow_ups" && <FollowUpsTab visits={patient.visits || []} cases={initialCases} />}
-        {activeTab === "documents" && <DocumentsTab patient={patient} documents={documents} onDocumentsChange={setDocuments} />}
-        {activeTab === "notes" && <NotesTab patient={patient} latestVisit={latestVisit} profile={profile} />}
-      </section>
+      {/* Main Container */}
+      <div className="space-y-5 min-w-0">
+          
+          {/* horizontal tabs header (Pill background) */}
+          <div className="sticky top-16 z-20 border-b border-[var(--hh-border)] bg-white/90 backdrop-blur-md rounded-xl p-1 shadow-xs">
+            <div className="flex gap-1 overflow-x-auto">
+              {recordTabs.map((tab) => (
+                <button
+                  key={tab.key}
+                  type="button"
+                  onClick={() => setActiveTab(tab.key)}
+                  className={`min-h-10 shrink-0 rounded-lg px-4 text-xs font-extrabold tracking-wide transition-all ${
+                    activeTab === tab.key
+                      ? "bg-[var(--hh-purple)] text-white shadow-sm"
+                      : "border-transparent text-[#3f4d47] hover:bg-slate-50 hover:text-[#111827]"
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Quick-action items bar */}
+          <div className="flex flex-wrap gap-2 rounded-xl border border-[var(--hh-border)] bg-white p-3 shadow-xs">
+            {consentAction?.enabled ? (
+              <Button variant="secondary" type="button" onClick={() => setActiveTab("documents")} className="text-xs">
+                <FileText size={15} />
+                {consentAction.completed ? "Consent form" : "Sign consent"}
+              </Button>
+            ) : (
+              disabledWorkflowButton(consentAction, <FileText size={15} />, "Consent form")
+            )}
+            {checkInAction?.enabled ? (
+              <Button asChild variant="secondary" className="text-xs">
+                <Link href={checkInAction.href || "/check-ins"}>
+                  <ListChecks size={15} />
+                  {checkInAction.completed ? "Patient checked in" : "Check in / queue"}
+                </Link>
+              </Button>
+            ) : (
+              disabledWorkflowButton(checkInAction, <ListChecks size={15} />, "Check in / queue")
+            )}
+            {canCreateVisit && visitAction?.enabled ? (
+              <Button asChild className="text-xs">
+                <Link className="!text-white" href={`/visits/new?patient=${patient.id}`}>
+                  <ClipboardList size={15} />
+                  New visit
+                </Link>
+              </Button>
+            ) : (
+              disabledWorkflowButton(visitAction, <ClipboardList size={15} />, "New visit")
+            )}
+            {canCreateVisit && historyAction?.enabled ? (
+              <PatientMedicalHistoryDialog patient={{ ...patient, profile }} onSaved={(p) => setProfile(p)} />
+            ) : (
+              disabledWorkflowButton(historyAction, <HeartPulse size={15} />, "Medical history")
+            )}
+            {canCreateVisit && confidentialAction?.enabled ? (
+              <Button variant="secondary" type="button" onClick={() => setActiveTab("overview")} className="text-xs">
+                <ShieldCheck size={15} />
+                Confidential records
+              </Button>
+            ) : (
+              disabledWorkflowButton(confidentialAction, <ShieldCheck size={15} />, "Confidential records")
+            )}
+            {canCreateVisit && vitalsAction?.enabled ? <PatientVitalsDialog patient={patient} /> : disabledWorkflowButton(vitalsAction, <HeartPulse size={15} />, "Add vitals")}
+            <Button variant="secondary" type="button" className="text-xs">
+              <Printer size={15} />
+              Print summary
+            </Button>
+            <PatientAppointmentDialog patient={patient} />
+            <Button variant="secondary" type="button" className="text-xs">
+              <LockKeyhole size={15} />
+              Access log
+            </Button>
+          </div>
+
+          {/* Dynamic Tab panels */}
+          <section className="grid gap-5">
+            {activeTab === "overview" && <OverviewTab patient={patient} latestVisit={latestVisit} latestVitals={latestVitals} profile={profile} />}
+            {activeTab === "cases" && <CasesTab patientId={patient.id} initialCases={initialCases} />}
+            {activeTab === "assessments" && <AssessmentsTab visits={patient.visits || []} cases={initialCases} />}
+            {activeTab === "diagnosis" && <DiagnosisTab visits={patient.visits || []} cases={initialCases} clinicalAccess={patient.clinical_access} />}
+            {activeTab === "remedies" && <RemediesTab visits={patient.visits || []} cases={initialCases} />}
+            {activeTab === "vitals" && <VitalsTab vitals={allVitals(patient)} patient={patient} />}
+            {activeTab === "follow_ups" && <FollowUpsTab visits={patient.visits || []} cases={initialCases} />}
+            {activeTab === "documents" && <DocumentsTab patient={patient} documents={documents} onDocumentsChange={setDocuments} />}
+            {activeTab === "notes" && <NotesTab patient={patient} latestVisit={latestVisit} profile={profile} />}
+          </section>
+
+        </div>
     </>
   );
 }
 
 function OverviewTab({ patient, latestVisit, latestVitals, profile }: { patient: Patient; latestVisit?: Visit; latestVitals?: Vital & { visitLabel: string }; profile?: PatientProfile | null }) {
   return (
-    <>
-      <PatientJourneyPanel patient={patient} />
-      <ClinicalPanel title="Patient details" icon={<UserRound size={17} />}>
-        <InfoGrid
-          rows={[
-            ["Patient code", patient.patient_code],
-            ["Date of birth", formatDate(patient.date_of_birth)],
-            ["National / Passport ID", value(patient.national_id)],
-            ["Primary phone", value(patient.primary_phone)],
-            ["Email", value(patient.email)],
-            ["Locality", value(patient.town_or_locality || patient.region)],
-            ["Secondary phone", value(patient.secondary_phone)],
-            ["Status", patient.status]
-          ]}
-        />
-      </ClinicalPanel>
-      <ClinicalPanel title="Next of kin" icon={<UserRound size={17} />}>
-        <InfoGrid
-          rows={[
-            ["Full name(s)", value(patient.next_of_kin_full_name)],
-            ["Relationship", value(relationshipLabel(patient.next_of_kin_relationship, patient.next_of_kin_relationship_other))],
-            ["Phone", value(patient.next_of_kin_phone)],
-            ["Email", value(patient.next_of_kin_email)]
-          ]}
-        />
-      </ClinicalPanel>
-      <ClinicalPanel title="Homeopathy profile" icon={<Stethoscope size={17} />}>
-        {profile ? (
-          <InfoGrid
-            rows={[
-              ["Past medical history", value(profile.past_medical_history)],
-              ["Family medical history", value(profile.family_medical_history)],
-              ["Allopathic medication", value(profile.allopathic_medication)],
-              ["Children count", profile.children_count?.toString() || "--"]
-            ]}
-          />
-        ) : (
-          <LockedClinicalNotice />
-        )}
-      </ClinicalPanel>
+    <div className="grid gap-6 animate-fade-in">
+      {/* 1. Visual Vitals indicators Dashboard */}
       <LatestVitalsPanel vitals={latestVitals} />
-      <ConfidentialRecords patient={patient} profile={profile} />
-      <ClinicalPanel title="History of present complaint" icon={<ClipboardList size={17} />} action>
-        <div className="space-y-4 text-sm leading-6 text-[#3f4d47]">
-          <p>{latestVisit?.initial_complaints || latestVisit?.main_complaint || "No complaint history recorded yet."}</p>
-          {latestVisit?.physical_examination && <p>{latestVisit.physical_examination}</p>}
+
+      {/* 2. Responsive Bento Split Grid */}
+      <div className="grid gap-5 md:grid-cols-2">
+        <div className="space-y-5">
+          <ClinicalPanel title="History of present complaint" icon={<ClipboardList size={17} />} action>
+            <div className="space-y-4 text-sm leading-6 text-[#3f4d47]">
+              <p>{latestVisit?.initial_complaints || latestVisit?.main_complaint || "No complaint history recorded yet."}</p>
+              {latestVisit?.physical_examination && <p>{latestVisit.physical_examination}</p>}
+            </div>
+          </ClinicalPanel>
+
+          <ClinicalPanel title="Clinical assessment" icon={<Stethoscope size={17} />} action>
+            {latestVisit ? (
+              <InfoGrid
+                rows={[
+                  ["Main complaint", latestVisit.main_complaint],
+                  ["Diagnosis", value(latestVisit.diagnosis)],
+                  ["Remedy", value(latestVisit.remedy)],
+                  ["Visit type", latestVisit.visit_type.replaceAll("_", " ")]
+                ]}
+              />
+            ) : (
+              <p className="text-sm text-[#66736d]">No visit assessment recorded yet.</p>
+            )}
+          </ClinicalPanel>
         </div>
-      </ClinicalPanel>
-      <ClinicalPanel title="Clinical assessment" icon={<Stethoscope size={17} />} action>
-        {latestVisit ? (
-          <InfoGrid
-            rows={[
-              ["Main complaint", latestVisit.main_complaint],
-              ["Diagnosis", value(latestVisit.diagnosis)],
-              ["Remedy", value(latestVisit.remedy)],
-              ["Visit type", latestVisit.visit_type.replaceAll("_", " ")]
-            ]}
-          />
-        ) : (
-          <p className="text-sm text-[#66736d]">No visit assessment recorded yet.</p>
-        )}
-      </ClinicalPanel>
-      <VisitTimeline visits={patient.visits || []} />
-    </>
+
+        <div className="space-y-5">
+          <VisitTimeline visits={patient.visits || []} />
+        </div>
+      </div>
+
+      {/* 3. Confidential disclosures section */}
+      <ConfidentialRecords patient={patient} profile={profile} />
+    </div>
   );
 }
 
-function PatientJourneyPanel({ patient }: { patient: Patient }) {
-  const journey = patient.current_journey;
-  return (
-    <ClinicalPanel title="Patient process today" icon={<ListChecks size={17} />}>
-      {journey ? (
-        <div className="grid gap-4 lg:grid-cols-[1fr_auto] lg:items-center">
-          <div className="grid gap-3 sm:grid-cols-3">
-            <ProcessMetric label="Stage" value={journey.current_stage_label} />
-            <ProcessMetric label="Flow" value={journey.flow_type_label} />
-            <ProcessMetric label="Queue" value={journey.queue_number ? `#${journey.queue_number}` : journey.appointment_matched ? "Appointment" : "--"} />
-          </div>
-          <Button asChild variant="secondary">
-            <Link href={`/patient-flow?identifier=${encodeURIComponent(patient.patient_code)}`}>Track full flow</Link>
-          </Button>
-        </div>
-      ) : (
-        <div className="grid gap-3 sm:grid-cols-[1fr_auto] sm:items-center">
-          <p className="text-sm leading-6 text-[#66736d]">No active establishment process has been started for this patient today.</p>
-          <Button asChild variant="secondary">
-            <Link href="/check-ins">Check in patient</Link>
-          </Button>
-        </div>
-      )}
-    </ClinicalPanel>
-  );
-}
+
 
 function CasesTab({ patientId, initialCases }: { patientId: number; initialCases: Case[] }) {
   const [cases, setCases] = useState<Case[]>(initialCases || []);
@@ -387,7 +448,7 @@ function CasesTab({ patientId, initialCases }: { patientId: number; initialCases
                     <div className="flex items-center gap-2">
                       <button
                         type="button"
-                        className="cursor-pointer text-left font-bold hover:text-[var(--hh-purple)]"
+                        className="cursor-pointer text-left font-bold hover:text-[var(--hh-purple)] text-sm sm:text-base"
                         onClick={() => setExpandedId(isExpanded ? null : caseItem.id)}
                       >
                         {caseItem.title}
@@ -638,39 +699,102 @@ function RemediesTab({ visits, cases }: { visits: Visit[]; cases: Case[] }) {
   );
 }
 
-function VitalsTab({ vitals }: { vitals: Array<Vital & { visitLabel: string }> }) {
+function VitalsTab({ vitals, patient }: { vitals: Array<Vital & { visitLabel: string }>; patient: Patient }) {
   return (
     <ClinicalPanel title="Vitals history" icon={<HeartPulse size={17} />}>
       <div className="overflow-x-auto">
-        <table className="w-full text-left text-sm">
-          <thead className="bg-[#f7faf8] text-xs uppercase text-[#66736d]">
+        <table className="hh-compact-table">
+          <thead>
             <tr>
-              <th className="px-3 py-2">Recorded</th>
-              <th className="px-3 py-2">Visit</th>
-              <th className="px-3 py-2">BP</th>
-              <th className="px-3 py-2">Pulse</th>
-              <th className="px-3 py-2">Temp</th>
-              <th className="px-3 py-2">Weight</th>
-              <th className="px-3 py-2">Glucose</th>
-              <th className="px-3 py-2">Food</th>
+              <th>Recorded</th>
+              <th>Visit</th>
+              <th>BP</th>
+              <th>Pulse</th>
+              <th>Temp</th>
+              <th>Weight</th>
+              <th>Glucose</th>
+              <th>Food</th>
+              <th className="text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
-            {vitals.map((vital) => (
-              <tr key={vital.id} className="border-t border-[var(--hh-border)]">
-                <td className="px-3 py-3">{formatDateTime(vital.recorded_at || vital.created_at)}</td>
-                <td className="px-3 py-3">{vital.visitLabel}</td>
-                <td className="px-3 py-3">{value(vital.bp_first_reading)} / {value(vital.bp_second_reading)}</td>
-                <td className="px-3 py-3">{vital.pulse ? `${vital.pulse} bpm` : "--"}</td>
-                <td className="px-3 py-3">{vital.temperature ? `${vital.temperature} C` : "--"}</td>
-                <td className="px-3 py-3">{vital.weight ? `${vital.weight} kg` : "--"}</td>
-                <td className="px-3 py-3">{vital.glucose_mmol_l ? `${vital.glucose_mmol_l} mmol/L` : "--"}</td>
-                <td className="px-3 py-3">{value(vital.glucose_food_type)}</td>
-              </tr>
-            ))}
+            {vitals.map((vital) => {
+              const bp = getBPStatus(vital.bp_first_reading, vital.bp_second_reading);
+              const pulse = getPulseStatus(vital.pulse);
+              const temp = getTempStatus(vital.temperature);
+              const glucose = getGlucoseStatus(vital.glucose_mmol_l, vital.glucose_context);
+              return (
+                <tr key={vital.id}>
+                  <td className="font-semibold text-slate-500 whitespace-nowrap">{formatDateTime(vital.recorded_at || vital.created_at)}</td>
+                  <td className="font-semibold text-[var(--hh-purple-dark)]">{vital.visitLabel}</td>
+                  <td>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-extrabold">{value(vital.bp_first_reading)} / {value(vital.bp_second_reading)}</span>
+                      {vital.bp_first_reading && (
+                        <span className={`inline-block self-start rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${bp.badge}`}>
+                          {bp.label}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium">{vital.pulse ? `${vital.pulse} bpm` : "--"}</span>
+                      {vital.pulse && (
+                        <span className={`inline-block self-start rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${pulse.badge}`}>
+                          {pulse.label}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium">{vital.temperature ? `${vital.temperature} °C` : "--"}</span>
+                      {vital.temperature && (
+                        <span className={`inline-block self-start rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${temp.badge}`}>
+                          {temp.label}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="font-semibold">{vital.weight ? `${vital.weight} kg` : "--"}</td>
+                  <td>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-medium">{vital.glucose_mmol_l ? `${vital.glucose_mmol_l} mmol/L` : "--"}</span>
+                      {vital.glucose_mmol_l && (
+                        <span className={`inline-block self-start rounded-full px-2 py-0.5 text-[9px] font-bold uppercase ${glucose.badge}`}>
+                          {glucose.label}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="flex flex-col gap-0.5">
+                      <span className="font-semibold text-[#1a221d]">{value(vital.glucose_food_type)}</span>
+                      <span className="text-[10px] text-[#5c6a61] uppercase">{value(vital.glucose_context?.replaceAll("_", " "))}</span>
+                    </div>
+                  </td>
+                  <td className="text-right">
+                    <PatientVitalsDialog
+                      patient={patient}
+                      vital={vital}
+                      trigger={
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-7 px-2.5 text-xs font-bold text-[var(--hh-purple)] hover:bg-[var(--hh-purple-light)] hover:text-[var(--hh-purple-dark)]"
+                        >
+                          Change
+                        </Button>
+                      }
+                    />
+                  </td>
+                </tr>
+              );
+            })}
             {vitals.length === 0 && (
               <tr>
-                <td className="px-3 py-8 text-center text-[#66736d]" colSpan={8}>No vitals have been recorded for this patient yet.</td>
+                <td className="px-3 py-8 text-center text-[#66736d]" colSpan={9}>No vitals have been recorded for this patient yet.</td>
               </tr>
             )}
           </tbody>
@@ -991,25 +1115,288 @@ function NotesTab({ patient, profile, latestVisit }: { patient: Patient; profile
 }
 
 function LatestVitalsPanel({ vitals }: { vitals?: Vital & { visitLabel: string } }) {
-  return (
-    <ClinicalPanel title="Latest vitals" icon={<HeartPulse size={17} />}>
-      {vitals ? (
-        <InfoGrid
-          rows={[
-            ["Blood pressure", `${value(vitals.bp_first_reading)} / ${value(vitals.bp_second_reading)}`],
-            ["Pulse", vitals.pulse ? `${vitals.pulse} bpm` : "--"],
-            ["Temperature", vitals.temperature ? `${vitals.temperature} C` : "--"],
-            ["Weight", vitals.weight ? `${vitals.weight} kg` : "--"],
-            ["Respiration", vitals.resp_rate ? `${vitals.resp_rate} / min` : "--"],
-            ["Glucose", vitals.glucose_mmol_l ? `${vitals.glucose_mmol_l} mmol/L` : "--"],
-            ["Food type", value(vitals.glucose_food_type)],
-            ["Context", value(vitals.glucose_context?.replaceAll("_", " "))],
-            ["Recorded", formatDateTime(vitals.recorded_at || vitals.created_at)]
-          ]}
-        />
-      ) : (
+  const [selectedVital, setSelectedVital] = useState<string | null>(null);
+
+  if (!vitals) {
+    return (
+      <ClinicalPanel title="Latest vitals" icon={<HeartPulse size={17} />}>
         <p className="text-sm text-[#66736d]">No vitals recorded yet.</p>
-      )}
+      </ClinicalPanel>
+    );
+  }
+
+  const bp = getBPStatus(vitals.bp_first_reading, vitals.bp_second_reading);
+  const pulse = getPulseStatus(vitals.pulse);
+  const temp = getTempStatus(vitals.temperature);
+  const glucose = getGlucoseStatus(vitals.glucose_mmol_l, vitals.glucose_context);
+
+  return (
+    <ClinicalPanel title="Latest vitals dashboard" icon={<HeartPulse size={17} />}>
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        
+        {/* Blood Pressure Card */}
+        <div 
+          onClick={() => setSelectedVital(selectedVital === "bp" ? null : "bp")}
+          className={`group relative rounded-xl border p-4 transition-all duration-300 cursor-pointer ${
+            selectedVital === "bp" 
+              ? "border-emerald-500 ring-2 ring-emerald-100 bg-emerald-50/20 shadow-xs" 
+              : "border-[#d8e5dd] bg-white hover:border-emerald-300 hover:shadow-md"
+          }`}
+        >
+          <div className="flex justify-between items-start">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 group-hover:bg-emerald-100 transition-colors">
+              <HeartPulse size={18} />
+            </div>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${bp.badge}`}>
+              {bp.label}
+            </span>
+          </div>
+          
+          <div className="mt-3">
+            <div className="text-2xl font-black text-[#1a221d] tracking-tight">
+              {value(vitals.bp_first_reading)} / {value(vitals.bp_second_reading)} <span className="text-xs font-bold text-[#5c6a61]">mmHg</span>
+            </div>
+            <div className="text-[11px] font-bold text-[#445048] mt-0.5 uppercase tracking-wider">
+              Blood Pressure
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-slate-100 flex">
+              <div className="h-full w-[45%] bg-emerald-500 rounded-l-full"></div>
+              <div className="h-full w-[15%] bg-amber-300"></div>
+              <div className="h-full w-[20%] bg-orange-400"></div>
+              <div className="h-full w-[20%] bg-red-500 rounded-r-full"></div>
+              <div 
+                style={{ left: `${bp.pct}%` }}
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3.5 w-3.5 rounded-full bg-emerald-800 border-2 border-white shadow-sm ring-2 ring-emerald-100 transition-all duration-500"
+              ></div>
+            </div>
+          </div>
+
+          <div className="mt-3 border-t border-[#f0f5f1] pt-2.5 flex justify-between items-center text-xs text-[#526057]">
+            <span className="font-semibold text-slate-500 text-[10px]">
+              Recorded {formatDateTime(vitals.recorded_at || vitals.created_at)}
+            </span>
+            <ChevronDown size={14} className={`text-slate-400 transition-transform ${selectedVital === "bp" ? "rotate-180 text-emerald-600" : ""}`} />
+          </div>
+
+          {selectedVital === "bp" && (
+            <div className="mt-3 text-xs bg-emerald-50 border border-emerald-100 p-2.5 rounded-lg text-emerald-950 animate-fade-in">
+              Optimal range is &lt; 120/80 mmHg. Review for trends of hypertension.
+            </div>
+          )}
+        </div>
+
+        {/* Heart Rate / Pulse Card */}
+        <div 
+          onClick={() => setSelectedVital(selectedVital === "hr" ? null : "hr")}
+          className={`group relative rounded-xl border p-4 transition-all duration-300 cursor-pointer ${
+            selectedVital === "hr" 
+              ? "border-rose-400 ring-2 ring-rose-100 bg-rose-50/20 shadow-xs" 
+              : "border-[#d8e5dd] bg-white hover:border-rose-300 hover:shadow-md"
+          }`}
+        >
+          <div className="flex justify-between items-start">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-rose-50 text-rose-500 group-hover:bg-rose-100 transition-colors">
+              <HeartPulse size={18} className="animate-pulse duration-1000" />
+            </div>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${pulse.badge}`}>
+              {pulse.label}
+            </span>
+          </div>
+          
+          <div className="mt-3">
+            <div className="text-2xl font-black text-[#1a221d] tracking-tight">
+              {vitals.pulse ? `${vitals.pulse}` : "--"} <span className="text-xs font-bold text-[#5c6a61]">bpm</span>
+            </div>
+            <div className="text-[11px] font-bold text-[#445048] mt-0.5 uppercase tracking-wider">
+              Heart Rate / Pulse
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-slate-100 flex">
+              <div className="h-full w-[30%] bg-sky-400 rounded-l-full"></div>
+              <div className="h-full w-[45%] bg-emerald-500"></div>
+              <div className="h-full w-[25%] bg-rose-500 rounded-r-full"></div>
+              <div 
+                style={{ left: `${pulse.pct}%` }}
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3.5 w-3.5 rounded-full bg-emerald-800 border-2 border-white shadow-sm ring-2 ring-emerald-100 transition-all duration-500"
+              ></div>
+            </div>
+          </div>
+
+          <div className="mt-3 border-t border-[#f0f5f1] pt-2.5 flex justify-between items-center text-xs text-[#526057]">
+            <span className="font-semibold text-slate-500 text-[10px]">
+              Normal Rest Range: 60-100 bpm
+            </span>
+            <ChevronDown size={14} className={`text-slate-400 transition-transform ${selectedVital === "hr" ? "rotate-180 text-rose-600" : ""}`} />
+          </div>
+
+          {selectedVital === "hr" && (
+            <div className="mt-3 text-xs bg-rose-50 border border-rose-100 p-2.5 rounded-lg text-rose-950 animate-fade-in">
+              Stable resting pulse indicates efficient cardiovascular fitness.
+            </div>
+          )}
+        </div>
+
+        {/* Temperature Card */}
+        <div 
+          onClick={() => setSelectedVital(selectedVital === "temp" ? null : "temp")}
+          className={`group relative rounded-xl border p-4 transition-all duration-300 cursor-pointer ${
+            selectedVital === "temp" 
+              ? "border-sky-400 ring-2 ring-sky-100 bg-sky-50/20 shadow-xs" 
+              : "border-[#d8e5dd] bg-white hover:border-sky-300 hover:shadow-md"
+          }`}
+        >
+          <div className="flex justify-between items-start">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-sky-50 text-sky-600 group-hover:bg-sky-100 transition-colors">
+              <Thermometer size={18} />
+            </div>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${temp.badge}`}>
+              {temp.label}
+            </span>
+          </div>
+          
+          <div className="mt-3">
+            <div className="text-2xl font-black text-[#1a221d] tracking-tight">
+              {vitals.temperature ? `${vitals.temperature}` : "--"} <span className="text-xs font-bold text-[#5c6a61]">°C</span>
+            </div>
+            <div className="text-[11px] font-bold text-[#445048] mt-0.5 uppercase tracking-wider">
+              Temperature
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-slate-100 flex">
+              <div className="h-full w-[25%] bg-blue-400 rounded-l-full"></div>
+              <div className="h-full w-[35%] bg-emerald-500"></div>
+              <div className="h-full w-[20%] bg-amber-400"></div>
+              <div className="h-full w-[20%] bg-rose-500 rounded-r-full"></div>
+              <div 
+                style={{ left: `${temp.pct}%` }}
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3.5 w-3.5 rounded-full bg-emerald-800 border-2 border-white shadow-sm ring-2 ring-emerald-100 transition-all duration-500"
+              ></div>
+            </div>
+          </div>
+
+          <div className="mt-3 border-t border-[#f0f5f1] pt-2.5 flex justify-between items-center text-xs text-[#526057]">
+            <span className="font-semibold text-slate-500 text-[10px]">
+              Normal range is 36.1 - 37.2 °C
+            </span>
+            <ChevronDown size={14} className={`text-slate-400 transition-transform ${selectedVital === "temp" ? "rotate-180 text-sky-600" : ""}`} />
+          </div>
+
+          {selectedVital === "temp" && (
+            <div className="mt-3 text-xs bg-sky-50 border border-sky-100 p-2.5 rounded-lg text-sky-950 animate-fade-in">
+              Review body temperature to evaluate acute, sub-acute, or inflammatory triggers.
+            </div>
+          )}
+        </div>
+
+        {/* Weight Card */}
+        <div 
+          onClick={() => setSelectedVital(selectedVital === "weight" ? null : "weight")}
+          className={`group relative rounded-xl border p-4 transition-all duration-300 cursor-pointer ${
+            selectedVital === "weight" 
+              ? "border-indigo-400 ring-2 ring-indigo-100 bg-indigo-50/20 shadow-xs" 
+              : "border-[#d8e5dd] bg-white hover:border-indigo-300 hover:shadow-md"
+          }`}
+        >
+          <div className="flex justify-between items-start">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-indigo-50 text-indigo-600 group-hover:bg-indigo-100 transition-colors">
+              <Scale size={18} />
+            </div>
+            <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-extrabold text-white uppercase">
+              Stable
+            </span>
+          </div>
+          
+          <div className="mt-3">
+            <div className="text-2xl font-black text-[#1a221d] tracking-tight">
+              {vitals.weight ? `${vitals.weight}` : "--"} <span className="text-xs font-bold text-[#5c6a61]">kg</span>
+            </div>
+            <div className="text-[11px] font-bold text-[#445048] mt-0.5 uppercase tracking-wider">
+              Weight
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-slate-100 flex">
+              <div className="h-full w-full bg-emerald-500 rounded-full"></div>
+            </div>
+          </div>
+
+          <div className="mt-3 border-t border-[#f0f5f1] pt-2.5 flex justify-between items-center text-xs text-[#526057]">
+            <span className="font-semibold text-slate-500 text-[10px]">
+              Respiration: {vitals.resp_rate ? `${vitals.resp_rate} / min` : "--"}
+            </span>
+            <ChevronDown size={14} className={`text-slate-400 transition-transform ${selectedVital === "weight" ? "rotate-180 text-indigo-600" : ""}`} />
+          </div>
+
+          {selectedVital === "weight" && (
+            <div className="mt-3 text-xs bg-indigo-50 border border-indigo-100 p-2.5 rounded-lg text-indigo-950 animate-fade-in">
+              Consistent monitoring evaluates nutritional stability and systemic hydration.
+            </div>
+          )}
+        </div>
+
+        {/* Blood Glucose Card */}
+        <div 
+          onClick={() => setSelectedVital(selectedVital === "glucose" ? null : "glucose")}
+          className={`group relative rounded-xl border p-4 transition-all duration-300 cursor-pointer ${
+            selectedVital === "glucose" 
+              ? "border-violet-400 ring-2 ring-violet-100 bg-violet-50/20 shadow-xs" 
+              : "border-[#d8e5dd] bg-white hover:border-violet-300 hover:shadow-md"
+          }`}
+        >
+          <div className="flex justify-between items-start">
+            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-50 text-violet-600 group-hover:bg-violet-100 transition-colors">
+              <Activity size={18} />
+            </div>
+            <span className={`rounded-full px-2 py-0.5 text-[10px] font-extrabold uppercase ${glucose.badge}`}>
+              {glucose.label}
+            </span>
+          </div>
+          
+          <div className="mt-3">
+            <div className="text-2xl font-black text-[#1a221d] tracking-tight">
+              {vitals.glucose_mmol_l ? `${vitals.glucose_mmol_l}` : "--"} <span className="text-xs font-bold text-[#5c6a61]">mmol/L</span>
+            </div>
+            <div className="text-[11px] font-bold text-[#445048] mt-0.5 uppercase tracking-wider">
+              Glucose ({value(vitals.glucose_context?.replaceAll("_", " "))})
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <div className="relative h-2 w-full overflow-hidden rounded-full bg-slate-100 flex">
+              <div className="h-full w-[20%] bg-rose-400 rounded-l-full"></div>
+              <div className="h-full w-[35%] bg-emerald-500"></div>
+              <div className="h-full w-[20%] bg-amber-400"></div>
+              <div className="h-full w-[25%] bg-rose-600 rounded-r-full"></div>
+              <div 
+                style={{ left: `${glucose.pct}%` }}
+                className="absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-3.5 w-3.5 rounded-full bg-emerald-800 border-2 border-white shadow-sm ring-2 ring-emerald-100 transition-all duration-500"
+              ></div>
+            </div>
+          </div>
+
+          <div className="mt-3 border-t border-[#f0f5f1] pt-2.5 flex justify-between items-center text-xs text-[#526057]">
+            <span className="font-semibold text-slate-500 text-[10px]">
+              Food Type: {value(vitals.glucose_food_type)}
+            </span>
+            <ChevronDown size={14} className={`text-slate-400 transition-transform ${selectedVital === "glucose" ? "rotate-180 text-violet-600" : ""}`} />
+          </div>
+
+          {selectedVital === "glucose" && (
+            <div className="mt-3 text-xs bg-violet-50 border border-violet-100 p-2.5 rounded-lg text-violet-950 animate-fade-in">
+              Diabetes fasting limit is &ge; 7.0 mmol/L and fed limit is &ge; 11.1 mmol/L. Monitor diet.
+            </div>
+          )}
+        </div>
+
+      </div>
     </ClinicalPanel>
   );
 }
@@ -1133,19 +1520,11 @@ function RecordList({ rows, emptyText }: { rows: Array<{ id: number; title: stri
   );
 }
 
-function EmptyTab({ title, text, icon }: { title: string; text: string; icon: React.ReactNode }) {
-  return (
-    <ClinicalPanel title={title} icon={icon}>
-      <p className="text-sm text-[#66736d]">{text}</p>
-    </ClinicalPanel>
-  );
-}
-
 function ProcessMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-3">
-      <div className="text-xs font-bold uppercase text-[#66736d]">{label}</div>
-      <div className="mt-1 font-bold text-[#1f2933]">{value}</div>
+    <div className="rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-2.5 text-center">
+      <div className="text-[10px] font-bold uppercase text-[#66736d]">{label}</div>
+      <div className="mt-1 text-xs font-extrabold text-[var(--hh-purple-dark)]">{value}</div>
     </div>
   );
 }
@@ -1164,7 +1543,7 @@ function InfoGrid({ rows }: { rows: ReadonlyArray<readonly [string, string]> }) 
       {rows.map(([label, text]) => (
         <div key={label}>
           <div className="text-xs font-bold uppercase text-[#66736d]">{label}</div>
-          <div className="mt-1 text-sm capitalize text-[#1f2933]">{text}</div>
+          <div className="mt-1 text-sm capitalize text-[#1f2933] font-semibold">{text}</div>
         </div>
       ))}
     </div>

@@ -3,6 +3,9 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { PatientRecordWorkspace } from "@/components/patient-record-workspace";
+import { PatientInfoDialog } from "@/components/patient-info-dialog";
+import { KeyNotesDialog } from "@/components/key-notes-dialog";
+import { PatientJourneyPanel } from "@/components/patient-journey-panel";
 import { Badge } from "@/components/ui/badge";
 import { getCases, getPatient } from "@/lib/api";
 import { getSessionUser } from "@/lib/session";
@@ -51,6 +54,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-bold text-[var(--hh-purple-dark)]">{patient.full_name_display}</h1>
                   <span className="font-mono text-sm font-bold text-[#66736d]">{patient.patient_code}</span>
+                  <PatientInfoDialog patient={patient} />
                 </div>
                 <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-[#53605a]">
                   <span className="capitalize">{patient.gender.replaceAll("_", " ")}</span>
@@ -74,9 +78,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
                   <ClipboardList size={17} />
                   Key notes
                 </div>
-                <button className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-[#53605a] hover:bg-white" type="button">
-                  <Pencil size={15} />
-                </button>
+                <KeyNotesDialog patient={patient} />
               </div>
               <p className="px-4 py-3 text-sm leading-6 text-[#3f4d47]">
                 {patient.profile?.other_important_information || latestVisit?.main_complaint || "No key notes recorded yet."}
@@ -85,7 +87,13 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
           </div>
         </div>
 
-        <PatientRecordWorkspace patient={patient} canCreateVisit={canCreateVisit} initialCases={cases.results} />
+        <div className="px-4 pb-5 pt-5 sm:px-6">
+          <PatientJourneyPanel patient={patient} />
+        </div>
+
+        <div className="px-4 pb-5 sm:px-6">
+          <PatientRecordWorkspace patient={patient} canCreateVisit={canCreateVisit} initialCases={cases.results} />
+        </div>
       </section>
     </AppShell>
   );
