@@ -114,3 +114,95 @@ Recommended next steps:
 Important rule:
 
 - Harmony should remain the source of truth for the conversation and clinical context. n8n or provider APIs should only deliver or receive channel-specific messages and then call back into Harmony.
+
+## Keycloak Identity Completion
+
+Partially implemented / in progress.
+
+Goal:
+
+- Make Keycloak the central identity service for Harmony MIS and future Harmony-connected systems.
+- Use Harmony-generated User IDs as usernames.
+- Keep employee, supplier, and partner ID ranges separated.
+- Allow realm managers to administer only the Harmony Health realm, not the master realm.
+
+Required next steps:
+
+- Connect MIS user creation to Keycloak user provisioning.
+- Generate User IDs automatically based on account type.
+- Map MIS roles to Keycloak groups or roles.
+- Send setup instructions by email with the generated User ID.
+- Remove old local fallback users only after production users are fully migrated.
+- Keep local fallback only for emergency recovery until the rollout is complete.
+
+## Brevo Transactional Email
+
+Partially implemented / in progress.
+
+Goal:
+
+- Use Brevo for transactional email instead of relying on Zoho Free SMTP.
+- Manage email configuration through Harmony system settings.
+- Record email delivery results in `EmailDeliveryLog`.
+
+Initial transactional emails:
+
+- employee enrollment received / under review
+- employee approval or rejection notices
+- Keycloak setup instructions
+- password setup/reset support messages
+- appointment confirmations and reminders
+- consent pending reminders
+- support ticket notifications
+- scheduled maintenance notices
+
+## Role And Module Governance
+
+Partially implemented / in progress.
+
+Goal:
+
+- Let admin enable or disable modules per role.
+- Stop hardcoding all navigation behavior in the frontend.
+- Support employee, supplier, and partner role families without mixing unrelated role options.
+
+Recommended next steps:
+
+- Complete the role module matrix UI.
+- Enforce module permissions in backend endpoints, not only navigation.
+- Add audit entries when role permissions change.
+- Add default templates for common roles such as receptionist, clinician, admin, supplier contact, and partner contact.
+
+## Consent Renewal And Document Governance
+
+Planned / foundation implemented.
+
+Goal:
+
+- Prevent duplicate active consent forms.
+- Define when consent expires or must be renewed.
+- Apply generated letterhead, QR verification, stamps, and signature blocks to all generated documents.
+- Use one reusable document-generation service for consent forms, reports, patient summaries, and future certificates.
+
+Recommended next steps:
+
+- Add consent validity rules.
+- Add document template registry.
+- Add document versioning and replacement rules.
+- Add document status transitions for generated, pending signature, signed, verified, rejected, and expired.
+
+## System Administration Modules
+
+Planned / partially implemented.
+
+System settings should continue expanding into:
+
+- email settings
+- location/access rules
+- device and accessibility logs
+- maintenance mode
+- API/tokens
+- audit and retention settings
+- notification templates
+
+Maintenance mode should allow admins to schedule notices before turning restricted access on.

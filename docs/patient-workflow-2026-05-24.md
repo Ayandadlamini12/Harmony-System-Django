@@ -63,3 +63,60 @@ Already registered patients are checked in from `/check-ins` by reception or fro
   - Patient ID
   - National / Passport ID
 - National / Passport ID values are treated as alphanumeric exact IDs, not as phone-number digits.
+
+## Current Patient Process Rules
+
+The patient journey now needs to represent what is next for each patient on a service day.
+
+For a new patient:
+
+1. Registration
+2. Consent form signing
+3. Check-in / queue
+4. Medical and family history
+5. Confidential clinical records
+6. Vitals
+7. New visit / consultation
+
+For an existing patient:
+
+1. Check-in / appointment check-in
+2. Review whether confidential records changed
+3. Vitals
+4. New visit or follow-up
+
+Consent signing is a blocker before vitals and clinical records. Consent and check-in do not need one fixed order; the system should block only the steps that require consent.
+
+## Patient Journey Tracking
+
+`PatientJourney` records the patient's active process for a specific service date. It links to check-in, appointment, and visit records where available.
+
+Stages include:
+
+- registered
+- queued
+- checked in
+- vitals recorded
+- waiting clinician
+- in consultation
+- visit recorded
+- completed
+- cancelled
+
+The patient view and `/patient-flow` should show the current stage and the next expected action.
+
+## Consent Form Requirement
+
+New patients must have a consent form signed before clinical data capture proceeds. The system supports generated consent documents and a handwritten digital signature workflow. Manual paper signing with later n8n-assisted upload/verification is planned but should still require human review.
+
+## Visit And Follow-Up Direction
+
+The visit model is moving toward being the main case/event record. Ongoing symptoms/problems are tracked as items that can stay open across visits and be marked resolved during follow-up.
+
+Follow-up forms should:
+
+- pull previous/open complaint or symptom/problem context
+- hide previous diagnosis, remedy, and recommendations by default behind a view/eye action
+- record new evaluation, remedy response, diet/lifestyle/exercise/energy changes, and notes
+- allow new symptom/problem items to be added
+- allow existing symptom/problem items to be marked resolved with notes

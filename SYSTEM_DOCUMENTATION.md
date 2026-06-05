@@ -1,815 +1,700 @@
-# Harmony Health System — Complete Documentation
+# Harmony Health MIS - System Documentation
 
-> **Version:** 1.0.0.0  
-> **Developed By:** FMT Digital Agency  
-> **Copyright:** © 2026 Harmony Health Eswatini. All Rights Reserved.
+> Updated: 2026-06-06  
+> Product: Harmony Health MIS  
+> Organization: Harmony Health and Wellness  
+> Source repository: `Ayandadlamini12/Harmony-System-Django`
 
----
-
-## Table of Contents
-
-1. [System Overview](#1-system-overview)
-2. [Architecture](#2-architecture)
-3. [Technology Stack](#3-technology-stack)
-4. [Project Structure](#4-project-structure)
-5. [Backend Modules](#5-backend-modules)
-6. [Frontend Pages](#6-frontend-pages)
-7. [Database Schema](#7-database-schema)
-8. [API Reference](#8-api-reference)
-9. [Authentication & Roles](#9-authentication--roles)
-10. [Deployment Configuration](#10-deployment-configuration)
-11. [Hosting Infrastructure](#11-hosting-infrastructure)
-12. [Update & Deployment Procedures](#12-update--deployment-procedures)
-13. [Current Status & Remaining Modules](#13-current-status--remaining-modules)
-14. [Getting Started for New Developers](#14-getting-started-for-new-developers)
-15. [Troubleshooting](#15-troubleshooting)
+This document is the current technical and workflow reference for the Harmony Health MIS. It reflects the Django REST API, Next.js frontend, Keycloak identity rollout, patient workflow work, document/consent work, support modules, and deployment changes that have been added after the original Laravel + Vue + Inertia prototype was replaced.
 
 ---
 
-## 1. System Overview
+## 1. System Purpose
 
-Harmony Health System is a clinic management platform for **Harmony Health & Wellness** in Eswatini. It provides:
+Harmony Health MIS is a clinic operating system for a homeopathic practice. It is being built to manage:
 
-- **Patient management** — registration, demographics, clinical profiles
-- **Visit tracking** — consultations, vitals, diagnosis, remedies, follow-ups
-- **Role-based access control** — admin, clinician, receptionist roles with elevated access workflow
-- **Audit logging** — full trail of all data changes
-- **Cloudflare tunnel** — zero-trust network access, no public ports exposed
+- patient registration and identity records
+- consent form generation, signing, and patient document storage
+- check-in, queue, appointment check-in, and patient process tracking
+- medical/family history and confidential clinical records
+- vitals, visits, follow-ups, symptoms/problems, remedies, and recommendations
+- role-aware dashboards for admin, clinicians, and reception
+- employee onboarding and account administration
+- support tickets, deleted-patient recovery, internal messages, and future external workflow integrations
 
-The system was migrated from a legacy Laravel application to a modern Django + Next.js stack with containerized deployment via Portainer.
-
----
-
-## 2. Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Cloudflare Tunnel                        │
-│              (mis.harmonyhealthsz.com)                      │
-└──────────────────┬──────────────────────────────────────────┘
-                   │ HTTPS
-                   ▼
-┌─────────────────────────────────────────────────────────────┐
-│                   Portainer Host (ARM64)                    │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────┐  │
-│  │  Frontend   │  │   Backend   │  │    Cloudflared      │  │
-│  │  Next.js    │◄─┤  Django     │  │   (Tunnel Agent)    │  │
-│  │  :3000      │  │  Gunicorn   │  │                     │  │
-│  └──────┬──────┘  │  :8000      │  ─────────────────────┘  │
-│         │         └──────┬──────┘                            │
-│         │                │                                   │
-│  ┌──────▼──────┐  ┌──────▼──────┐  ┌─────────────────────┐  │
-│  │   Celery    │  │  PostgreSQL │  │       Redis         │  │
-│  │   Worker    │  │  :5432      │  │       :6379         │  │
-│  └─────────────┘  └─────────────┘  └─────────────────────  │
-│                                                             │
-│  ─────────────┐                                            │
-│  │  Celery     │                                            │
-│  │  Beat       │                                            │
-│  └─────────────┘                                            │
-└─────────────────────────────────────────────────────────────┘
-```
-
-### Network Topology
-- All containers communicate over a Docker bridge network (`harmony-net`)
-- **No public ports** are exposed — all external access goes through Cloudflare Tunnel
-- Non-standard internal ports avoid conflicts with CyberPanel (PostgreSQL `54321`, Redis `63791`, Frontend `30001`)
+The system must protect confidential clinical information while still allowing reception staff to perform non-clinical intake and front-desk workflows.
 
 ---
 
-## 3. Technology Stack
+## 2. Current Stack
 
 ### Backend
-| Component | Version | Purpose |
-|---|---|---|
-| Python | 3.13 | Runtime |
-| Django | 5.2.6 | Web framework |
-| Django REST Framework | 3.16.1 | API framework |
-| SimpleJWT | 5.5.1 | JWT authentication |
-| Celery | 5.5.3 | Async task queue |
-| PostgreSQL | 16/17 | Relational database |
-| Redis | 7 | Cache + message broker |
-| Gunicorn | 23.0.0 | WSGI server |
-| Whitenoise | 6.9.0 | Static file serving |
+
+| Area | Technology |
+| --- | --- |
+| Framework | Django 5.2 |
+| API | Django REST Framework |
+| Authentication | SimpleJWT locally, Keycloak integration for production identity |
+| Database | PostgreSQL in production, SQLite available for local dev fallback |
+| Async / queue | Redis + Celery + Celery Beat |
+| Email | django-anymail with Brevo API support plus SMTP fallback settings |
+| PDF / documents | WeasyPrint, ReportLab, Pillow, qrcode |
+| Web server | Gunicorn |
 
 ### Frontend
-| Component | Version | Purpose |
-|---|---|---|
-| Next.js | 15.5.x | React framework (App Router) |
-| React | 19.1.x | UI library |
-| TypeScript | 5.9.x | Type safety |
-| Tailwind CSS | 4.1.x | Styling |
-| Radix UI | Various | Headless UI primitives |
-| React Hook Form | 7.62.x | Form handling |
-| Zod | 4.1.x | Schema validation |
+
+| Area | Technology |
+| --- | --- |
+| Framework | Next.js 15 App Router |
+| UI | React 19 + TypeScript |
+| Styling | Tailwind CSS 4, shared Harmony CSS tokens, Radix UI primitives |
+| Forms | React Hook Form, Zod, custom staged form components |
+| Icons | lucide-react |
+| Tables | shared `.hh-compact-table` style and local table components |
+| Signing | `signature_pad` for handwritten signature capture |
 
 ### Infrastructure
-| Component | Version | Purpose |
-|---|---|---|
-| Docker | 29.x | Container runtime |
-| Portainer | 2.39.2 | Container management UI |
-| Cloudflare Tunnel | latest | Zero-trust network access |
-| Ubuntu | 22.04.5 LTS | Host OS (aarch64/ARM64) |
+
+| Area | Technology |
+| --- | --- |
+| Runtime | Docker containers |
+| Control panel | Portainer |
+| Public access | Cloudflare Tunnel |
+| Server constraints | Existing CyberPanel and PHP sites must not be disturbed |
+| Current live URL | `https://mis.harmonyhealthsz.com` |
+| Identity URL | `https://auth.harmonyhealthsz.com` |
 
 ---
 
-## 4. Project Structure
+## 3. Current Deployment State
 
-```
+The production deployment has evolved from a normal compose build into a mixed faster deployment model.
+
+Observed current live behavior:
+
+- backend, celery, and beat may run from GHCR images
+- frontend may be rebuilt and hot-swapped locally as a server image
+- Portainer stack 69 can still contain an older compose definition
+- the running frontend container may not perfectly match the stack editor definition
+
+Important rule:
+
+Do not blindly click Portainer "Redeploy stack" or run a full stack recreation unless the stack definition is verified first. It may replace the optimized running containers with stale compose behavior.
+
+Recommended safe deployment approach:
+
+1. Commit and push source changes to GitHub.
+2. For backend changes, build/publish backend image or update the server source and run migrations deliberately.
+3. For frontend-only changes, use the faster targeted frontend rebuild/swap method if it is still the active production method.
+4. Restart only the affected containers.
+5. Verify `/api/health`, login, and the changed page.
+6. Keep Portainer as visibility and emergency control, not as a place for manual source editing.
+
+Long-term recommendation:
+
+- GitHub should remain the source of truth.
+- Production should move toward prebuilt image tags and repeatable deploy scripts.
+- Portainer stack definitions should be reconciled with the running containers to remove drift.
+
+---
+
+## 4. Repository Structure
+
+```text
 Harmony-System-Django/
-├── backend/                    # Django REST API
-│   ├── accounts/               # User auth & management
-│   │   ├── models.py           # Custom User model with roles
-│   │   ├── views.py            # User CRUD, register, change-password
-│   │   ├── serializers.py      # User, Register, ChangePassword serializers
-│   │   ├── urls.py             # /api/users/, /api/auth/register/, /api/auth/change-password/
-│   │   └── admin.py            # Django admin registration
-│   ├── clinic/                 # Clinical domain
-│   │   ├── models.py           # Patient, Visit, Vital, AuditLog, etc.
-│   │   ├── views.py            # Patient, Visit, AccessRequest viewsets
-│   │   ├── serializers.py      # All clinic serializers
-│   │   ├── urls.py             # /api/patients/, /api/visits/, etc.
-│   │   ├── access.py           # Role-based access helpers
-│   │   ├── permissions.py      # DRF permission classes
-│   │   └── admin.py            # Django admin for clinic models
-│   ├── config/                 # Django project settings
-│   │   ├── settings.py         # Django configuration
-│   │   ├── urls.py             # Root URL routing
-│   │   ├── wsgi.py             # WSGI entry point
-│   │   └── celery.py           # Celery app configuration
-│   ├── requirements.txt        # Python dependencies
-│   ├── Dockerfile              # Backend container image
-│   └── manage.py               # Django CLI
-├── frontend/                   # Next.js frontend
-│   ├── src/
-│   │   ├── app/                # App Router pages
-│   │   │   ├── api/auth/       # Auth route handlers (login, logout, register, change-password)
-│   │   │   ├── patients/       # Patient pages (list, new, detail, edit)
-│   │   │   ├── visits/         # Visit pages
-│   │   │   ├── users/          # User management (admin only)
-│   │   │   ├── account/        # Profile + password change
-│   │   │   ├── access-requests/ # Elevated access requests
-│   │   │   └── ...             # Other pages
-│   │   ├── components/         # Shared UI (AppShell, Footer, Button, etc.)
-│   │   ├── lib/                # API client, session, role utilities
-│   │   └── types/              # TypeScript type definitions
-│   ├── package.json            # Node dependencies
-│   ├── Dockerfile              # Frontend container (multi-stage)
-│   ── next.config.ts          # Next.js config (standalone output)
-├── docker-compose.yml          # Local dev stack
-├── docker-compose.prod.yml     # Production stack
-├── remote-deployment-stack.yml # Portainer deployment compose
-├── .env.example                # Environment variable template
-── .env.remote.template        # Remote deployment template
-└── README.md                   # Project README
+  backend/
+    accounts/                  User, roles, Keycloak helpers, email settings
+    clinic/                    Patient, visit, consent, journey, messaging domain
+    config/                    Django settings, URL routing, Celery
+    manage.py
+    requirements.txt
+  frontend/
+    src/app/                   Next.js App Router pages and API proxies
+    src/components/            Shared UI, forms, patient workspace, shell
+    src/lib/                   API helpers, session helpers, role workflow maps
+    src/types/                 TypeScript domain types
+    public/brand/              Harmony logo/favicon assets
+  docs/                        Workflow, deployment, Keycloak, n8n, future roadmap
+  deployment/                  Deployment helpers and related assets
+  docker-compose.yml           Local development stack
+  docker-compose.prod.yml      Production compose reference
+  remote-deployment-stack.yml  Historical Portainer stack reference
 ```
 
----
+The active local source-of-truth folder is:
 
-## 5. Backend Modules
-
-### 5.1 Accounts App
-
-**User Model** (`accounts/models.py`)
-- Extends Django's `AbstractUser`
-- Custom fields: `role` (admin/clinician/receptionist), `is_active`
-- Default role: `receptionist`
-
-**Views:**
-| View | URL | Permission | Description |
-|---|---|---|---|
-| `UserViewSet` | `/api/users/` | Admin only | Full CRUD for users |
-| `UserViewSet.toggle_status` | `POST /api/users/{id}/toggle_status/` | Admin only | Activate/deactivate user |
-| `UserViewSet.me` | `GET /api/users/me/` | Authenticated | Current user profile |
-| `RegisterView` | `POST /api/auth/register/` | Public | Self-registration (creates receptionist) |
-| `ChangePasswordView` | `POST /api/auth/change-password/` | Authenticated | Change own password |
-
-### 5.2 Clinic App
-
-**Models:**
-| Model | Description |
-|---|---|
-| `Patient` | Master patient records with auto-generated codes (PAT-YYYY-000001) |
-| `PatientProfile` | One-to-one clinical history (HIV status, medical history, medications) |
-| `PatientCondition` | Patient conditions (active/historical/suspected) |
-| `Visit` | Consultation records (complaints, diagnosis, remedy, recommendations) |
-| `Vital` | One-to-one vitals per visit (BP, pulse, temp, weight, glucose) |
-| `FollowUpEvaluation` | One-to-one follow-up notes per visit |
-| `AuditLog` | Audit trail for all entity changes (who, what, when, IP) |
-| `ElevatedAccessRequest` | Role-based access approval workflow |
-
-**Views:**
-| View | URL | Permission |
-|---|---|---|
-| `PatientViewSet` | `/api/patients/` | Authenticated |
-| `PatientViewSet.visits` | `GET/POST /api/patients/{id}/visits/` | Authenticated + clinical access check |
-| `VisitViewSet` | `/api/visits/` | Authenticated (filtered by access) |
-| `AuditLogViewSet` | `/api/audit-logs/` | Authenticated (read-only) |
-| `ElevatedAccessRequestViewSet` | `/api/access-requests/` | Authenticated |
-| `ElevatedAccessRequestViewSet.approve` | `POST /api/access-requests/{id}/approve/` | Clinical user |
-| `ElevatedAccessRequestViewSet.reject` | `POST /api/access-requests/{id}/reject/` | Clinical user |
-| `dashboard_stats` | `GET /api/dashboard/stats/` | Authenticated |
-| `patient_import_webhook` | `POST /api/webhooks/patient-import/` | AllowAny (X-Harmony-Secret header) |
-
-### 5.3 Access Control (`clinic/access.py`)
-
-```python
-CLINICAL_ROLES = {"admin", "clinician"}
-
-def is_clinical_user(user) -> bool:
-    """Returns True for admin or clinician roles."""
-
-def has_patient_clinical_access(user, patient_id) -> bool:
-    """Clinical roles always have access. Non-clinical users need an
-    approved, non-expired ElevatedAccessRequest for the specific patient."""
+```text
+C:\Users\ayand\Local Library\Github\Harmony-System-Django
 ```
 
----
-
-## 6. Frontend Pages
-
-### Ready (Production)
-| Route | Description | Role Access |
-|---|---|---|
-| `/` | Dashboard with stats, workspace cards, recent patients/visits | All roles |
-| `/login` | Sign-in form | Public |
-| `/register` | Self-registration form | Public |
-| `/patients` | Patient directory with search | All roles |
-| `/patients/new` | Multi-step patient registration | Admin, Receptionist |
-| `/patients/[id]` | Patient detail with clinical access gating | All roles (gated) |
-| `/patients/[id]/edit` | Edit patient demographics | Admin, Receptionist |
-| `/patients/dashboard` | Patient management hub | All roles |
-| `/visits` | Visit records list | Admin, Clinician |
-| `/visits/new` | Add visit form | Admin, Clinician |
-| `/users` | User management (list, edit, toggle status) | Admin only |
-| `/account` | Profile display + password change | All roles |
-| `/access-requests` | Request elevated access | Receptionist |
-| `/approvals` | Approve/reject access requests | Admin, Clinician |
-| `/messages` | Internal user messaging | Staff conversations with extensible patient, appointment, visit, case, and document references |
-
-### Planned (Placeholder)
-| Route | Status | Notes |
-|---|---|---|
-| `/waiting-list` | Placeholder | Shows recent visits; no real check-in backend |
-| `/check-ins` | Placeholder | Shows all patients; no arrival status tracking |
-| `/appointments` | Placeholder | No appointment booking model exists |
-| `/reports` | Partial | Shows dashboard stats; export filters not implemented |
-| `/inventory` | Placeholder | Cards for stock items, reorder alerts, stock movement |
-| `/staff` | Static | Role description cards only |
+The older OneDrive-managed clone should not be treated as the active working repo.
 
 ---
 
-## 7. Database Schema
+## 5. Backend Domain Model
 
-### Entity Relationship Overview
+### Accounts
 
-```
-User (accounts)
- ├── created_by ───► Patient
- ├── practitioner ──► Visit
- ├── requested_by ──► ElevatedAccessRequest
- ├── reviewed_by ───► ElevatedAccessRequest
- └── user ──────────► AuditLog
+| Model | Purpose |
+| --- | --- |
+| `User` | Django user with Harmony role and optional profile image |
+| `RoleModulePermission` | Enables/disables modules per role |
+| `ClinicianProfile` | Clinician resume/profile completion tracking |
+| `EmployeeEnrollmentRequest` | Pending employee onboarding requests from n8n/internal sources |
+| `SystemEmailSettings` | Brevo API or SMTP settings managed in the app |
+| `EmailDeliveryLog` | Audit/log table for transactional email delivery |
 
-Patient (clinic)
- ├── profile ───────► PatientProfile (1:1)
- ├── conditions ────► PatientCondition (1:N)
- ├── visits ────────► Visit (1:N)
- └── access_requests ► ElevatedAccessRequest (1:N)
+Supported user role categories:
 
-Visit (clinic)
- ├── vitals ────────► Vital (1:1)
- └── follow_up ─────► FollowUpEvaluation (1:1)
-```
+- `admin`
+- `clinician`
+- `receptionist`
+- `supplier_contact`
+- `supplier_manager`
+- `partner_contact`
+- `partner_manager`
 
-### Key Fields
+Current employee User ID rule:
 
-**Patient:**
-- `patient_code` — Auto-generated: `PAT-YYYY-NNNNNN`
-- `national_id` — Optional national ID number
-- `status` — Active/Inactive/Archived
+- employees use the `HH200` range
+- issued example IDs include `HH2005110`, `HH2005187`, `HH2005264`, `HH2005341`
+- future ranges planned:
+  - `HH100...` patients
+  - `HH200...` employees
+  - `HH300...` suppliers
+  - `HH400...` external partners
 
-**Visit:**
-- `visit_type` — Consultation/Follow-up/Emergency
-- `visit_date`, `visit_time` — When the visit occurred
-- `main_complaint`, `diagnosis`, `remedy` — Clinical notes
+### Clinic
 
-**ElevatedAccessRequest:**
-- `scope` — What data the user needs access to
-- `status` — Pending/Approved/Rejected/Expired
-- `expires_at` — When the access grant expires
-
----
-
-## 8. API Reference
-
-### Authentication
-| Method | Path | Description |
-|---|---|---|
-| POST | `/api/auth/token/` | Login — returns access + refresh JWT |
-| POST | `/api/auth/token/refresh/` | Refresh access token |
-| POST | `/api/auth/register/` | Self-registration |
-| POST | `/api/auth/change-password/` | Change own password |
-
-### Users
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/users/` | List all users (admin only) |
-| POST | `/api/users/` | Create user (admin only) |
-| GET | `/api/users/{id}/` | Get user detail (admin only) |
-| PUT/PATCH | `/api/users/{id}/` | Update user (admin only) |
-| DELETE | `/api/users/{id}/` | Delete user (admin only) |
-| POST | `/api/users/{id}/toggle_status/` | Toggle active/inactive (admin only) |
-| GET | `/api/users/me/` | Current user profile |
-
-### Patients
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/patients/` | List patients (searchable) |
-| POST | `/api/patients/` | Create patient |
-| GET | `/api/patients/{id}/` | Get patient detail |
-| PUT/PATCH | `/api/patients/{id}/` | Update patient |
-| DELETE | `/api/patients/{id}/` | Delete patient |
-| GET | `/api/patients/{id}/visits/` | Get patient's visits |
-| POST | `/api/patients/{id}/visits/` | Add visit for patient |
-
-### Visits
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/visits/` | List visits (filtered by access) |
-| POST | `/api/visits/` | Create visit |
-| GET/PUT/DELETE | `/api/visits/{id}/` | Visit CRUD |
-
-### Access Requests
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/access-requests/` | List access requests |
-| POST | `/api/access-requests/` | Create access request |
-| POST | `/api/access-requests/{id}/approve/` | Approve request (clinical user) |
-| POST | `/api/access-requests/{id}/reject/` | Reject request (clinical user) |
-
-### Other
-| Method | Path | Description |
-|---|---|---|
-| GET | `/api/dashboard/stats/` | Dashboard statistics |
-| GET | `/api/audit-logs/` | Audit trail (read-only) |
-| POST | `/api/webhooks/patient-import/` | Patient import webhook (X-Harmony-Secret) |
+| Model | Purpose |
+| --- | --- |
+| `Patient` | Master patient identity, contact, next of kin, consent status, soft-delete |
+| `PatientProfile` | Medical/family history and sensitive summary fields |
+| `PatientCondition` | Confidential condition flags with yes/no and notes |
+| `PatientDocument` | Generated/uploaded patient documents, consent forms, signed files |
+| `ElevatedAccessRequest` | Approval flow for protected clinical records |
+| `PatientCheckIn` | Reception/tablet/API check-in records |
+| `Appointment` | Booked appointment records and source tracking |
+| `PatientJourney` | Daily process tracking for patient stage, queue/check-in status |
+| `PatientJourneyEvent` | Stage history for patient journey tracking |
+| `FormDraft` | Generic account-linked form draft/autosave storage |
+| `Visit` | Consultation/follow-up clinical record |
+| `VisitSymptomProblem` | Open/resolved symptom/problem list across visits |
+| `Case` | Legacy/transition case model; future model may be adjusted |
+| `Vital` | Vitals linked to a visit; supports multiple vitals per visit |
+| `MessageThread`, `Message`, `MessageParticipant`, `MessageDelivery` | Internal messaging foundation and future external delivery channels |
+| `AuditLog` | Create/update/delete/access traceability |
+| `SupportTicket` | Internal support request tracking |
 
 ---
 
-## 9. Authentication & Roles
+## 6. Patient Workflow
 
-### JWT Configuration
-- **Access token lifetime:** 30 minutes
-- **Refresh token lifetime:** 7 days
-- **Default permission:** `IsAuthenticated` on all API endpoints
-- **Auth header:** `Authorization: Bearer <token>`
+### New Patient
 
-### Role System
-| Role | Capabilities |
-|---|---|
-| **Admin** | Full access: user management, patient CRUD, visit CRUD, elevated access approval, audit logs, all frontend pages |
-| **Clinician** | Clinical access: patient CRUD, visit CRUD, elevated access approval, dashboard, patient records, clinical records |
-| **Receptionist** | Limited: patient registration/demographics, patient directory, dashboard. Needs elevated access approval for medical records. Cannot create visits. |
+Current planned flow:
 
-### Frontend Session
-- JWT access token stored in `harmony_access` cookie (httpOnly, 30 min)
-- Refresh token stored in `harmony_refresh` cookie (httpOnly, 7 days)
-- Role stored in `harmony_role` cookie
-- Name stored in `harmony_name` cookie
-- Username stored in `harmony_username` cookie
-- All cookies: `httpOnly`, `sameSite: "lax"`, `secure` flag configurable
+1. Registration
+2. Consent form signing
+3. Check-in / queue
+4. Medical and family history
+5. Confidential clinical records
+6. Vitals
+7. New visit / consultation
 
-### Elevated Access Workflow
-1. Receptionist requests access to a specific patient's medical records
-2. Clinician reviews and approves/rejects the request
-3. If approved, access is granted until `expires_at` (default 4 hours)
-4. `has_patient_clinical_access()` checks for approved, non-expired requests
+Important rules:
 
----
+- consent signing is a blocker before vitals and clinical records
+- check-in and consent do not need to happen in only one order
+- a receptionist should not reach clinician-only clinical steps
+- vitals must be linked to a visit and can be recorded more than once
+- after a step is completed, the next eligible step should be opened automatically when possible
 
-## 10. Deployment Configuration
+### Existing Patient
 
-### Environment Variables
+Current planned flow:
 
-#### Required (Production)
-| Variable | Description | Example |
-|---|---|---|
-| `DB_DATABASE` | PostgreSQL database name | `harmony` |
-| `DB_USERNAME` | PostgreSQL user | `harmony` |
-| `DB_PASSWORD` | PostgreSQL password | *(secure random)* |
-| `DJANGO_SECRET_KEY` | Django secret key | *(secure random)* |
-| `DJANGO_DEBUG` | Debug mode | `false` |
-| `APP_URL` | Public domain | `https://mis.harmonyhealthsz.com` |
-| `HARMONY_WEBHOOK_SECRET` | Webhook auth secret | *(secure random)* |
-| `TUNNEL_TOKEN` | Cloudflare tunnel token | *(from Cloudflare dashboard)* |
+1. Check-in or appointment check-in
+2. Review confidential records for changes
+3. Vitals
+4. New visit or follow-up
 
-#### Optional
-| Variable | Default | Description |
-|---|---|---|
-| `POSTGRES_HOST` | `postgres` | Database host |
-| `POSTGRES_PORT` | `5432` | Database port |
-| `CELERY_BROKER_URL` | `redis://redis:6379/0` | Celery broker |
-| `CELERY_RESULT_BACKEND` | `redis://redis:6379/1` | Celery result backend |
-| `API_BASE_URL` | `http://backend:8000/api` | Frontend server-side API URL |
-| `NEXT_PUBLIC_API_BASE_URL` | `${APP_URL}/api` | Frontend client-side API URL |
-| `COOKIE_SECURE` | `true` | Secure cookie flag |
+### Check-In
 
-### Container Configuration
+There are two check-in interfaces:
 
-| Container | Image/Build | Internal Port | External Port | Restart |
-|---|---|---|---|---|
-| `harmony-django-db` | `postgres:16-alpine` | 5432 | 54321 | always |
-| `harmony-django-redis` | `redis:7-alpine` | 6379 | 63791 | always |
-| `harmony-django-backend` | `build: ./backend` | 8000 | — | always |
-| `harmony-django-celery` | `build: ./backend` | — | — | always |
-| `harmony-django-beat` | `build: ./backend` | — | — | always |
-| `harmony-django-frontend` | `build: ./frontend` | 3000 | 30001 | always |
-| `cloudflared-harmony-django` | `cloudflare/cloudflared:latest` | — | — | always |
+- `/check-ins` for receptionist/staff
+- `/tablet-check-in` for mounted front-desk self check-in
 
-### Volumes
-- `postgres_django_data` — PostgreSQL data persistence
+Lookup options:
 
-### Networks
-- `harmony-net` — Docker bridge network (all containers)
+- cell number
+- Harmony patient ID
+- National / Passport ID
+
+The system checks for a same-day appointment:
+
+- if found, the patient is marked as appointment check-in
+- if not found, the patient is placed in the waiting list / queue
+- queue number is assigned for walk-ins
+- duplicate activation for the same patient on the same day is blocked until midnight reset
+
+### Patient Journey
+
+`PatientJourney` tracks the patient's daily process state:
+
+- registered
+- queued
+- checked in
+- vitals recorded
+- waiting clinician
+- in consultation
+- visit recorded
+- completed
+- cancelled
+
+The patient view and `/patient-flow` should show the current stage and what is next.
 
 ---
 
-## 11. Hosting Infrastructure
+## 7. Registration and Patient Identity
 
-### Server Details
-- **OS:** Ubuntu 22.04.5 LTS
-- **Architecture:** aarch64 (ARM64)
-- **Docker:** 29.x
-- **Portainer:** 2.39.2
-- **Control Panel:** CyberPanel (hosts other sites — do not disturb)
+Patient registration currently records:
 
-### Portainer
-- **URL:** `https://portainer.fmtagency.online`
-- **Endpoint ID:** `5` (local Docker socket)
-- **Stack name:** `harmony`
-- **Stack ID:** `69`
-- **Deployment method:** Git repository (pulls from `master` branch)
-- **Compose file:** `remote-deployment-stack.yml`
+- first name, middle name, last name
+- National / Passport ID, alphanumeric
+- date of birth and gender
+- primary and secondary phone numbers
+- email, optional
+- country code, region/state, town/locality, village/address area
+- next of kin full name, phone, optional email, relationship
 
-### Cloudflare Tunnel
-- **Public hostname:** `mis.harmonyhealthsz.com`
-- **Service:** `http://harmony-django-frontend:3000`
-- **Configuration:** Managed via Cloudflare Zero Trust dashboard
-- **Token:** Stored in `TUNNEL_TOKEN` environment variable
+Location fields use `country-state-city` in the frontend. Phone country code drives available regions/towns where data exists.
 
-### Network Security
-- **No public ports exposed** on the server
-- All external traffic flows through Cloudflare Tunnel
-- Internal services communicate over Docker bridge network
-- PostgreSQL and Redis ports mapped to non-standard ports (54321, 63791) to avoid CyberPanel conflicts
+Patient number rule:
 
----
-
-## 12. Update & Deployment Procedures
-
-### 12.1 Standard Deployment (Git-based)
-
-The stack is configured to pull from the GitHub repository. To deploy updates:
-
-1. **Push changes to GitHub:**
-   ```bash
-   git add .
-   git commit -m "Your commit message"
-   git push origin master
-   ```
-
-2. **Redeploy in Portainer:**
-   - Go to **Portainer → Stacks → harmony**
-   - Click **"Pull and redeploy"**
-   - Enable **"Re-pull image and redeploy"** toggle if Docker images changed
-   - Click **"Update"**
-   - Wait 2-3 minutes for rebuild
-
-### 12.2 What Gets Rebuilt
-
-| Service | Rebuild Trigger |
-|---|---|
-| Backend | Any change in `backend/` directory |
-| Frontend | Any change in `frontend/` directory |
-| PostgreSQL | Never (data persists in volume) |
-| Redis | Never |
-| Celery/Celery Beat | With backend (same build context) |
-| Cloudflared | Only if image tag changes |
-
-### 12.3 Manual Redeploy via API
-
-If Portainer UI is unavailable, use the API:
-
-```powershell
-# Get stack details
-Invoke-RestMethod -Uri "https://portainer.fmtagency.online/api/stacks/69" `
-  -Headers @{ "X-API-Key" = "YOUR_API_TOKEN" }
-
-# Redeploy (PUT with env vars)
-$body = @{
-  Env = @(
-    @{ name = "DB_DATABASE"; value = "harmony" }
-    # ... all env vars
-  )
-  Prune = $true
-} | ConvertTo-Json
-
-Invoke-RestMethod -Method Put `
-  -Uri "https://portainer.fmtagency.online/api/stacks/69?endpointId=5" `
-  -Headers @{ "X-API-Key" = "YOUR_API_TOKEN" } `
-  -ContentType "application/json" `
-  -Body $body
+```text
+HHPAT-<sequence><yy><last6phone>
 ```
 
-### 12.4 Local Development
+Example:
+
+```text
+HHPAT-10026301048
+```
+
+Older patient codes may still exist in the database; new records use the new rule.
+
+Soft-delete:
+
+- patient delete is now soft-delete using `is_deleted` and `deleted_at`
+- normal patient lists exclude deleted patients
+- admin recovery page can list and restore deleted patients
+
+---
+
+## 8. Consent Forms and Documents
+
+Consent forms are generated and stored as patient documents.
+
+Current document stack:
+
+- WeasyPrint for HTML/CSS to PDF generation
+- ReportLab for structured PDF/stamp/signature work
+- Pillow for image processing
+- qrcode for document verification codes
+- signature_pad in the frontend for handwritten digital signature capture
+
+Consent workflow goals:
+
+1. Generate one active consent form for the patient unless renewal rules require another.
+2. Display the document for review in the system.
+3. Require the patient/authorized signer to confirm they have read it.
+4. Capture handwritten signature.
+5. Regenerate or update the PDF with embedded signature and metadata.
+6. Mark document and patient consent status appropriately.
+7. Store generated/signed files under patient documents.
+
+Future workflow:
+
+- reception can print and manually sign a form
+- n8n/Telegram can accept a photo or PDF upload
+- AI/OCR may verify whether the correct document was submitted and signed
+- human review remains required before final document acceptance
+
+Important rule:
+
+Document signing here means handwritten electronic signature capture and embedding, not certificate-based cryptographic signing.
+
+---
+
+## 9. Clinical Records and Visits
+
+Visit model currently supports:
+
+- visit type: new consultation, follow-up, review
+- visit date/time
+- main complaint
+- initial complaints
+- physical examination
+- diagnosis
+- remedy
+- reason for remedy
+- dietary recommendation
+- lifestyle recommendation
+- digestive, general, reproductive, sleep/mental review JSON sections
+- follow-up review JSON section
+- linked practitioner
+
+Symptoms/problems:
+
+- open symptom/problem items are stored in `VisitSymptomProblem`
+- each item can be marked resolved on later follow-up visits
+- each item can carry notes
+- follow-up visits should pull the open symptom/problem list forward
+
+Follow-up rules under discussion:
+
+- previous complaint can be pulled into the follow-up context
+- previous diagnosis/remedy/recommendations should be hidden by default and shown through an eye/view action
+- follow-up forms should record remedy/evaluation and lifestyle/diet/exercise/energy evaluation fields
+
+The case model is transitional. The long-term direction is to make the visit the main case-like event and use symptom/problem records to track ongoing issues across visits.
+
+---
+
+## 10. Vitals
+
+Vitals are now linked to `Visit` through a foreign key, meaning one visit can have multiple vitals records.
+
+Recorded fields include:
+
+- first and second blood pressure readings
+- pulse
+- respiratory rate
+- temperature
+- weight
+- glucose
+- glucose context: fasting, after meals, unknown
+- glucose food type
+- medication taken status
+- recorded at/by
+
+Rules:
+
+- vitals cannot be recorded before consent is signed
+- vitals can be taken at flexible points during the patient flow
+- patient-specific "Add vitals" actions should open contextual forms/modals where possible
+- main sidebar "Add Vitals" can remain a general entry point that asks for patient selection
+
+---
+
+## 11. Roles, Modules, and Dashboards
+
+The app has role-based dashboards and a role-module permission matrix.
+
+Current sidebar/module areas include:
+
+- Dashboard
+- Patients
+- Add Patient
+- Patient List
+- Check-In
+- Track Patient Flow
+- Add Vitals
+- Consent Forms
+- Appointments
+- Approvals / Access Requests
+- Messages
+- Inventory (future)
+- Reports
+- Users / User Management
+- Employee Enrollment
+- Roles
+- Teams
+- System Settings
+- Support Tickets
+- Deleted Patients
+
+Admin can manage module availability through role permissions. This is the foundation for turning features on/off per role instead of hardcoding visibility only in frontend navigation.
+
+User management is being aligned to Harmony ID rules:
+
+- the system should generate User IDs rather than requiring manual username entry
+- employees use `HH200...`
+- supplier and partner roles should not show employee-only roles
+- Keycloak user creation is the target production identity path
+
+---
+
+## 12. Authentication and Identity
+
+Production identity target:
+
+- Keycloak realm: `harmony-health`
+- login URL: `https://auth.harmonyhealthsz.com`
+- MIS client: `harmony-mis`
+- Harmony app login: `/login`
+
+Current approach:
+
+- production can use Keycloak password login
+- local fallback is still enabled during transition
+- the login page expects Harmony User ID instead of old username
+- Keycloak action emails are used for password setup/reset
+
+Realm management:
+
+- a master Keycloak admin can manage all realms
+- realm managers can be assigned to manage only the Harmony Health realm
+- realm managers should not receive master-realm access unless explicitly required
+
+Future identity work:
+
+- connect MIS manual user creation fully to Keycloak provisioning
+- generate IDs based on account type
+- send onboarding and password setup emails that include the generated Harmony User ID
+- align roles/groups between MIS and Keycloak
+
+---
+
+## 13. Email and Notifications
+
+Brevo is the selected transactional email provider.
+
+Current email system:
+
+- `SystemEmailSettings` stores provider, SMTP fallback, from/reply-to settings, and saved key flags
+- `EmailDeliveryLog` records delivery attempts
+- django-anymail supports Brevo API delivery
+- SMTP fallback is available for providers that expose SMTP
+
+Planned email uses:
+
+- employee application received / under review
+- Keycloak password setup instructions
+- password reset instructions
+- appointment confirmations/reminders
+- consent pending reminders
+- support ticket notifications
+- maintenance notifications
+
+Zoho Free can remain useful for receiving business mailbox email, but app transactional email should use Brevo.
+
+---
+
+## 14. Employee Onboarding and n8n
+
+n8n is used as a workflow helper, not as the clinical source of truth.
+
+Current onboarding plan:
+
+1. Employee sends a greeting to Telegram bot.
+2. n8n asks onboarding fields one by one.
+3. n8n submits an employee enrollment request to Harmony MIS.
+4. Admin reviews the request in `/employees/enrollment`.
+5. Admin approves/rejects.
+6. Identity setup and Keycloak provisioning follow after review.
+
+Current endpoint:
+
+```http
+POST /api/employee-enrollment-requests/
+```
+
+Important rule:
+
+n8n must not create clinical records or Keycloak users directly until scoped API/token management is implemented.
+
+---
+
+## 15. Messaging
+
+Harmony now has an internal messaging foundation:
+
+- message threads
+- participants
+- messages
+- delivery records
+- links to patient, appointment, visit, case, or document context
+
+Current intent:
+
+- start with internal staff messaging
+- later connect delivery records to Telegram, WhatsApp, and email through n8n/provider workflows
+- keep Harmony as the source of truth for message context
+
+External chat platform work is parked for now. Zulip, Mattermost, Nextcloud Talk, and lighter alternatives were discussed, but not adopted as the primary system communication layer yet.
+
+---
+
+## 16. Support and Administration
+
+Recently added admin features:
+
+- support ticket creation by users
+- support ticket admin dashboard
+- deleted patient recovery page
+- system email settings
+- role-module permissions
+- employee enrollment request review
+
+Planned system settings areas:
+
+- email settings
+- location/access rules
+- device and accessibility logs
+- maintenance mode
+- API/tokens
+- audit and retention settings
+- notification templates
+
+---
+
+## 17. API Summary
+
+Important backend APIs:
+
+```text
+POST /api/auth/token/
+POST /api/auth/token/refresh/
+GET  /api/users/me/
+GET  /api/users/
+GET  /api/role-module-permissions/
+GET  /api/system/email-settings/
+GET  /api/email-delivery-logs/
+GET  /api/employee-enrollment-requests/
+GET  /api/dashboard/stats/
+GET  /api/patients/
+GET  /api/patients/deleted/
+POST /api/patients/{id}/restore/
+GET  /api/patient-documents/
+GET  /api/visits/
+GET  /api/cases/
+GET  /api/vitals/
+GET  /api/check-ins/
+POST /api/check-ins/
+POST /api/check-ins/lookup/
+GET  /api/appointments/
+GET  /api/patient-journeys/
+POST /api/patient-journeys/lookup/
+GET  /api/form-drafts/
+GET  /api/message-threads/
+GET  /api/access-requests/
+GET  /api/audit-logs/
+GET  /api/support-tickets/
+POST /api/webhooks/patient-import/
+```
+
+Next.js also provides server-side API proxy routes under `/api/...` for login, patient actions, check-in lookup/create, documents, messages, support tickets, employee enrollment, and vitals.
+
+---
+
+## 18. Audit and Traceability
+
+Audit logging is a backend responsibility.
+
+`AuditLog` tracks:
+
+- user
+- entity type
+- entity ID
+- action
+- before data
+- after data
+- changed fields
+- IP address
+- user agent
+- timestamp
+
+Audit logging must be expanded consistently as modules mature. Clinical and confidential records require especially strong traceability.
+
+---
+
+## 19. UI Standards
+
+Current UI direction:
+
+- Harmony purple and green brand colors
+- no dark purple/black button combinations where text becomes unreadable
+- compact tables with `.hh-compact-table`
+- card/panel surfaces with stronger borders for high-DPI screens
+- responsive collapsible sidebar for tablet/mobile
+- shadcn/Radix-style primitives for dialogs, buttons, inputs, tabs, and menus
+- reusable centered error modal for important user-facing errors
+- loading states through Harmony loading components
+
+Known UI follow-up:
+
+- remove remaining `alert`, `confirm`, and one-off error displays
+- keep button standards consistent across all pages
+- continue replacing bulky lists with compact table/list components
+- complete responsive sidebar refinements for long menus on tablets
+
+---
+
+## 20. Local Development
+
+Backend:
 
 ```bash
-# Clone and setup
-git clone https://github.com/Ayandadlamini12/Harmony-System-Django.git
-cd Harmony-System-Django
-cp .env.example .env
-# Edit .env with your values
-
-# Start local stack
-docker compose up -d
-
-# Run migrations
-docker compose exec backend python manage.py migrate
-
-# Create superuser
-docker compose exec backend python manage.py createsuperuser
-
-# Stop
-docker compose down
+cd backend
+pip install -r requirements.txt
+python manage.py migrate
+python manage.py runserver 127.0.0.1:8000
 ```
 
-### 12.5 Database Migrations
-
-Migrations are applied automatically on container start via the backend's startup command:
-```yaml
-command: >
-  sh -c "python manage.py migrate --noinput &&
-         python manage.py collectstatic --noinput &&
-         gunicorn config.wsgi:application --bind 0.0.0.0:8000"
-```
-
-To run migrations manually:
-```bash
-# On server via Portainer exec
-docker exec harmony-django-backend python manage.py migrate
-
-# Or create new migrations
-docker exec harmony-django-backend python manage.py makemigrations
-```
-
-### 12.6 Backup Procedures
+Frontend:
 
 ```bash
-# PostgreSQL backup
-docker exec harmony-django-db pg_dump -U harmony harmony > backup_$(date +%Y%m%d).sql
-
-# Restore
-docker exec -i harmony-django-db psql -U harmony harmony < backup_20260517.sql
-
-# Volume backup
-docker run --rm -v postgres_django_data:/data -v $(pwd):/backup alpine tar czf /backup/postgres_data.tar.gz -C /data .
+cd frontend
+npm install
+npm run dev -- -H 0.0.0.0 -p 3000
 ```
+
+Full compose stack:
+
+```bash
+docker compose up --build
+```
+
+Common local URLs:
+
+```text
+Frontend: http://localhost:3000
+Backend API: http://127.0.0.1:8000/api/
+Django admin: http://127.0.0.1:8000/admin/
+```
+
+If local Next.js renders plain HTML with no CSS after a build, stop the dev server, delete `frontend/.next`, and restart `npm run dev`.
 
 ---
 
-## 13. Current Status & Remaining Modules
+## 21. Current Known Risks
 
-### ✅ Completed Modules
-
-| Module | Status | Notes |
-|---|---|---|
-| User Authentication | ✅ Complete | JWT, login, logout, register, change-password |
-| User Management | ✅ Complete | Admin CRUD, toggle status, role assignment |
-| Patient Registration | ✅ Complete | Multi-step form, auto-generated codes |
-| Patient Directory | ✅ Complete | Search, list, detail, edit |
-| Visit Records | ✅ Complete | List, create, vitals, follow-up |
-| Dashboard | ✅ Complete | Stats cards, recent patients/visits |
-| Elevated Access | ✅ Complete | Request, approve, reject workflow |
-| Audit Logging | ✅ Complete | Full trail of all changes |
-| Role-Based UI | ✅ Complete | Navigation adapts by role |
-| Cloudflare Tunnel | ✅ Complete | Zero-trust access |
-| Container Deployment | ✅ Complete | Portainer + Docker Compose |
-| Brand Theme | ✅ Complete | Purple + green brand colors |
-| Footer | ✅ Complete | Copyright + FMT Digital Agency link |
-
-### 🚧 In Progress / Partial
-
-| Module | Status | What's Missing |
-|---|---|---|
-| Reports |  Partial | Export filters, date range selection, PDF generation |
-| Visits New Form | 🟡 Partial | Backend route handler for form submission |
-
-### 📋 Planned Modules
-
-| Module | Priority | Description |
-|---|---|---|
-| **Waiting List** | High | Real-time patient arrival tracking, check-in flow, status updates |
-| **Check-ins** | High | Mark arrivals, update demographics on arrival, move to waiting list |
-| **Appointments** | Medium | Appointment booking, calendar view, reminders, rescheduling |
-| **Messages** | Medium | Internal messaging foundation is active; next work is notification counts, attachments, and n8n delivery connectors for email, WhatsApp, and Telegram |
-| **Inventory** | Medium | Stock items, reorder alerts, stock movement tracking, supplier management |
-| **Reports** | Medium | Operational reporting, exports, patient activity, visit trends, inventory reports |
-| **Staff Page** | Low | Convert from static to dynamic staff directory |
-| **Password Reset** | Low | Email-based forgot password flow (requires SMTP config) |
-| **Notifications** | Low | In-app notifications, email alerts, SMS reminders |
-| **Multi-language** | Low | i18n support (siSwati + English) |
-
-### 📊 Module Completion Summary
-
-```
-Completed:    ████████████████████ 12 modules
-In Progress:  ████░░░░░░░░░░░░░░░░  2 modules
-Planned:      ████████░░░░░░░░░░░░  8 modules
-────────────────────────────────────
-Total:        █████████████████████ 22 modules (55% complete)
-```
+- production compose/Portainer stack definition may not match running containers
+- some modules are implemented as foundations and still need full workflow hardening
+- Keycloak provisioning from MIS is not fully complete
+- n8n should not receive broad API access until scoped API/token manager exists
+- the visit/case model is still being redesigned with the clinic team
+- audit logging must be standardized across all create/update/delete operations
+- long clinical forms require autosave/session refresh/error modal coverage
+- some old local fallback users may still exist and should be cleaned up after Keycloak rollout
 
 ---
 
-## 14. Getting Started for New Developers
+## 22. Future Work Roadmap
 
-### 14.1 Prerequisites
+Planned or proposed:
 
-- Python 3.13+
-- Node.js 24+
-- Docker + Docker Compose
-- Git
-- PostgreSQL (for local dev, or use Docker)
-- Redis (for local dev, or use Docker)
+- API/token manager with scopes for n8n, Telegram, WhatsApp, mobile apps, and external partners
+- scanned paper form to AI/OCR draft workflow
+- full Keycloak provisioning from MIS user management
+- device/accessibility and allowed-location controls
+- maintenance mode and user notifications
+- document renewal rules for consent forms
+- report templates with branded headers, QR verification, stamps, and signatures
+- message delivery integrations through n8n/provider APIs
+- richer appointment reminders and follow-up workflows
+- full clinical visit model redesign with symptom/problem tracking as the main case continuity mechanism
 
-### 14.2 Local Setup
-
-```bash
-# 1. Clone the repository
-git clone https://github.com/Ayandadlamini12/Harmony-System-Django.git
-cd Harmony-System-Django
-
-# 2. Copy environment template
-cp .env.example .env
-# Edit .env with your values (or use defaults for local dev)
-
-# 3. Start the full stack
-docker compose up -d
-
-# 4. Wait for services to be ready (check with docker compose ps)
-
-# 5. Access the application
-# Frontend: http://localhost:3000
-# Backend API: http://localhost:8000/api
-# Django Admin: http://localhost:8000/admin
-```
-
-### 14.3 Creating a Superuser
-
-```bash
-docker compose exec backend python manage.py createsuperuser
-```
-
-### 14.4 Running Tests
-
-```bash
-# Backend tests
-docker compose exec backend python manage.py test
-
-# Frontend type check
-cd frontend && npm run typecheck
-
-# Frontend lint
-cd frontend && npm run lint
-```
-
-### 14.5 Making Changes
-
-1. **Backend changes:**
-   - Edit files in `backend/`
-   - Create new migrations: `docker compose exec backend python manage.py makemigrations`
-   - Apply migrations: `docker compose exec backend python manage.py migrate`
-   - Restart backend: `docker compose restart backend`
-
-2. **Frontend changes:**
-   - Edit files in `frontend/src/`
-   - Hot reload works in dev mode (`npm run dev`)
-   - Build for production: `cd frontend && npm run build`
-
-3. **Deploy to production:**
-   - Commit and push to `master` branch
-   - Redeploy in Portainer (see Section 12.1)
-
-### 14.6 Code Conventions
-
-**Backend (Python/Django):**
-- Follow PEP 8 style guide
-- Use type hints where possible
-- Docstrings for public functions and classes
-- Model field names: snake_case
-- API endpoints: kebab-case in URLs, snake_case in JSON
-
-**Frontend (TypeScript/Next.js):**
-- Use TypeScript for all new code
-- Server Components by default (async page.tsx)
-- Client Components only when needed (`"use client"`)
-- Form submissions via Server Actions or Route Handlers
-- API calls server-side only (no client-side fetch)
-- Styling: Tailwind CSS with custom `hh-*` utility classes
-
-### 14.7 Project-Specific Patterns
-
-**Authentication Flow:**
-- Login form POSTs to `/api/auth/login` (Next.js Route Handler)
-- Route Handler calls Django `/api/auth/token/` for JWT
-- Sets httpOnly cookies (`harmony_access`, `harmony_refresh`, etc.)
-- All subsequent API calls read `harmony_access` cookie for Bearer token
-
-**Role-Based Rendering:**
-- `src/lib/role-workflows.ts` defines nav items and workflow cards with `roles` array
-- `allowedForRole()` filters items by current user's role
-- Server components check role before rendering sensitive content
-
-**Elevated Access:**
-- Receptionist requests access via `/access-requests` page
-- Clinician approves via `/approvals` page
-- Backend `has_patient_clinical_access()` checks for approved, non-expired requests
-- Patient detail page gates clinical data based on access
-
----
-
-## 15. Troubleshooting
-
-### Common Issues
-
-#### Frontend build fails with "exit code: 1"
-- **Cause:** TypeScript errors or missing imports
-- **Fix:** Run `cd frontend && npm run build` locally to see full error output
-- **Common fix:** Ensure all imported types are included in the import statement
-
-#### Button text not visible (white on white)
-- **Cause:** CSS specificity issue with Tailwind
-- **Fix:** Check `globals.css` for `.hh-button` color rules. Primary buttons should have white text, secondary buttons should have dark text.
-
-#### Cannot access admin pages
-- **Cause:** User role is not `admin`
-- **Fix:** Update user role in Django admin or via API:
-  ```bash
-  docker exec harmony-django-backend python manage.py shell -c "from accounts.models import User; u = User.objects.get(username='youruser'); u.role = 'admin'; u.save()"
-  ```
-
-#### Cloudflare tunnel not connecting
-- **Cause:** Invalid or expired tunnel token
-- **Fix:** Generate new token in Cloudflare Zero Trust dashboard, update `TUNNEL_TOKEN` env var, redeploy
-
-#### Database connection refused
-- **Cause:** PostgreSQL not healthy or wrong credentials
-- **Fix:** Check `docker compose logs postgres`, verify `DB_PASSWORD` matches
-
-#### CORS errors
-- **Cause:** Frontend domain not in `CORS_ALLOWED_ORIGINS`
-- **Fix:** Add domain to env var: `CORS_ALLOWED_ORIGINS=http://localhost:3000,https://mis.harmonyhealthsz.com`
-
-#### Celery worker not processing tasks
-- **Cause:** Redis connection issue or worker not started
-- **Fix:** Check `docker compose logs celery`, verify `CELERY_BROKER_URL` points to correct Redis instance
-
-### Debug Commands
-
-```bash
-# Check container status
-docker compose ps
-
-# View logs for a service
-docker compose logs backend
-docker compose logs frontend
-docker compose logs celery
-
-# Exec into a container
-docker compose exec backend bash
-docker compose exec frontend sh
-
-# Check database connectivity
-docker compose exec backend python manage.py dbshell
-
-# Check Redis connectivity
-docker compose exec redis redis-cli ping
-
-# View Docker network
-docker network inspect harmony-net
-
-# Check Portainer stack status
-curl -H "X-API-Key: YOUR_TOKEN" https://portainer.fmtagency.online/api/stacks/69
-```
-
-### Getting Help
-
-- **Project repository:** https://github.com/Ayandadlamini12/Harmony-System-Django
-- **Portainer:** https://portainer.fmtagency.online
-- **Live application:** https://mis.harmonyhealthsz.com
-- **Developer:** FMT Digital Agency — https://website.fmtagency.online
-
----
-
-*Last updated: May 17, 2026*
