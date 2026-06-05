@@ -11,6 +11,7 @@ import { ConditionChecklist } from "@/components/condition-checklist";
 import { NextOfKinFields } from "@/components/next-of-kin-fields";
 import { PatientContactFields } from "@/components/patient-contact-fields";
 import { getPatient } from "@/lib/api";
+import { getSessionUser } from "@/lib/session";
 
 import { updatePatient } from "./actions";
 import { DeletePatientButton } from "@/components/delete-patient-button";
@@ -27,7 +28,7 @@ export default async function EditPatientPage({
 }) {
   const { id } = await params;
   const query = await searchParams;
-  const patient = await getPatient(id);
+  const [patient, session] = await Promise.all([getPatient(id), getSessionUser()]);
   if (!patient) notFound();
 
   const submit = updatePatient.bind(null, id);
@@ -127,7 +128,9 @@ export default async function EditPatientPage({
 
         <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-between items-center border-t border-[var(--hh-border)] pt-5">
           <div>
-            <DeletePatientButton patientId={patient.public_id} name={patient.full_name_display} />
+            {(session.role === "admin" || session.role === "clinician") && (
+              <DeletePatientButton patientId={patient.public_id} name={patient.full_name_display} />
+            )}
           </div>
           <div className="flex flex-col-reverse gap-3 sm:flex-row sm:justify-end w-full sm:w-auto">
             <Button asChild variant="secondary"><Link href={`/patients/${patient.public_id}`}>Cancel</Link></Button>

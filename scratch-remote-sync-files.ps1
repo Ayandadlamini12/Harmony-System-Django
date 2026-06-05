@@ -5,13 +5,8 @@ $WorkspaceRoot = "c:\Users\ayand\Local Library\Github\Harmony-System-Django"
 
 # Files to sync
 $FilesToSync = @(
-    @{ Local = "frontend/src/app/patients/[id]/page.tsx"; Remote = "frontend/src/app/patients/[id]/page.tsx" },
-    @{ Local = "frontend/src/app/ui-mockup/page.tsx"; Remote = "frontend/src/app/ui-mockup/page.tsx" },
-    @{ Local = "frontend/src/components/patient-record-workspace.tsx"; Remote = "frontend/src/components/patient-record-workspace.tsx" },
-    @{ Local = "frontend/src/components/key-notes-dialog.tsx"; Remote = "frontend/src/components/key-notes-dialog.tsx" },
-    @{ Local = "frontend/src/components/patient-info-dialog.tsx"; Remote = "frontend/src/components/patient-info-dialog.tsx" },
-    @{ Local = "frontend/src/components/patient-journey-panel.tsx"; Remote = "frontend/src/components/patient-journey-panel.tsx" },
-    @{ Local = "backend/seed_patients.py"; Remote = "backend/seed_patients.py" }
+    @{ Local = "frontend/src/app/patients/[id]/edit/page.tsx"; Remote = "frontend/src/app/patients/[id]/edit/page.tsx" },
+    @{ Local = "frontend/src/components/patient-check-in.tsx"; Remote = "frontend/src/components/patient-check-in.tsx" }
 )
 
 Write-Host "Starting file-by-file remote sync..." -ForegroundColor Yellow

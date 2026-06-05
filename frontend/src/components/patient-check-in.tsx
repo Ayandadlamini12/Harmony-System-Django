@@ -431,6 +431,7 @@ export function PatientCheckIn({
                             loadingText="Checking in..."
                             onClick={() => checkIn({ patient: patient.id, visitType: "new_consultation" })}
                             type="button"
+                            variant="secondary"
                             className="min-h-8 rounded-md bg-white px-3 py-1.5 text-xs font-bold text-[var(--hh-purple)] shadow-none ring-1 ring-[var(--hh-purple)] hover:bg-[#f7f0fb] hover:text-[var(--hh-purple-dark)] disabled:text-[#66736d] disabled:ring-[var(--hh-border)]"
                           >
                             <ClipboardPlus size={15} />

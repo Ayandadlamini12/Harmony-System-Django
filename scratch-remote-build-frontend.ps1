@@ -30,15 +30,38 @@ try {
     Invoke-RestMethod -Uri "$BaseUri/containers/harmony-builder/start" -Headers $Headers -Method Post -ErrorAction Stop
     Write-Host "Docker build started in background..." -ForegroundColor Green
     
-    # Wait for completion
-    Write-Host "Waiting for build to finish (this may take a few minutes)..." -ForegroundColor Yellow
-    $WaitResponse = Invoke-RestMethod -Uri "$BaseUri/containers/harmony-builder/wait" -Headers $Headers -Method Post -ErrorAction Stop
-    Write-Host "Build container exited with status code: $($WaitResponse.StatusCode)" -ForegroundColor Green
+    # Poll for completion to avoid Cloudflare 524 timeout
+    $IsRunning = $true
+    $SecondsElapsed = 0
+    Write-Host "Polling builder status every 15 seconds..." -ForegroundColor Yellow
     
-    # Fetch logs
-    $Logs = Invoke-RestMethod -Uri "$BaseUri/containers/harmony-builder/logs?stdout=true&stderr=true" -Headers $Headers -Method Get -ErrorAction Stop
-    Write-Host "DOCKER BUILD LOGS:" -ForegroundColor Cyan
-    Write-Host $Logs
+    while ($IsRunning) {
+        Start-Sleep -Seconds 15
+        $SecondsElapsed += 15
+        
+        try {
+            $Inspect = Invoke-RestMethod -Uri "$BaseUri/containers/harmony-builder/json" -Headers $Headers -Method Get -ErrorAction Stop
+            $State = $Inspect.State
+            Write-Host "Build in progress... (Elapsed: $SecondsElapsed s, Status: $($State.Status))" -ForegroundColor Gray
+            
+            if ($State.Running -ne $true) {
+                $IsRunning = $false
+                Write-Host "Builder container exited with code: $($State.ExitCode)" -ForegroundColor Green
+                
+                # Fetch and print logs
+                $Logs = Invoke-RestMethod -Uri "$BaseUri/containers/harmony-builder/logs?stdout=true&stderr=true" -Headers $Headers -Method Get -ErrorAction Stop
+                Write-Host "DOCKER BUILD LOGS:" -ForegroundColor Cyan
+                Write-Host $Logs
+                
+                if ($State.ExitCode -ne 0) {
+                    throw "Docker build failed with exit code $($State.ExitCode)"
+                }
+            }
+        } catch {
+            Write-Host "Error polling or container missing: $($_.Exception.Message)" -ForegroundColor Red
+            $IsRunning = $false
+        }
+    }
 } catch {
     Write-Host "Failed: $($_.Exception.Message)" -ForegroundColor Red
 } finally {
