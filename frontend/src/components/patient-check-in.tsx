@@ -381,45 +381,74 @@ export function PatientCheckIn({
       )}
 
       {!isTablet && (
-      <section className="hh-panel overflow-hidden">
-        <div className="border-b border-[var(--hh-border)] px-5 py-4">
-          <h2 className="text-sm font-bold uppercase text-[#66736d]">{searching ? "Searching patients..." : "Matched patients"}</h2>
-        </div>
-        <div className="divide-y divide-[var(--hh-border)]">
-          {matches.map((patient) => (
-            <div key={patient.id} className="grid gap-4 px-5 py-4 xl:grid-cols-[1fr_auto] xl:items-center">
-              <div className="grid gap-1">
-                <div className="font-bold">{patient.full_name_display}</div>
-                <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-[#66736d]">
-                  <span className="font-mono text-[var(--hh-purple)]">{patient.patient_code}</span>
-                  {patient.primary_phone && <span>{patient.primary_phone}</span>}
-                  {patient.national_id && <span>ID: {patient.national_id}</span>}
-                  {patient.town_or_locality && <span>{patient.town_or_locality}</span>}
-                  {hasTodayActivation(patient, activatedPatientIds) && <span className="font-bold text-[#875400]">Already activated today</span>}
-                </div>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <LoadingButton
-                  disabled={hasTodayActivation(patient, activatedPatientIds)}
-                  loading={submittingType === `${patient.id}-new_consultation`}
-                  loadingText="Checking in..."
-                  onClick={() => checkIn({ patient: patient.id, visitType: "new_consultation" })}
-                  type="button"
-                  className="bg-[var(--hh-purple)] hover:bg-[var(--hh-purple-dark)] text-white font-bold"
-                >
-                  <ClipboardPlus size={17} />
-                  Check In
-                </LoadingButton>
-              </div>
+        <section className="hh-panel overflow-hidden">
+          <div className="flex items-center justify-between gap-3 border-b border-[var(--hh-border)] bg-[var(--hh-section)] px-4 py-3">
+            <h2 className="text-xs font-bold uppercase tracking-[0.12em] text-[#53605a]">{searching ? "Searching patients..." : "Matched patients"}</h2>
+            <span className="rounded-full border border-[var(--hh-border)] bg-white px-2.5 py-1 text-xs font-bold text-[#66736d]">
+              {matches.length} shown
+            </span>
+          </div>
+          {matches.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="hh-compact-table min-w-[820px] text-left">
+                <thead>
+                  <tr>
+                    <th>Patient</th>
+                    <th>Phone</th>
+                    <th>National / Passport ID</th>
+                    <th>Locality</th>
+                    <th>Status</th>
+                    <th className="text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {matches.map((patient) => {
+                    const alreadyActivated = hasTodayActivation(patient, activatedPatientIds);
+                    return (
+                      <tr key={patient.id}>
+                        <td>
+                          <div className="font-bold text-[var(--hh-text)]">{patient.full_name_display}</div>
+                          <div className="mt-0.5 font-mono text-xs text-[var(--hh-purple)]">{patient.patient_code}</div>
+                        </td>
+                        <td>{patient.primary_phone || "-"}</td>
+                        <td>{patient.national_id || "-"}</td>
+                        <td>{patient.town_or_locality || "-"}</td>
+                        <td>
+                          {alreadyActivated ? (
+                            <span className="rounded-full border border-[#f6d58b] bg-[#fff8e6] px-2.5 py-1 text-xs font-bold text-[#875400]">
+                              Activated today
+                            </span>
+                          ) : (
+                            <span className="rounded-full border border-[#cce4d1] bg-[#f2fbf4] px-2.5 py-1 text-xs font-bold text-[#225c2c]">
+                              Ready
+                            </span>
+                          )}
+                        </td>
+                        <td className="text-right">
+                          <LoadingButton
+                            disabled={alreadyActivated}
+                            loading={submittingType === `${patient.id}-new_consultation`}
+                            loadingText="Checking in..."
+                            onClick={() => checkIn({ patient: patient.id, visitType: "new_consultation" })}
+                            type="button"
+                            className="min-h-8 rounded-md bg-white px-3 py-1.5 text-xs font-bold text-[var(--hh-purple)] shadow-none ring-1 ring-[var(--hh-purple)] hover:bg-[#f7f0fb] hover:text-[var(--hh-purple-dark)] disabled:text-[#66736d] disabled:ring-[var(--hh-border)]"
+                          >
+                            <ClipboardPlus size={15} />
+                            Check In
+                          </LoadingButton>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
-          ))}
-          {matches.length === 0 && (
+          ) : (
             <div className="px-5 py-10 text-sm text-[#66736d]">
               {hasQuery ? "No matching patient was found. Confirm the number or ID, or register the patient first." : "Search to check in an existing patient."}
             </div>
           )}
-        </div>
-      </section>
+        </section>
       )}
     </div>
   );
