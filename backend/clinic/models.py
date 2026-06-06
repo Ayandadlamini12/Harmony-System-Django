@@ -173,6 +173,7 @@ class PatientDocument(TimeStampedModel):
         SIGNED = "signed", "Signed"
         VERIFIED = "verified", "Verified"
         REJECTED = "rejected", "Rejected"
+        INVALIDATED = "invalidated", "Invalidated"
 
     document_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="documents")

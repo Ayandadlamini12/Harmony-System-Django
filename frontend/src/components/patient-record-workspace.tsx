@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Activity,
   ChevronDown,
@@ -178,11 +179,19 @@ function getGlucoseStatus(glucoseVal?: string | null, context?: string) {
   }
 }
 
-export function PatientRecordWorkspace({ patient, canCreateVisit, initialCases }: { patient: Patient; canCreateVisit: boolean; initialCases: Case[] }) {
+export function PatientRecordWorkspace({ patient: initialPatient, canCreateVisit, initialCases }: { patient: Patient; canCreateVisit: boolean; initialCases: Case[] }) {
+  const router = useRouter();
+  const [patient, setPatient] = useState(initialPatient);
   const [activeTab, setActiveTab] = useState<RecordTab>("overview");
-  const [profile, setProfile] = useState(patient.profile);
-  const [documents, setDocuments] = useState(patient.documents || []);
+  const [profile, setProfile] = useState(initialPatient.profile);
+  const [documents, setDocuments] = useState(initialPatient.documents || []);
   const [draftTime, setDraftTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    setPatient(initialPatient);
+    setProfile(initialPatient.profile);
+    setDocuments(initialPatient.documents || []);
+  }, [initialPatient]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -205,9 +214,38 @@ export function PatientRecordWorkspace({ patient, canCreateVisit, initialCases }
     }
   }, [patient]);
 
+  const [isCheckingIn, setIsCheckingIn] = useState(false);
+
+  async function handleDirectCheckIn() {
+    setIsCheckingIn(true);
+    try {
+      const response = await fetch("/api/check-ins/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          patient: patient.id,
+          visit_type: "new_consultation",
+          method: "reception",
+          identifier_type: "reception_selected_patient",
+          source_label: "Clinical workspace direct",
+        }),
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(data.detail || "Direct check-in could not be completed.");
+        return;
+      }
+      toast.success("Patient checked in successfully!");
+      router.refresh();
+    } catch (err) {
+      toast.error("Could not connect to start patient journey.");
+    } finally {
+      setIsCheckingIn(false);
+    }
+  }
+
   const latestVisit = patient.visits?.[0];
   const latestVitals = allVitals(patient)[0];
-  const consentSigned = documents.some((d) => d.document_type === "consent_form" && (d.status === "signed" || d.status === "verified"));
   const workflowActions = patient.patient_actions || [];
   const actionFor = (key: PatientWorkflowAction["key"]) => workflowActions.find((action) => action.key === key);
   const consentAction = actionFor("consent_forms");
@@ -217,6 +255,7 @@ export function PatientRecordWorkspace({ patient, canCreateVisit, initialCases }
   const vitalsAction = actionFor("vitals");
   const visitAction = actionFor("visits");
   const nextAction = workflowActions.find((action) => action.next);
+  const consentSigned = consentAction?.completed ?? false;
 
   return (
     <>
@@ -304,11 +343,23 @@ export function PatientRecordWorkspace({ patient, canCreateVisit, initialCases }
               disabledWorkflowButton(consentAction, <FileText size={15} />, "Consent form")
             )}
             {checkInAction?.enabled ? (
-              <Button asChild variant="secondary" className="text-xs">
-                <Link href={checkInAction.href || "/check-ins"}>
-                  <ListChecks size={15} />
-                  {checkInAction.completed ? "Patient checked in" : "Check in / queue"}
-                </Link>
+              <Button 
+                variant="secondary" 
+                className="text-xs font-bold"
+                onClick={handleDirectCheckIn}
+                disabled={isCheckingIn || checkInAction.completed}
+              >
+                {isCheckingIn ? (
+                  <>
+                    <span className="animate-spin mr-1">⌛</span>
+                    Checking in...
+                  </>
+                ) : (
+                  <>
+                    <ListChecks size={15} />
+                    {checkInAction.completed ? "Patient checked in" : "Check in / queue"}
+                  </>
+                )}
               </Button>
             ) : (
               disabledWorkflowButton(checkInAction, <ListChecks size={15} />, "Check in / queue")
@@ -837,10 +888,12 @@ function FollowUpsTab({ visits, cases }: { visits: Visit[]; cases: Case[] }) {
 }
 
 function DocumentsTab({ patient, documents, onDocumentsChange }: { patient: Patient; documents: PatientDocument[]; onDocumentsChange: (docs: PatientDocument[]) => void }) {
+  const router = useRouter();
   const setDocuments = onDocumentsChange;
   const [generating, setGenerating] = useState(false);
+  const [invalidatingId, setInvalidatingId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const activeConsentDocument = documents.find((document) => document.document_type === "consent_form" && document.status !== "rejected");
+  const [showHistory, setShowHistory] = useState(false);
 
   async function generateConsent() {
     setGenerating(true);
@@ -863,6 +916,72 @@ function DocumentsTab({ patient, documents, onDocumentsChange }: { patient: Pati
     }
   }
 
+  async function handleInvalidateConsent(docId: number) {
+    if (!confirm("Are you sure you want to invalidate this consent form? It will be archived, and the patient must sign a new consent form before further clinical work.")) {
+      return;
+    }
+    setInvalidatingId(docId);
+    try {
+      const response = await fetch(`/api/patient-documents/${docId}/invalidate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" }
+      });
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        toast.error(data.detail || "Could not invalidate consent form.");
+        return;
+      }
+      toast.success("Consent form invalidated successfully.");
+      setDocuments(documents.map((d) => (d.id === docId ? { ...d, status: "invalidated" as const } : d)));
+      router.refresh();
+    } catch {
+      toast.error("An error occurred. Check connection and try again.");
+    } finally {
+      setInvalidatingId(null);
+    }
+  }
+
+  // Find active consent document (signed or verified)
+  const activeConsent = documents.find(
+    (d) => d.document_type === "consent_form" && (d.status === "signed" || d.status === "verified")
+  );
+
+  // Find pending / draft consent document (awaiting signature)
+  const pendingConsent = documents.find(
+    (d) => d.document_type === "consent_form" && (d.status === "pending_signature" || d.status === "generated")
+  );
+
+  const latestVisit = patient.visits?.[0];
+
+  let isConsentExpired = false;
+  let daysSinceLastVisit = 0;
+  if (latestVisit && activeConsent?.signed_at) {
+    const lastVisitDate = new Date(latestVisit.visit_date);
+    const today = new Date();
+    const diffTime = Math.abs(today.getTime() - lastVisitDate.getTime());
+    daysSinceLastVisit = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (daysSinceLastVisit > 30) {
+      const consentSignedDate = new Date(activeConsent.signed_at);
+      const lastVisitStr = latestVisit.visit_date;
+      const consentSignedStr = consentSignedDate.toISOString().split("T")[0];
+      if (consentSignedStr <= lastVisitStr) {
+        isConsentExpired = true;
+      }
+    }
+  }
+
+  // Filter historical / past documents
+  const historicalDocs = documents.filter((doc) => {
+    if (activeConsent && doc.id === activeConsent.id && !isConsentExpired) {
+      return false;
+    }
+    if (pendingConsent && doc.id === pendingConsent.id) {
+      return false;
+    }
+    return true;
+  });
+
   return (
     <ClinicalPanel title="Documents" icon={<ClipboardList size={17} />}>
       <ActionErrorDialog
@@ -873,46 +992,209 @@ function DocumentsTab({ patient, documents, onDocumentsChange }: { patient: Pati
         onOpenChange={(open) => !open && setError(null)}
       />
       <div className="grid gap-4">
-        <div className="flex flex-col gap-3 rounded-lg border border-[#d8c0e8] bg-[#f7f0fb] p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <div className="text-sm font-bold text-[var(--hh-purple-dark)]">Consent form</div>
-            <p className="mt-1 text-sm leading-6 text-[#53605a]">
-              Generate the internal consent document before clinical consultation starts. If one already exists, the system opens the existing document instead of creating another copy.
-            </p>
-          </div>
-          <Button type="button" onClick={generateConsent} disabled={generating}>
-            <FileText size={16} />
-            {generating ? "Opening..." : activeConsentDocument ? "Open consent" : "Generate consent"}
-          </Button>
-        </div>
-        <div className="divide-y divide-[var(--hh-border)] rounded-lg border border-[var(--hh-border)] bg-white">
-          {documents.map((document) => (
-            <div key={document.id} className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <div className="font-bold">{document.title}</div>
-                <div className="mt-1 text-xs font-bold uppercase text-[#66736d]">
-                  {document.document_type_label || document.document_type.replaceAll("_", " ")} - {document.status_label || document.status.replaceAll("_", " ")}
+        {/* Active Consent Form Section */}
+        {activeConsent && !isConsentExpired ? (
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-5 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-emerald-100 p-2 text-emerald-700 shrink-0">
+                  <ShieldCheck size={22} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-emerald-950">Active Patient Consent Form</h4>
+                  <p className="mt-1 text-xs text-emerald-800">
+                    This patient has a signed, fully active consent form covering clinical interventions.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#53605a] font-medium">
+                    <span><strong>Signed At:</strong> {activeConsent.signed_at ? new Date(activeConsent.signed_at).toLocaleString() : "N/A"}</span>
+                    {activeConsent.generated_by_name && (
+                      <span><strong>Witnessed By:</strong> {activeConsent.generated_by_name}</span>
+                    )}
+                    <span><strong>Status:</strong> <span className="capitalize font-bold text-emerald-700">{activeConsent.status}</span></span>
+                  </div>
                 </div>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {document.document_type === "consent_form" && document.status === "pending_signature" && (
-                  <ConsentSignatureDialog
-                    document={document}
-                    patient={patient}
-                    onSigned={(signedDocument) => setDocuments(documents.map((item) => (item.id === signedDocument.id ? signedDocument : item)))}
-                  />
-                )}
-                <Button asChild variant="secondary" size="sm">
-                  <a href={`/api/patient-documents/${document.id}/download?v=${encodeURIComponent(document.updated_at || document.status)}`} target="_blank" rel="noreferrer">
-                    <Download size={15} />
+              <div className="flex gap-2 shrink-0 sm:self-center">
+                <Button asChild variant="secondary" size="sm" className="border border-emerald-200 hover:bg-emerald-100 text-emerald-900 font-bold bg-white">
+                  <a href={`/api/patient-documents/${activeConsent.id}/download?v=${Date.now()}`} target="_blank" rel="noreferrer">
+                    <Download size={14} className="mr-1" />
+                    Open PDF
+                  </a>
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => handleInvalidateConsent(activeConsent.id)}
+                  disabled={invalidatingId === activeConsent.id}
+                  className="font-bold text-red-600 hover:text-red-700 hover:bg-red-50"
+                >
+                  {invalidatingId === activeConsent.id ? "Invalidating..." : "Invalidate Form"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        ) : isConsentExpired && activeConsent ? (
+          /* Expired Consent Block */
+          <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-5 shadow-xs animate-fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-amber-100 p-2 text-amber-700 shrink-0 font-bold text-lg leading-none">
+                  ⚠️
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-amber-950">Consent Form Expired (30-Day Visit Gap)</h4>
+                  <p className="mt-1 text-xs text-amber-800 leading-relaxed">
+                    The patient's last recorded visit was on <strong>{latestVisit?.visit_date}</strong> ({daysSinceLastVisit} days ago). 
+                    Because the visit gap exceeded 30 days, the prior consent form signed on {new Date(activeConsent.signed_at || "").toLocaleDateString()} has automatically expired.
+                    A new consent form must be signed.
+                  </p>
+                </div>
+              </div>
+              <Button 
+                type="button" 
+                onClick={generateConsent} 
+                disabled={generating}
+                className="bg-amber-600 hover:bg-amber-700 text-white font-bold shrink-0 sm:self-center"
+              >
+                <FileText size={14} className="mr-1" />
+                {generating ? "Opening..." : "Generate New Consent"}
+              </Button>
+            </div>
+          </div>
+        ) : pendingConsent ? (
+          /* Pending Consent Block */
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-5 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-start gap-3">
+                <div className="rounded-lg bg-indigo-100 p-2 text-indigo-700 shrink-0">
+                  <FileText size={22} />
+                </div>
+                <div>
+                  <h4 className="text-sm font-bold text-indigo-950">Consent Form Pending Signature</h4>
+                  <p className="mt-1 text-xs text-indigo-800">
+                    A consent form has been generated and is awaiting handwritten digital signature.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#53605a]">
+                    <span><strong>Created:</strong> {new Date(pendingConsent.created_at).toLocaleString()}</span>
+                    <span><strong>Status:</strong> <span className="capitalize font-bold text-indigo-700">{pendingConsent.status}</span></span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0 sm:self-center">
+                <ConsentSignatureDialog
+                  document={pendingConsent}
+                  patient={patient}
+                  onSigned={(signedDocument) => setDocuments(documents.map((item) => (item.id === signedDocument.id ? signedDocument : item)))}
+                />
+                <Button asChild variant="secondary" size="sm" className="border border-indigo-200 hover:bg-indigo-100 text-indigo-900 bg-white font-bold">
+                  <a href={`/api/patient-documents/${pendingConsent.id}/download?v=${Date.now()}`} target="_blank" rel="noreferrer">
+                    <Download size={14} className="mr-1" />
                     Open PDF
                   </a>
                 </Button>
               </div>
             </div>
-          ))}
-          {documents.length === 0 && <p className="p-4 text-sm text-[#66736d]">No documents have been uploaded or generated for this patient yet.</p>}
-        </div>
+          </div>
+        ) : (
+          /* Generate Consent CTA */
+          <div className="rounded-xl border border-dashed border-[var(--hh-border)] bg-slate-50/50 p-6 text-center">
+            <FileText size={32} className="mx-auto text-[#a2b2ac]" />
+            <h4 className="mt-2 text-sm font-bold text-[#111827]">No Active Consent Form Found</h4>
+            <p className="mt-1 text-xs text-[#53605a] max-w-md mx-auto leading-relaxed">
+              Before clinical visits, vitals, or medical histories can be registered, the patient must review and sign the standard clinic consent document.
+            </p>
+            <Button type="button" onClick={generateConsent} disabled={generating} className="mt-4 font-bold">
+              <FileText size={14} className="mr-1" />
+              {generating ? "Opening..." : "Generate Consent Form"}
+            </Button>
+          </div>
+        )}
+
+        {/* Expandable Historical Documents Table */}
+        {historicalDocs.length > 0 && (
+          <div className="mt-6 border-t border-[var(--hh-border)] pt-5">
+            <button
+              type="button"
+              onClick={() => setShowHistory(!showHistory)}
+              className="flex w-full items-center justify-between rounded-lg border border-[var(--hh-border)] bg-white px-4 py-3 hover:bg-slate-50 transition-colors shadow-xs"
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-[#3f4d47]">📋</span>
+                <span className="text-sm font-bold text-[#111827]">
+                  Archived / Past Documents ({historicalDocs.length})
+                </span>
+              </div>
+              <span className="text-[#66736d] text-xs font-semibold">
+                {showHistory ? "Hide archived records" : "View archived records"}
+              </span>
+            </button>
+
+            {showHistory && (
+              <div className="mt-3 overflow-x-auto rounded-lg border border-[var(--hh-border)] bg-white shadow-xs animate-fade-in">
+                <table className="hh-compact-table w-full text-left">
+                  <thead>
+                    <tr>
+                      <th>Document Name</th>
+                      <th>Type</th>
+                      <th>Status</th>
+                      <th>Created At</th>
+                      <th>Signed At</th>
+                      <th className="text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {historicalDocs.map((doc) => (
+                      <tr key={doc.id}>
+                        <td className="font-bold">{doc.title}</td>
+                        <td className="capitalize text-xs text-[#53605a]">
+                          {doc.document_type_label || doc.document_type.replaceAll("_", " ")}
+                        </td>
+                        <td>
+                          <Badge 
+                            variant={
+                              doc.status === "invalidated"
+                                ? "outline"
+                                : doc.status === "rejected"
+                                ? "warning"
+                                : "default"
+                            }
+                            className={`capitalize text-[10px] px-2 py-0.5 font-extrabold tracking-wide ${
+                              doc.status === "invalidated"
+                                ? "border-amber-300 text-amber-700 bg-amber-50"
+                                : ""
+                            }`}
+                          >
+                            {doc.status_label || doc.status.replaceAll("_", " ")}
+                          </Badge>
+                        </td>
+                        <td className="text-xs text-[#66736d]">
+                          {new Date(doc.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="text-xs text-[#66736d]">
+                          {doc.signed_at ? new Date(doc.signed_at).toLocaleDateString() : "—"}
+                        </td>
+                        <td className="text-right">
+                          <Button asChild variant="ghost" size="sm" className="h-7 text-xs font-bold text-[var(--hh-purple)]">
+                            <a href={`/api/patient-documents/${doc.id}/download?v=${encodeURIComponent(doc.updated_at || doc.status)}`} target="_blank" rel="noreferrer">
+                              <Download size={12} className="mr-1" />
+                              Open PDF
+                            </a>
+                          </Button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {documents.length === 0 && (
+          <p className="p-4 text-sm text-[#66736d] text-center border rounded-lg border-dashed bg-slate-50/30">
+            No documents have been uploaded or generated for this patient yet.
+          </p>
+        )}
       </div>
     </ClinicalPanel>
   );

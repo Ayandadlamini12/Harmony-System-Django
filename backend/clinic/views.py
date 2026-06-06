@@ -491,6 +491,36 @@ class PatientDocumentViewSet(viewsets.ReadOnlyModelViewSet):
         )
         return Response(after_data)
 
+    @action(detail=True, methods=["post"])
+    def invalidate(self, request, pk=None):
+        document = self.get_object()
+        if document.document_type != PatientDocument.DocumentType.CONSENT_FORM:
+            return Response({"detail": "Only consent forms can be invalidated."}, status=status.HTTP_400_BAD_REQUEST)
+        if document.status == PatientDocument.Status.REJECTED:
+            return Response({"detail": "Rejected documents cannot be invalidated."}, status=status.HTTP_400_BAD_REQUEST)
+
+        before_data = PatientDocumentSerializer(document, context={"request": request}).data
+        document.status = PatientDocument.Status.INVALIDATED
+        document.save(update_fields=["status", "updated_at"])
+
+        patient = document.patient
+        from .workflow import consent_is_complete
+        if not consent_is_complete(patient):
+            patient.consent_status = Patient.ConsentStatus.PENDING
+            patient.save(update_fields=["consent_status", "updated_at"])
+
+        after_data = PatientDocumentSerializer(document, context={"request": request}).data
+        write_audit_log(
+            request=request,
+            action="invalidate",
+            instance=document,
+            entity_type="patient_document",
+            before_data=before_data,
+            after_data=after_data,
+            details="Consent form manually invalidated.",
+        )
+        return Response(after_data)
+
 
 class VisitViewSet(viewsets.ModelViewSet):
     queryset = Visit.objects.select_related("patient").prefetch_related("vitals").order_by("-visit_date", "-created_at")

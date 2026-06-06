@@ -10,12 +10,22 @@ def active_journey_today(patient: Patient) -> PatientJourney | None:
 
 
 def consent_is_complete(patient: Patient) -> bool:
-    if patient.consent_status in (Patient.ConsentStatus.SIGNED, Patient.ConsentStatus.VERIFIED):
-        return True
-    return patient.documents.filter(
+    latest_consent = patient.documents.filter(
         document_type=PatientDocument.DocumentType.CONSENT_FORM,
         status__in=(PatientDocument.Status.SIGNED, PatientDocument.Status.VERIFIED),
-    ).exists()
+    ).order_by("-signed_at", "-created_at").first()
+
+    if not latest_consent:
+        return False
+
+    latest_visit = patient.visits.order_by("-visit_date", "-created_at").first()
+    if latest_visit:
+        days_since_last_visit = (timezone.localdate() - latest_visit.visit_date).days
+        if days_since_last_visit > 30:
+            if latest_consent.signed_at:
+                return timezone.localdate(latest_consent.signed_at) > latest_visit.visit_date
+            return False
+    return True
 
 
 def medical_history_started(patient: Patient) -> bool:

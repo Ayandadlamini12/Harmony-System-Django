@@ -683,6 +683,7 @@ class MessageThreadSerializer(serializers.ModelSerializer):
 class PatientListSerializer(serializers.ModelSerializer):
     last_visit_date = serializers.SerializerMethodField()
     current_journey = serializers.SerializerMethodField()
+    consent_status = serializers.SerializerMethodField()
 
     class Meta:
         model = Patient
@@ -740,6 +741,26 @@ class PatientListSerializer(serializers.ModelSerializer):
             "queue_number": journey.queue_number,
             "appointment_matched": journey.appointment_matched,
         }
+
+    def get_consent_status(self, obj):
+        from .workflow import consent_is_complete
+        if consent_is_complete(obj):
+            latest_consent = obj.documents.filter(
+                document_type=PatientDocument.DocumentType.CONSENT_FORM,
+                status__in=(PatientDocument.Status.SIGNED, PatientDocument.Status.VERIFIED),
+            ).order_by("-signed_at", "-created_at").first()
+            if latest_consent:
+                return latest_consent.status
+            return "signed"
+
+        latest_consent = obj.documents.filter(
+            document_type=PatientDocument.DocumentType.CONSENT_FORM
+        ).order_by("-created_at").first()
+        if latest_consent:
+            if latest_consent.status in ("pending_signature", "generated", "invalidated"):
+                return latest_consent.status
+
+        return "pending"
 
 
 class PatientDetailSerializer(PatientListSerializer):

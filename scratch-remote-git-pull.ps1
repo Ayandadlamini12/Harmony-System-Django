@@ -23,7 +23,7 @@ $CreateUri = "$BaseUri/containers/create?name=harmony-git-sync"
 $CreateBody = @{
     Image = "alpine/git:latest"
     Entrypoint = @("sh", "-c")
-    Cmd = @("git config --global --add safe.directory /data/compose/69 && git -C /data/compose/69 pull origin master")
+    Cmd = @("git config --global --add safe.directory /data/compose/69 && git -C /data/compose/69 reset --hard && git -C /data/compose/69 pull origin master")
     HostConfig = @{
         Binds = @("portainer_data:/data")
     }

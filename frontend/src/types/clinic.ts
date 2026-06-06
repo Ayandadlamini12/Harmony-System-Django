@@ -90,7 +90,7 @@ export type PatientDocument = {
   document_type: "consent_form" | "patient_upload" | "report";
   document_type_label?: string;
   title: string;
-  status: "generated" | "pending_signature" | "signed" | "verified" | "rejected";
+  status: "generated" | "pending_signature" | "signed" | "verified" | "rejected" | "invalidated";
   status_label?: string;
   file_url?: string;
   verification_payload?: Record<string, unknown>;
