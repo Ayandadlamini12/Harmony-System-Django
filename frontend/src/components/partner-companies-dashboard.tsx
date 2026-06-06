@@ -1,0 +1,638 @@
+"use client";
+
+import React, { useState, useTransition } from "react";
+import { 
+  Building2, 
+  Search, 
+  Plus, 
+  Edit, 
+  Trash2, 
+  Globe, 
+  Phone, 
+  Mail, 
+  MapPin, 
+  AlertCircle, 
+  CheckCircle2, 
+  X,
+  Briefcase,
+  Layers,
+  Percent,
+  CreditCard
+} from "lucide-react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
+
+import { PartnerCompany, Paginated } from "@/types/clinic";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Select } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger, DialogClose } from "@/components/ui/dialog";
+import { LoadingButton } from "@/components/harmony-loading";
+
+interface PartnerCompaniesDashboardProps {
+  initialCompanies: Paginated<PartnerCompany>;
+  userRole: string;
+}
+
+export function PartnerCompaniesDashboard({ initialCompanies, userRole }: PartnerCompaniesDashboardProps) {
+  const router = useRouter();
+  const [companies, setCompanies] = useState<PartnerCompany[]>(initialCompanies.results);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<"all" | "supplier" | "medical_aid" | "affiliate">("all");
+  const [isPending, startTransition] = useTransition();
+
+  // Form Drawer (Dialog) State
+  const [formOpen, setFormOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<PartnerCompany | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+
+  // Form Fields State
+  const [companyCode, setCompanyCode] = useState("");
+  const [name, setName] = useState("");
+  const [category, setCategory] = useState<"supplier" | "medical_aid" | "affiliate">("supplier");
+  const [address, setAddress] = useState("");
+  const [email, setEmail] = useState("");
+  const [website, setWebsite] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
+  const [taxNumber, setTaxNumber] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
+
+  // Delete Dialog State
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [companyToDelete, setCompanyToDelete] = useState<PartnerCompany | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // Open creation form
+  const handleCreateOpen = () => {
+    setEditingCompany(null);
+    setCompanyCode("");
+    setName("");
+    setCategory("supplier");
+    setAddress("");
+    setEmail("");
+    setWebsite("");
+    setPhoneNumber("");
+    setTaxNumber("");
+    setAccountNumber("");
+    setFormError(null);
+    setFormOpen(true);
+  };
+
+  // Open edit form
+  const handleEditOpen = (company: PartnerCompany) => {
+    setEditingCompany(company);
+    setCompanyCode(company.company_code || "");
+    setName(company.name || "");
+    setCategory(company.category || "supplier");
+    setAddress(company.address || "");
+    setEmail(company.email || "");
+    setWebsite(company.website || "");
+    setPhoneNumber(company.phone_number || "");
+    setTaxNumber(company.tax_number || "");
+    setAccountNumber(company.account_number || "");
+    setFormError(null);
+    setFormOpen(true);
+  };
+
+  // Save / Update company handler
+  const handleSaveCompany = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!companyCode.trim() || !name.trim()) {
+      setFormError("Company ID/Code and Name are required fields.");
+      return;
+    }
+
+    setFormLoading(true);
+    setFormError(null);
+
+    const payload = {
+      company_code: companyCode.trim(),
+      name: name.trim(),
+      category,
+      address: address.trim(),
+      email: email.trim(),
+      website: website.trim(),
+      phone_number: phoneNumber.trim(),
+      tax_number: taxNumber.trim(),
+      account_number: accountNumber.trim(),
+    };
+
+    try {
+      const url = editingCompany 
+        ? `/api/partner-companies/${editingCompany.public_id}/` 
+        : `/api/partner-companies/`;
+      
+      const method = editingCompany ? "PATCH" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        toast.success(editingCompany 
+          ? `Partner company '${name}' updated successfully.` 
+          : `Partner company '${name}' registered successfully.`
+        );
+        setFormOpen(false);
+        
+        // Refresh server-side state in transition
+        startTransition(() => {
+          router.refresh();
+          // We also fetch updated client-side list in background or we can let router refresh update initialProps.
+          // Since we want instant local responsiveness, let's update client side state:
+          fetch("/api/partner-companies/")
+            .then(r => r.json())
+            .then((resData: Paginated<PartnerCompany>) => {
+              if (resData && resData.results) {
+                setCompanies(resData.results);
+              }
+            });
+        });
+      } else {
+        // DRF validation errors standard parser
+        let errorMsg = data.detail || data.non_field_errors?.[0];
+        if (!errorMsg) {
+          const keys = Object.keys(data);
+          if (keys.length > 0) {
+            errorMsg = `${keys[0].replaceAll("_", " ")}: ${data[keys[0]][0] || data[keys[0]]}`;
+          } else {
+            errorMsg = "An error occurred while saving the partner company.";
+          }
+        }
+        setFormError(errorMsg);
+      }
+    } catch (err: any) {
+      setFormError(err.message || "An unexpected network error occurred.");
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
+  // Open deletion modal
+  const handleDeleteOpen = (company: PartnerCompany) => {
+    setCompanyToDelete(company);
+    setDeleteOpen(true);
+  };
+
+  // Confirm delete company
+  const handleDeleteConfirm = async () => {
+    if (!companyToDelete) return;
+    setDeleteLoading(true);
+
+    try {
+      const res = await fetch(`/api/partner-companies/${companyToDelete.public_id}/`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        toast.success(`Partner company '${companyToDelete.name}' has been successfully deleted.`);
+        setDeleteOpen(false);
+        setCompanyToDelete(null);
+
+        startTransition(() => {
+          router.refresh();
+          // Instantly filter out locally for immediate UI updates
+          setCompanies(companies.filter(c => c.public_id !== companyToDelete.public_id));
+        });
+      } else {
+        const data = await res.json().catch(() => ({}));
+        toast.error(data.detail || "Unable to delete partner company at this time.");
+      }
+    } catch {
+      toast.error("A network error occurred while deleting the partner company.");
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
+  // Filter list based on search state and active category tab selection
+  const filteredCompanies = companies.filter(company => {
+    const matchesSearch = 
+      company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      company.company_code.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (company.tax_number && company.tax_number.toLowerCase().includes(searchTerm.toLowerCase())) ||
+      (company.account_number && company.account_number.toLowerCase().includes(searchTerm.toLowerCase()));
+
+    const matchesCategory = selectedCategory === "all" || company.category === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
+  const categoryLabels: Record<string, string> = {
+    all: "All",
+    supplier: "Supplier",
+    medical_aid: "Medical Aid",
+    affiliate: "Affiliate",
+  };
+
+  const getCategoryBadgeClass = (cat: string) => {
+    switch (cat) {
+      case "supplier":
+        return "bg-purple-100 text-[var(--hh-purple)]";
+      case "medical_aid":
+        return "bg-emerald-100 text-emerald-800";
+      case "affiliate":
+        return "bg-sky-100 text-sky-800";
+      default:
+        return "bg-gray-100 text-gray-700";
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* 1. Header Actions Row */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <p className="text-sm text-[#66736d]">
+            Manage, record, and review clinic partner companies, suppliers, medical aid providers, and clinic affiliates.
+          </p>
+        </div>
+        <Button onClick={handleCreateOpen} className="bg-[var(--hh-purple)] text-white hover:bg-[var(--hh-purple-dark)] flex items-center gap-2">
+          <Plus size={16} />
+          Add Partner Company
+        </Button>
+      </div>
+
+      {/* 2. Interactive Search & Categorization Row */}
+      <div className="hh-panel p-4 flex flex-wrap items-center justify-between gap-4">
+        <div className="relative w-full max-w-md">
+          <span className="absolute inset-y-0 left-3 flex items-center text-[#66736d]">
+            <Search size={16} />
+          </span>
+          <Input 
+            className="pl-9 h-10 border-[var(--hh-border)] focus:border-[var(--hh-purple)] focus:ring-1 focus:ring-[var(--hh-purple)] bg-white text-sm" 
+            placeholder="Search by ID, name, tax number, or account..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          {searchTerm && (
+            <button 
+              onClick={() => setSearchTerm("")} 
+              className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Category Pill Selectors */}
+        <div className="flex flex-wrap gap-1 bg-[#F5EDFA]/60 p-1 rounded-lg border border-[var(--hh-border)]">
+          {(["all", "supplier", "medical_aid", "affiliate"] as const).map((cat) => (
+            <button
+              key={cat}
+              onClick={() => setSelectedCategory(cat)}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition ${
+                selectedCategory === cat 
+                  ? "bg-white text-[var(--hh-purple)] shadow-sm border border-[var(--hh-border)]" 
+                  : "text-[#66736d] hover:text-[var(--hh-purple)]"
+              }`}
+            >
+              {categoryLabels[cat]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* 3. Directory Tabular View */}
+      <div className="hh-panel overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="hh-compact-table w-full text-left">
+            <thead>
+              <tr>
+                <th className="w-24">Company ID</th>
+                <th>Name</th>
+                <th>Category</th>
+                <th>Contact details</th>
+                <th>Tax & Account Info</th>
+                <th className="text-right w-24">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredCompanies.map((company) => (
+                <tr key={company.public_id} className="hover:bg-gray-50/50 transition-colors">
+                  <td className="font-mono text-xs text-[var(--hh-purple)] font-semibold">
+                    {company.company_code}
+                  </td>
+                  <td>
+                    <div className="font-bold text-[var(--hh-purple-dark)]">{company.name}</div>
+                    {company.address && (
+                      <div className="text-xs text-[#66736d] flex items-center gap-1 mt-0.5 max-w-xs truncate">
+                        <MapPin size={11} className="shrink-0" />
+                        {company.address}
+                      </div>
+                    )}
+                  </td>
+                  <td>
+                    <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${getCategoryBadgeClass(company.category)}`}>
+                      {company.category_label || company.category.replaceAll("_", " ")}
+                    </span>
+                  </td>
+                  <td>
+                    <div className="space-y-1 text-xs">
+                      {company.phone_number && (
+                        <div className="flex items-center gap-1.5 text-gray-700">
+                          <Phone size={11} className="text-[#66736d]" />
+                          <span>{company.phone_number}</span>
+                        </div>
+                      )}
+                      {company.email && (
+                        <a href={`mailto:${company.email}`} className="flex items-center gap-1.5 text-[var(--hh-purple)] hover:underline">
+                          <Mail size={11} className="text-[#66736d]" />
+                          <span>{company.email}</span>
+                        </a>
+                      )}
+                      {company.website && (
+                        <a href={company.website.startsWith("http") ? company.website : `https://${company.website}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sky-700 hover:underline">
+                          <Globe size={11} className="text-[#66736d]" />
+                          <span className="truncate max-w-[120px]">{company.website.replace(/^https?:\/\//i, "")}</span>
+                        </a>
+                      )}
+                      {!company.phone_number && !company.email && !company.website && (
+                        <span className="text-gray-400">--</span>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="space-y-1 text-xs">
+                      {company.tax_number && (
+                        <div className="flex items-center gap-1 text-gray-700">
+                          <span className="font-bold text-[#66736d]">Tax:</span>
+                          <span className="font-mono">{company.tax_number}</span>
+                        </div>
+                      )}
+                      {company.account_number && (
+                        <div className="flex items-center gap-1 text-gray-700">
+                          <span className="font-bold text-[#66736d]">Acc:</span>
+                          <span className="font-mono">{company.account_number}</span>
+                        </div>
+                      )}
+                      {!company.tax_number && !company.account_number && (
+                        <span className="text-gray-400">--</span>
+                      )}
+                    </div>
+                  </td>
+                  <td>
+                    <div className="flex justify-end gap-1">
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-8 w-8 text-[#66736d] hover:text-[var(--hh-purple)] hover:bg-[#F5EDFA]/60 rounded-lg"
+                        onClick={() => handleEditOpen(company)}
+                      >
+                        <Edit size={14} />
+                      </Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                        onClick={() => handleDeleteOpen(company)}
+                      >
+                        <Trash2 size={14} />
+                      </Button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+              {filteredCompanies.length === 0 && (
+                <tr>
+                  <td colSpan={6} className="text-center py-12 text-[#66736d] text-sm">
+                    No partner companies found matching your criteria.
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 4. Slide-over Sheet Drawer (Creation & Edition Form) */}
+      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+        <DialogContent className="w-[min(94vw,620px)] p-0 overflow-hidden">
+          <form onSubmit={handleSaveCompany} className="flex flex-col">
+            <div className="border-b border-[var(--hh-border)] bg-[#fdfdfd] px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--hh-border)] bg-[var(--hh-purple-light)] text-[var(--hh-purple)]">
+                  <Building2 size={20} />
+                </div>
+                <div>
+                  <DialogTitle className="text-base font-bold text-[var(--hh-purple-dark)]">
+                    {editingCompany ? `Edit '${editingCompany.name}'` : "Add Partner Company"}
+                  </DialogTitle>
+                  <DialogDescription className="text-xs text-[#66736d] mt-0.5">
+                    {editingCompany 
+                      ? "Update the company profile, categories, financial account keys, and communication metrics." 
+                      : "Create a directory file containing legal, financial, and contact identifiers."
+                    }
+                  </DialogDescription>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid gap-4 p-6 max-h-[64vh] overflow-y-auto">
+              {formError && (
+                <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3.5 text-xs font-semibold text-red-700">
+                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                  <div>{formError}</div>
+                </div>
+              )}
+
+              {/* Company ID and Category Row */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                    <Briefcase size={12} />
+                    Company ID / Code <span className="text-red-500">*</span>
+                  </span>
+                  <Input
+                    className="hh-input h-10 text-sm"
+                    placeholder="e.g. SUP-MED-01, MEDAID-MUT"
+                    value={companyCode}
+                    onChange={(e) => setCompanyCode(e.target.value)}
+                    disabled={formLoading}
+                    required
+                  />
+                </label>
+
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                    <Layers size={12} />
+                    Category <span className="text-red-500">*</span>
+                  </span>
+                  <Select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value as any)}
+                    disabled={formLoading}
+                    className="h-10 text-sm bg-white"
+                  >
+                    <option value="supplier">Supplier</option>
+                    <option value="medical_aid">Medical Aid</option>
+                    <option value="affiliate">Affiliate</option>
+                  </Select>
+                </label>
+              </div>
+
+              {/* Company Name */}
+              <label className="grid gap-1.5">
+                <span className="text-xs font-bold text-[#3f1d58]">
+                  Company Legal Name <span className="text-red-500">*</span>
+                </span>
+                <Input
+                  className="hh-input h-10 text-sm"
+                  placeholder="e.g. Swaziland Pharma Supplies Ltd"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={formLoading}
+                  required
+                />
+              </label>
+
+              {/* Contacts info row */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                    <Phone size={12} />
+                    Phone number
+                  </span>
+                  <Input
+                    className="hh-input h-10 text-sm"
+                    placeholder="e.g. +268 2404 0000"
+                    value={phoneNumber}
+                    onChange={(e) => setPhoneNumber(e.target.value)}
+                    disabled={formLoading}
+                  />
+                </label>
+
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                    <Mail size={12} />
+                    Email address
+                  </span>
+                  <Input
+                    type="email"
+                    className="hh-input h-10 text-sm"
+                    placeholder="e.g. info@company.com"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    disabled={formLoading}
+                  />
+                </label>
+              </div>
+
+              {/* Website and Address */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                    <Globe size={12} />
+                    Website url
+                  </span>
+                  <Input
+                    type="text"
+                    className="hh-input h-10 text-sm"
+                    placeholder="e.g. www.swazipharma.sz"
+                    value={website}
+                    onChange={(e) => setWebsite(e.target.value)}
+                    disabled={formLoading}
+                  />
+                </label>
+
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                    <Percent size={12} />
+                    Tax Number
+                  </span>
+                  <Input
+                    className="hh-input h-10 text-sm"
+                    placeholder="e.g. TIN-100-244-11"
+                    value={taxNumber}
+                    onChange={(e) => setTaxNumber(e.target.value)}
+                    disabled={formLoading}
+                  />
+                </label>
+              </div>
+
+              {/* Financial Account & Physical Address */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                    <CreditCard size={12} />
+                    Account Number
+                  </span>
+                  <Input
+                    className="hh-input h-10 text-sm"
+                    placeholder="e.g. Standard Bank 9091102"
+                    value={accountNumber}
+                    onChange={(e) => setAccountNumber(e.target.value)}
+                    disabled={formLoading}
+                  />
+                </label>
+
+                <label className="grid gap-1.5">
+                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                    <MapPin size={12} />
+                    Physical address
+                  </span>
+                  <Textarea
+                    className="h-10 min-h-[40px] text-sm border-[var(--hh-border)] focus:border-[var(--hh-purple)] focus:ring-1 focus:ring-[var(--hh-purple)] leading-normal resize-none py-2"
+                    placeholder="e.g. Suite 4, Plot 12, Gables Mbabane"
+                    value={address}
+                    onChange={(e) => setAddress(e.target.value)}
+                    disabled={formLoading}
+                  />
+                </label>
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 bg-[#fdfdfd] border-t border-[var(--hh-border)] px-6 py-4">
+              <Button type="button" variant="ghost" onClick={() => setFormOpen(false)} disabled={formLoading} className="text-sm font-semibold">
+                Cancel
+              </Button>
+              <LoadingButton type="submit" loading={formLoading} loadingText="Saving..." className="bg-[var(--hh-purple)] text-white hover:bg-[var(--hh-purple-dark)] flex items-center justify-center gap-2">
+                {editingCompany ? "Save Changes" : "Register Company"}
+              </LoadingButton>
+            </div>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* 5. Delete Confirmation Warning Modal */}
+      <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <DialogContent className="w-[min(92vw,480px)] p-0 overflow-hidden">
+          <div className="p-6">
+            <div className="flex items-start gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-red-100 text-red-700">
+                <AlertCircle size={24} />
+              </div>
+              <div>
+                <DialogTitle className="text-lg font-bold text-[var(--hh-purple-dark)]">Delete Partner Company</DialogTitle>
+                <DialogDescription className="text-sm text-[#5c6a61] mt-2 leading-relaxed">
+                  Are you absolutely sure you want to delete <span className="font-bold text-gray-800">'{companyToDelete?.name}'</span>?
+                  This will permanently delete this company record, ID/code, and financial identifiers from our clinical system. This operation cannot be undone.
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-col-reverse sm:flex-row sm:justify-end gap-2 bg-[#fdfdfd] border-t border-[var(--hh-border)] px-6 py-4">
+            <Button type="button" variant="ghost" onClick={() => setDeleteOpen(false)} disabled={deleteLoading} className="text-sm font-semibold">
+              Cancel
+            </Button>
+            <LoadingButton 
+              type="button" 
+              loading={deleteLoading} 
+              loadingText="Deleting..." 
+              onClick={handleDeleteConfirm}
+              className="bg-red-600 text-white hover:bg-red-700 font-bold"
+            >
+              Confirm Deletion
+            </LoadingButton>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}

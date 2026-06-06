@@ -405,7 +405,7 @@ export function PatientRegistrationForm() {
                   <FieldError message={errors.primary_phone?.country_code?.message || errors.primary_phone?.number?.message} />
                 </label>
                 <label className={fieldClass}>
-                  <Label>Secondary phone</Label>
+                  <Label>WhatsApp / Telegram Number</Label>
                   <div className="grid grid-cols-[92px_minmax(10rem,1fr)] gap-2 max-[420px]:grid-cols-1">
                     <input className="hh-input" list="secondary-phone-codes" {...form.register("secondary_phone.country_code")} />
                     <Input inputMode="tel" placeholder="7600 0000" {...form.register("secondary_phone.number")} />

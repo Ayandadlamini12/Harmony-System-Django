@@ -1,6 +1,7 @@
 import {
   Activity,
   Archive,
+  Building2,
   CalendarCheck,
   ClipboardCheck,
   DatabaseBackup,
@@ -70,6 +71,7 @@ export const navItems: NavItem[] = [
   { href: "/messages", label: "Messages", icon: MessageSquare, roles: ["admin", "clinician", "receptionist"] },
   { href: "/inventory", label: "Inventory", icon: Package, roles: ["admin", "clinician"] },
   { href: "/reports", label: "Reports", icon: FileText, roles: ["admin", "clinician"] },
+  { href: "/partner-companies", label: "Partner Companies", icon: Building2, roles: ["admin", "clinician", "receptionist"] },
   {
     href: "/users",
     label: "User Management",

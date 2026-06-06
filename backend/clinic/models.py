@@ -838,3 +838,29 @@ class SupportTicket(TimeStampedModel):
         return f"{self.title} ({self.status})"
 
 # Create your models here.
+
+
+class PartnerCompany(TimeStampedModel):
+    class Category(models.TextChoices):
+        SUPPLIER = "supplier", "Supplier"
+        MEDICAL_AID = "medical_aid", "Medical Aid"
+        AFFILIATE = "affiliate", "Affiliate"
+
+    public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    company_code = models.CharField(max_length=100, unique=True)
+    name = models.CharField(max_length=255)
+    category = models.CharField(max_length=50, choices=Category.choices)
+    address = models.TextField(blank=True)
+    email = models.EmailField(blank=True)
+    website = models.URLField(blank=True)
+    phone_number = models.CharField(max_length=50, blank=True)
+    tax_number = models.CharField(max_length=100, blank=True)
+    account_number = models.CharField(max_length=100, blank=True)
+
+    class Meta:
+        ordering = ["name"]
+        verbose_name_plural = "Partner Companies"
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.get_category_display()})"
+

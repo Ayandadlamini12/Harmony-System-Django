@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, VisitSymptomProblem, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, VisitSymptomProblem, Vital
 
 
 class PatientProfileInline(admin.StackedInline):
@@ -144,4 +144,12 @@ class AuditLogAdmin(admin.ModelAdmin):
     list_filter = ("entity_type", "action", "created_at")
     readonly_fields = ("created_at",)
 
+@admin.register(PartnerCompany)
+class PartnerCompanyAdmin(admin.ModelAdmin):
+    list_display = ("company_code", "name", "category", "email", "phone_number")
+    search_fields = ("company_code", "name", "tax_number", "account_number")
+    list_filter = ("category", "created_at")
+
+
 # Register your models here.
+

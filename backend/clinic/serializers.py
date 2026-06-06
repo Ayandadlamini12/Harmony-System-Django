@@ -4,7 +4,7 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, VisitSymptomProblem, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, VisitSymptomProblem, Vital
 from .workflow import build_patient_workflow_actions
 
 User = get_user_model()
@@ -946,3 +946,33 @@ class SupportTicketSerializer(serializers.ModelSerializer):
         if request and request.user and request.user.is_authenticated:
             validated_data["created_by"] = request.user
         return super().create(validated_data)
+
+
+class PartnerCompanySerializer(serializers.ModelSerializer):
+    category_label = serializers.CharField(source="get_category_display", read_only=True)
+
+    class Meta:
+        model = PartnerCompany
+        fields = (
+            "id",
+            "public_id",
+            "company_code",
+            "name",
+            "category",
+            "category_label",
+            "address",
+            "email",
+            "website",
+            "phone_number",
+            "tax_number",
+            "account_number",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "public_id",
+            "created_at",
+            "updated_at",
+        )
+

@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
 from .document_generation import consent_document_reference, generate_consent_pdf, render_consent_html, save_consent_pdf, sign_consent_document
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, Vital
 from .serializers import (
     AuditLogSerializer,
     AppointmentSerializer,
@@ -35,6 +35,7 @@ from .serializers import (
     SupportTicketSerializer,
     VisitSerializer,
     VitalSerializer,
+    PartnerCompanySerializer,
 )
 
 User = get_user_model()
@@ -1329,4 +1330,53 @@ class SupportTicketViewSet(viewsets.ModelViewSet):
         serializer.save(created_by=self.request.user)
 
 
-# Create your views here.
+class PartnerCompanyViewSet(viewsets.ModelViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+    queryset = PartnerCompany.objects.all()
+    serializer_class = PartnerCompanySerializer
+    lookup_field = "public_id"
+    filterset_fields = ("category", "company_code")
+    search_fields = (
+        "company_code",
+        "name",
+        "tax_number",
+        "account_number",
+    )
+    ordering_fields = ("name", "created_at", "updated_at")
+
+    def perform_create(self, serializer):
+        instance = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=instance,
+            after_data=snapshot_instance(instance),
+            details=f"Partner company '{instance.name}' created.",
+        )
+
+    def perform_update(self, serializer):
+        before_data = snapshot_instance(self.get_object())
+        instance = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="update",
+            instance=instance,
+            before_data=before_data,
+            after_data=snapshot_instance(instance),
+            details=f"Partner company '{instance.name}' updated.",
+        )
+
+    def perform_destroy(self, instance):
+        before_data = snapshot_instance(instance)
+        entity_id = instance.pk
+        name = instance.name
+        instance.delete()
+        write_audit_log(
+            request=self.request,
+            action="delete",
+            entity_type="partner_company",
+            entity_id=entity_id,
+            before_data=before_data,
+            details=f"Partner company '{name}' deleted.",
+        )
+

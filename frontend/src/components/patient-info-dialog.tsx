@@ -277,7 +277,7 @@ export function PatientInfoDialog({ patient }: { patient: Patient }) {
             <DetailSection title="Contact & Location" icon={MapPin} badge="Communication" theme="blue">
               <div className="grid grid-cols-1 gap-1">
                 <InfoItem label="Primary Phone" val={value(patient.primary_phone)} icon={Phone} theme="blue" />
-                <InfoItem label="Secondary Phone" val={value(patient.secondary_phone)} icon={Phone} theme="blue" />
+                <InfoItem label="WhatsApp / Telegram Number" val={value(patient.secondary_phone)} icon={Phone} theme="blue" />
                 <InfoItem label="Email Address" val={value(patient.email)} icon={Mail} theme="blue" />
                 <InfoItem label="Residential Address" val={
                   [patient.village, patient.town_or_locality, patient.region]

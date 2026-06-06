@@ -79,7 +79,7 @@ export function PatientContactFields({
         }}
         required
       />
-      <PhoneNumberInput label="Secondary phone" name="secondary_phone" defaultValue={defaultSecondaryPhone} />
+      <PhoneNumberInput label="WhatsApp / Telegram Number" name="secondary_phone" defaultValue={defaultSecondaryPhone} />
       <label className="grid gap-1.5">
         <Label>Email</Label>
         <Input name="email" type="email" defaultValue={defaultEmail} />

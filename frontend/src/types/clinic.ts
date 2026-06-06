@@ -514,3 +514,22 @@ export type SupportTicket = {
   created_at: string;
   updated_at: string;
 };
+
+
+export type PartnerCompany = {
+  id: number;
+  public_id: string;
+  company_code: string;
+  name: string;
+  category: "supplier" | "medical_aid" | "affiliate";
+  category_label: string;
+  address?: string;
+  email?: string;
+  website?: string;
+  phone_number?: string;
+  tax_number?: string;
+  account_number?: string;
+  created_at: string;
+  updated_at: string;
+};
+
