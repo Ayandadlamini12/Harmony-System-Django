@@ -571,7 +571,7 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
               </Button>
             </div>
           </div>
-        </div>
+        </DialogContent>
       </Dialog>
 
       {/* 4. Slide-over Sheet Drawer (Creation & Edition Form) */}
