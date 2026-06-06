@@ -9,7 +9,7 @@ class OrganizationStamp:
     name_line_2: str = "WELLNESS (PTY) LTD"
     address: str = "P.O. Box 3516, Manzini"
     phone: str = "Tel: +268 3460 1079"
-    email: str = "Email: harmonyhealth@webmail.co.za"
+    email: str = "Email: info@harmonyhealthsz.com"
 
     def html_context(self) -> dict:
         return {
