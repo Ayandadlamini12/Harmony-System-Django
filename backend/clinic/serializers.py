@@ -952,6 +952,17 @@ class PartnerCompanySerializer(serializers.ModelSerializer):
     category_label = serializers.CharField(source="get_category_display", read_only=True)
     company_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
+    def to_internal_value(self, data):
+        if "website" in data and isinstance(data["website"], str):
+            website = data["website"].strip()
+            if website and not website.startswith(("http://", "https://")):
+                if hasattr(data, "copy"):
+                    data = data.copy()
+                else:
+                    data = dict(data)
+                data["website"] = f"https://{website}"
+        return super().to_internal_value(data)
+
     class Meta:
         model = PartnerCompany
         fields = (

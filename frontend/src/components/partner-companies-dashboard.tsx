@@ -121,12 +121,17 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
     setFormError(null);
     setFieldErrors({});
 
+    let websiteUrl = website.trim();
+    if (websiteUrl && !/^https?:\/\//i.test(websiteUrl)) {
+      websiteUrl = `https://${websiteUrl}`;
+    }
+
     const payload: any = {
       name: name.trim(),
       category,
       address: address.trim(),
       email: email.trim(),
-      website: website.trim(),
+      website: websiteUrl,
       phone_number: phoneNumber.trim(),
       tax_number: taxNumber.trim(),
       bank_name: bankName,
