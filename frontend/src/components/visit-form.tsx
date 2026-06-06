@@ -300,8 +300,12 @@ export function VisitForm({
         .map((visit) => ({
           id: visit.id,
           date: visit.visit_date,
+          visit_type: visit.visit_type,
           remedy: visit.remedy || "--",
-          evaluation: visit.follow_up_evaluation?.evaluation_notes || visit.reason_for_remedy || "--"
+          reason: visit.reason_for_remedy || "",
+          evaluation: visit.follow_up_evaluation?.evaluation_notes || "",
+          main_complaint: visit.main_complaint || "",
+          diagnosis: visit.diagnosis || ""
         })),
     [previousVisits]
   );
@@ -878,8 +882,17 @@ export function VisitForm({
                               Visit on {formatDate(row.date)}
                             </DialogDescription>
                           </div>
-                          <div className="p-5">
-                            <div className="whitespace-pre-wrap text-sm leading-6 text-[#1f2933] rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4">{row.remedy}</div>
+                          <div className="p-5 grid gap-4 max-h-[70vh] overflow-y-auto">
+                            <div>
+                              <div className="text-xs font-bold uppercase text-[#66736d] mb-1.5">Remedy & Instructions</div>
+                              <div className="whitespace-pre-wrap text-sm leading-6 text-[#1f2933] rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4">{row.remedy}</div>
+                            </div>
+                            {row.reason && (
+                              <div>
+                                <div className="text-xs font-bold uppercase text-[#66736d] mb-1.5">Reason for Remedy</div>
+                                <div className="whitespace-pre-wrap text-sm leading-6 text-[#1f2933] rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4">{row.reason}</div>
+                              </div>
+                            )}
                           </div>
                         </DialogContent>
                       </Dialog>
@@ -899,8 +912,35 @@ export function VisitForm({
                               Visit on {formatDate(row.date)}
                             </DialogDescription>
                           </div>
-                          <div className="p-5">
-                            <div className="whitespace-pre-wrap text-sm leading-6 text-[#1f2933] rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4">{row.evaluation}</div>
+                          <div className="p-5 max-h-[70vh] overflow-y-auto">
+                            {row.evaluation ? (
+                              <div className="whitespace-pre-wrap text-sm leading-6 text-[#1f2933] rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4">
+                                {row.evaluation}
+                              </div>
+                            ) : (
+                              <div className="rounded-lg border border-emerald-100 bg-[#f4faf6] p-4 text-[#1f2933]">
+                                <div className="text-xs font-bold uppercase text-emerald-800 mb-2">Initial Consultation (First Visit)</div>
+                                <p className="text-sm leading-6 text-emerald-950 font-medium">
+                                  No follow-up evaluation is recorded yet for this date because this was the patient's first consultation.
+                                </p>
+                                {(row.main_complaint || row.diagnosis) && (
+                                  <div className="mt-4 grid gap-3 border-t border-emerald-200/60 pt-3 text-xs leading-5">
+                                    {row.main_complaint && (
+                                      <div>
+                                        <span className="font-bold text-emerald-900 uppercase block">Main Complaint:</span>
+                                        <span className="text-emerald-950 font-normal">{row.main_complaint}</span>
+                                      </div>
+                                    )}
+                                    {row.diagnosis && (
+                                      <div>
+                                        <span className="font-bold text-emerald-900 uppercase block">Diagnosis:</span>
+                                        <span className="text-emerald-950 font-normal">{row.diagnosis}</span>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
                         </DialogContent>
                       </Dialog>
