@@ -750,7 +750,8 @@ class Vital(TimeStampedModel):
         NOT_TAKEN = "not_taken", "Not taken"
         UNKNOWN = "unknown", "Unknown"
 
-    visit = models.ForeignKey(Visit, on_delete=models.CASCADE, related_name="vitals")
+    patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="vitals", null=True, blank=True)
+    visit = models.ForeignKey(Visit, on_delete=models.SET_NULL, null=True, blank=True, related_name="vitals")
     bp_first_reading = models.CharField(max_length=50, blank=True)
     bp_second_reading = models.CharField(max_length=50, blank=True)
     pulse = models.PositiveIntegerField(null=True, blank=True)
@@ -778,10 +779,13 @@ class Vital(TimeStampedModel):
         ordering = ("-recorded_at", "-created_at")
         indexes = [
             models.Index(fields=["visit", "recorded_at"]),
+            models.Index(fields=["patient", "recorded_at"]),
         ]
 
     def __str__(self) -> str:
-        return f"Vitals for visit {self.visit_id}"
+        if self.visit_id:
+            return f"Vitals for visit {self.visit_id}"
+        return f"Vitals for patient {self.patient_id} at {self.recorded_at}"
 
 
 class AuditLog(models.Model):

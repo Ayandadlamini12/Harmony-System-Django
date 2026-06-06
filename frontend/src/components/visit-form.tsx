@@ -214,6 +214,7 @@ export function VisitForm({
     };
   }, []);
   const today = new Date().toISOString().slice(0, 10);
+  const nowTime = new Date().toTimeString().slice(0, 5);
   const isFollowUp = visitType === "follow_up";
   const selectedPatient = patientDetail || patients.find((patient) => String(patient.id) === selectedPatientId) || null;
   const shouldCaptureReproductiveReview = selectedPatient?.gender === "female";
@@ -471,7 +472,8 @@ export function VisitForm({
         localStorage.removeItem(getDraftKey(selectedPatientId));
       }
       toast.success("Visit saved");
-      router.push("/visits");
+      const targetId = selectedPatient?.public_id || selectedPatientId;
+      router.push(`/patients/${targetId}`);
     } else {
       const message = extractSubmitError(data);
       setError(message);
@@ -598,14 +600,8 @@ export function VisitForm({
               <option value="review">Review</option>
             </select>
           </label>
-          <label>
-            <span className="hh-label">Visit date</span>
-            <input className="hh-input" name="visit_date" type="date" defaultValue={initialValues["visit_date"] || today} required />
-          </label>
-          <label>
-            <span className="hh-label">Visit time</span>
-            <input className="hh-input" name="visit_time" type="time" defaultValue={initialValues["visit_time"] || ""} />
-          </label>
+          <input name="visit_date" type="hidden" defaultValue={initialValues["visit_date"] || today} />
+          <input name="visit_time" type="hidden" defaultValue={initialValues["visit_time"] || nowTime} />
           <label className="md:col-span-2">
             <span className="hh-label">{isFollowUp ? "Previous complaint / case" : "Main complaint"}</span>
             <input className="hh-input" name="main_complaint" value={mainComplaint} onChange={(event) => setMainComplaint(event.currentTarget.value)} readOnly={isFollowUp && Boolean(priorComplaint)} placeholder={isFollowUp ? "Pulled from the previous visit when available" : "Optional summary; symptom/problem items below become the working case list"} />

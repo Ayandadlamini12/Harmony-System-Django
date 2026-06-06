@@ -38,7 +38,7 @@ def confidential_records_started(patient: Patient) -> bool:
 
 def vitals_recorded_today(patient: Patient) -> bool:
     today = timezone.localdate()
-    return patient.visits.filter(vitals__recorded_at__date=today).exists()
+    return patient.vitals.filter(recorded_at__date=today).exists()
 
 
 def build_patient_workflow_actions(patient: Patient, user) -> list[dict]:
@@ -88,6 +88,8 @@ def build_patient_workflow_actions(patient: Patient, user) -> list[dict]:
         visit_block = "Record medical and family history before the first consultation."
     elif not has_visits and not confidential_started:
         visit_block = "Review confidential clinical records before the first consultation."
+    elif not vitals_today:
+        visit_block = "Record vitals before visit is activated."
 
     actions = [
         action(

@@ -90,9 +90,9 @@ class PatientDocumentSerializer(serializers.ModelSerializer):
 
 
 class VitalSerializer(serializers.ModelSerializer):
-    patient = serializers.IntegerField(source="visit.patient_id", read_only=True)
-    patient_name = serializers.CharField(source="visit.patient.full_name_display", read_only=True)
-    patient_code = serializers.CharField(source="visit.patient.patient_code", read_only=True)
+    patient = serializers.PrimaryKeyRelatedField(queryset=Patient.objects.all(), required=False, allow_null=True)
+    patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
+    patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
     visit_label = serializers.SerializerMethodField()
 
     class Meta:
@@ -117,18 +117,26 @@ class VitalSerializer(serializers.ModelSerializer):
             "recorded_at",
             "created_at",
         )
-        read_only_fields = ("id", "patient", "patient_name", "patient_code", "visit_label", "created_at")
+        read_only_fields = ("id", "patient_name", "patient_code", "visit_label", "created_at")
         extra_kwargs = {
             "glucose_mmol_l": {"required": False, "allow_null": True},
         }
 
     def get_visit_label(self, obj):
-        return f"{obj.visit.get_visit_type_display()} - {obj.visit.visit_date}"
+        if obj.visit:
+            return f"{obj.visit.get_visit_type_display()} - {obj.visit.visit_date}"
+        return "No Visit Link"
 
     def create(self, validated_data):
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             validated_data["recorded_by"] = request.user
+            
+        visit = validated_data.get("visit")
+        patient = validated_data.get("patient")
+        if visit and not patient:
+            validated_data["patient"] = visit.patient
+            
         return super().create(validated_data)
 
 
@@ -739,10 +747,11 @@ class PatientDetailSerializer(PatientListSerializer):
     conditions = PatientConditionSerializer(many=True, required=False)
     documents = PatientDocumentSerializer(many=True, read_only=True)
     visits = VisitSerializer(many=True, read_only=True)
+    vitals = VitalSerializer(many=True, read_only=True)
     patient_actions = serializers.SerializerMethodField()
 
     class Meta(PatientListSerializer.Meta):
-        fields = PatientListSerializer.Meta.fields + ("profile", "conditions", "documents", "visits", "patient_actions")
+        fields = PatientListSerializer.Meta.fields + ("profile", "conditions", "documents", "visits", "vitals", "patient_actions")
 
     def get_patient_actions(self, obj):
         request = self.context.get("request")
@@ -757,6 +766,7 @@ class PatientDetailSerializer(PatientListSerializer):
             data.pop("profile", None)
             data.pop("conditions", None)
             data.pop("visits", None)
+            data.pop("vitals", None)
             data["clinical_access"] = "approval_required"
         else:
             data["clinical_access"] = "active"

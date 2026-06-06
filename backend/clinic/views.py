@@ -239,7 +239,7 @@ class PatientViewSet(viewsets.ModelViewSet):
     ordering_fields = ("created_at", "full_name_display", "patient_code")
 
     def get_queryset(self):
-        qs = Patient.objects.select_related("profile").prefetch_related("conditions", "documents", "visits__vitals")
+        qs = Patient.objects.select_related("profile").prefetch_related("conditions", "documents", "vitals", "visits__vitals")
         if self.request is None:
             return qs.filter(is_deleted=False)
         include_deleted = self.request.query_params.get("include_deleted") == "true"
@@ -634,10 +634,13 @@ class CaseViewSet(viewsets.ModelViewSet):
         return Response({"resolved_ids": resolved_ids})
 
 class VitalViewSet(viewsets.ModelViewSet):
-    queryset = Vital.objects.select_related("visit", "visit__patient", "recorded_by").order_by("-recorded_at", "-created_at")
+    queryset = Vital.objects.select_related("visit", "patient", "recorded_by").order_by("-recorded_at", "-created_at")
     serializer_class = VitalSerializer
-    search_fields = ("visit__patient__full_name_display", "visit__patient__patient_code")
-    filterset_fields = ("visit", "visit__patient", "glucose_context", "medication_taken_status")
+    search_fields = (
+        "patient__full_name_display", "patient__patient_code",
+        "visit__patient__full_name_display", "visit__patient__patient_code"
+    )
+    filterset_fields = ("visit", "patient", "visit__patient", "glucose_context", "medication_taken_status")
     ordering_fields = ("recorded_at", "created_at")
 
     def get_queryset(self):
@@ -646,9 +649,9 @@ class VitalViewSet(viewsets.ModelViewSet):
             return queryset
         now = timezone.now()
         return queryset.filter(
-            visit__patient__access_requests__requested_by=self.request.user,
-            visit__patient__access_requests__status=ElevatedAccessRequest.Status.APPROVED,
-            visit__patient__access_requests__expires_at__gt=now,
+            patient__access_requests__requested_by=self.request.user,
+            patient__access_requests__status=ElevatedAccessRequest.Status.APPROVED,
+            patient__access_requests__expires_at__gt=now,
         ).distinct()
 
     def create(self, request, *args, **kwargs):
@@ -658,12 +661,15 @@ class VitalViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         vital = serializer.save()
-        journey = transition_active_patient_journey(
-            vital.visit.patient,
-            PatientJourney.Stage.VITALS_RECORDED,
-            self.request,
-            "Vitals recorded for active patient flow.",
-        )
+        patient = vital.patient or (vital.visit.patient if vital.visit else None)
+        journey = None
+        if patient:
+            journey = transition_active_patient_journey(
+                patient,
+                PatientJourney.Stage.VITALS_RECORDED,
+                self.request,
+                "Vitals recorded for active patient flow.",
+            )
         write_audit_log(
             request=self.request,
             action="create",

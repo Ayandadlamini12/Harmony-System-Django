@@ -43,6 +43,7 @@ export type Patient = {
   conditions?: PatientCondition[];
   documents?: PatientDocument[];
   visits?: Visit[];
+  vitals?: Vital[];
   clinical_access?: "active" | "approval_required";
   current_journey?: PatientJourneySummary | null;
   patient_actions?: PatientWorkflowAction[];
@@ -185,7 +186,7 @@ export type Case = {
 
 export type Vital = {
   id: number;
-  visit: number;
+  visit?: number | null;
   patient?: number;
   patient_name?: string;
   patient_code?: string;

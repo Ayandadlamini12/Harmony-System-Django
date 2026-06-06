@@ -60,8 +60,10 @@ export function VitalsForm({
       return value ? Number(value) : null;
     };
 
+    const visitValue = val("visit");
     const body = {
-      visit: Number(val("visit")),
+      patient: selectedPatient ? Number(selectedPatient) : null,
+      visit: visitValue ? Number(visitValue) : null,
       bp_first_reading: val("bp_first_reading"),
       bp_second_reading: val("bp_second_reading"),
       pulse: num("pulse"),
@@ -89,7 +91,13 @@ export function VitalsForm({
       toast.success(isEdit ? "Vitals updated" : "Vitals saved");
       onSaved?.();
       if (!onSaved) {
-        router.push("/vitals/new");
+        if (selectedPatient) {
+          const patientObj = patients.find((p) => String(p.id) === selectedPatient);
+          const targetId = patientObj?.public_id || selectedPatient;
+          router.push(`/patients/${targetId}`);
+        } else {
+          router.push("/vitals/new");
+        }
       }
       router.refresh();
     } else {
@@ -139,11 +147,11 @@ export function VitalsForm({
             {isEdit ? (
               <>
                 <input className="hh-input bg-gray-100" type="text" value={vital?.visit_label || "Visit ID " + vital?.visit} disabled />
-                <input name="visit" type="hidden" value={vital?.visit} />
+                <input name="visit" type="hidden" value={vital?.visit ?? ""} />
               </>
             ) : (
-              <select className="hh-input" name="visit" defaultValue={visitId || ""} required>
-                <option value="">Select visit</option>
+              <select className="hh-input" name="visit" defaultValue={visitId || ""}>
+                <option value="">Select visit (optional)</option>
                 {filteredVisits.map((visit) => (
                   <option key={visit.id} value={visit.id}>
                     {visit.patient_name || "Patient"} - {visit.visit_date} - {visit.visit_type.replaceAll("_", " ")}

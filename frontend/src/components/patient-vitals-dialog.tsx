@@ -52,21 +52,15 @@ export function PatientVitalsDialog({
           </DialogDescription>
         </div>
         <div className="p-5">
-          {visits.length === 0 && !vital ? (
-            <div className="rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4 text-sm leading-6 text-[#66736d]">
-              No visit is available for this patient yet. Create a visit note first, then record vitals against that visit.
-            </div>
-          ) : (
-            <VitalsForm
-              patients={[patient]}
-              patientId={String(patient.id)}
-              visits={visits}
-              visitId={vital ? String(vital.visit) : (latestVisit ? String(latestVisit.id) : undefined)}
-              lockedPatient
-              onSaved={() => setOpen(false)}
-              vital={vital}
-            />
-          )}
+          <VitalsForm
+            patients={[patient]}
+            patientId={String(patient.id)}
+            visits={visits}
+            visitId={vital ? (vital.visit ? String(vital.visit) : undefined) : (latestVisit ? String(latestVisit.id) : undefined)}
+            lockedPatient
+            onSaved={() => setOpen(false)}
+            vital={vital}
+          />
         </div>
       </DialogContent>
     </Dialog>

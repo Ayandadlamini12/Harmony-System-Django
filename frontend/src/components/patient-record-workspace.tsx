@@ -71,8 +71,21 @@ function formatDateTime(text?: string | null) {
 }
 
 function allVitals(patient: Patient) {
-  return (patient.visits || [])
-    .flatMap((visit) => (visit.vitals || []).map((vital) => ({ ...vital, visitLabel: `${visit.visit_date} - ${visit.visit_type.replaceAll("_", " ")}` })))
+  const directVitals = (patient.vitals || []).map((vital) => ({
+    ...vital,
+    visitLabel: vital.visit_label || "No associated visit"
+  }));
+  const nestedVitals = (patient.visits || [])
+    .flatMap((visit) => (visit.vitals || []).map((vital) => ({
+      ...vital,
+      visitLabel: vital.visit_label || `${visit.visit_date} - ${visit.visit_type.replaceAll("_", " ")}`
+    })));
+  
+  const allMap = new Map<number, any>();
+  for (const v of nestedVitals) allMap.set(v.id, v);
+  for (const v of directVitals) allMap.set(v.id, v);
+  
+  return Array.from(allMap.values())
     .sort((a, b) => new Date(b.recorded_at || b.created_at || "").getTime() - new Date(a.recorded_at || a.created_at || "").getTime());
 }
 

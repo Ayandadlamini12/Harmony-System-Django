@@ -50,15 +50,23 @@ export function AppSidebar({
   signOut: React.ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false);
+  const pathname = usePathname();
+  const isPatientView = pathname.startsWith("/patients/") && pathname !== "/patients/new" && pathname !== "/patients/dashboard";
 
   useEffect(() => {
-    const saved = window.localStorage.getItem("harmony-sidebar-collapsed");
-    if (saved) setCollapsed(saved === "true");
-  }, []);
+    if (isPatientView) {
+      setCollapsed(true);
+    } else {
+      const saved = window.localStorage.getItem("harmony-sidebar-collapsed");
+      setCollapsed(saved === "true");
+    }
+  }, [pathname, isPatientView]);
 
   function toggleCollapsed() {
     setCollapsed((current) => {
-      window.localStorage.setItem("harmony-sidebar-collapsed", String(!current));
+      if (!isPatientView) {
+        window.localStorage.setItem("harmony-sidebar-collapsed", String(!current));
+      }
       return !current;
     });
   }
@@ -66,8 +74,11 @@ export function AppSidebar({
   return (
     <div className="min-h-screen bg-[#f7faf8]">
       <TopBar avatarUrl={avatarUrl} name={name} onToggle={toggleCollapsed} signedIn={signedIn} title={title} />
-      <DesktopSidebar collapsed={collapsed} name={name} role={role} />
-      <main className={cn("min-w-0 transition-[margin] duration-200 lg:pt-16", collapsed ? "lg:ml-[76px]" : "lg:ml-[260px]")}>
+      <DesktopSidebar collapsed={collapsed} isPatientView={isPatientView} name={name} role={role} />
+      <main className={cn(
+        "min-w-0 transition-[margin] duration-200 lg:pt-16",
+        (isPatientView && collapsed) ? "lg:ml-0" : (collapsed ? "lg:ml-[76px]" : "lg:ml-[260px]")
+      )}>
         <div className="mx-auto w-full max-w-[1540px] px-4 py-5 sm:px-6">{children}</div>
       </main>
     </div>
@@ -129,14 +140,21 @@ function TopBar({
   );
 }
 
-function DesktopSidebar({ collapsed, name, role }: { collapsed: boolean; name: string; role: UserRole }) {
+function DesktopSidebar({ collapsed, isPatientView, name, role }: { collapsed: boolean; isPatientView: boolean; name: string; role: UserRole }) {
   const pathname = usePathname();
   const nav = allowedForRole(navItems, role);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   return (
-    <aside className="fixed bottom-0 left-0 top-16 z-20 hidden border-r border-[#c7d7cd] bg-[#f9fcfa] lg:block">
-      <div className={cn("flex h-full flex-col transition-all", collapsed ? "w-[76px]" : "w-[260px]")}>
+    <aside className={cn(
+      "fixed bottom-0 left-0 top-16 z-20 hidden bg-[#f9fcfa] lg:block transition-all duration-200",
+      (isPatientView && collapsed) ? "w-0 border-r-0 overflow-hidden pointer-events-none opacity-0" : "border-r border-[#c7d7cd] opacity-100",
+      collapsed ? "w-[76px]" : "w-[260px]"
+    )}>
+      <div className={cn(
+        "flex h-full flex-col transition-all duration-200",
+        (isPatientView && collapsed) ? "w-0 overflow-hidden" : (collapsed ? "w-[76px]" : "w-[260px]")
+      )}>
         <div className="border-b border-[#d7e3dc] bg-white/70 p-3">
           {!collapsed ? (
             <>
