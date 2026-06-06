@@ -52,7 +52,6 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
   // Form Fields State
-  const [companyCode, setCompanyCode] = useState("");
   const [name, setName] = useState("");
   const [category, setCategory] = useState<"supplier" | "medical_aid" | "affiliate">("supplier");
   const [address, setAddress] = useState("");
@@ -75,7 +74,6 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
   // Open creation form
   const handleCreateOpen = () => {
     setEditingCompany(null);
-    setCompanyCode("");
     setName("");
     setCategory("supplier");
     setAddress("");
@@ -95,7 +93,6 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
   // Open edit form
   const handleEditOpen = (company: PartnerCompany) => {
     setEditingCompany(company);
-    setCompanyCode(company.company_code || "");
     setName(company.name || "");
     setCategory(company.category || "supplier");
     setAddress(company.address || "");
@@ -124,8 +121,7 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
     setFormError(null);
     setFieldErrors({});
 
-    const payload = {
-      company_code: companyCode.trim(),
+    const payload: any = {
       name: name.trim(),
       category,
       address: address.trim(),
@@ -138,6 +134,11 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
       account_holder: accountHolder.trim(),
       account_number: accountNumber.trim(),
     };
+
+    // If editing, preserve the original company code
+    if (editingCompany) {
+      payload.company_code = editingCompany.company_code;
+    }
 
     try {
       const url = editingCompany 
@@ -482,27 +483,28 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
                 </div>
               )}
 
-              {/* Company ID and Category Row */}
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
-                    <Briefcase size={12} />
-                    Company ID / Code <span className="text-xs text-gray-400 font-normal">(Optional)</span>
+              {/* Company Name */}
+              <div className="grid gap-1.5">
+                <span className="text-xs font-bold text-[#3f1d58]">
+                  Company Legal Name <span className="text-red-500">*</span>
+                </span>
+                <Input
+                  className={`hh-input h-10 text-sm ${fieldErrors.name ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+                  placeholder="e.g. Swaziland Pharma Supplies Ltd"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={formLoading}
+                  required
+                />
+                {fieldErrors.name && (
+                  <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                    {fieldErrors.name.join(" ")}
                   </span>
-                  <Input
-                    className={`hh-input h-10 text-sm ${fieldErrors.company_code ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-                    placeholder="Auto-generated if left blank"
-                    value={companyCode}
-                    onChange={(e) => setCompanyCode(e.target.value)}
-                    disabled={formLoading}
-                  />
-                  {fieldErrors.company_code && (
-                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
-                      {fieldErrors.company_code.join(" ")}
-                    </span>
-                  )}
-                </div>
+                )}
+              </div>
 
+              {/* Category and Tax Number Row */}
+              <div className="grid gap-4 md:grid-cols-2">
                 <div className="grid gap-1.5">
                   <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
                     <Layers size={12} />
@@ -524,26 +526,25 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
                     </span>
                   )}
                 </div>
-              </div>
 
-              {/* Company Name */}
-              <div className="grid gap-1.5">
-                <span className="text-xs font-bold text-[#3f1d58]">
-                  Company Legal Name <span className="text-red-500">*</span>
-                </span>
-                <Input
-                  className={`hh-input h-10 text-sm ${fieldErrors.name ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-                  placeholder="e.g. Swaziland Pharma Supplies Ltd"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  disabled={formLoading}
-                  required
-                />
-                {fieldErrors.name && (
-                  <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
-                    {fieldErrors.name.join(" ")}
+                <div className="grid gap-1.5">
+                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                    <Percent size={12} />
+                    Tax Number
                   </span>
-                )}
+                  <Input
+                    className={`hh-input h-10 text-sm ${fieldErrors.tax_number ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+                    placeholder="e.g. TIN-100-244-11"
+                    value={taxNumber}
+                    onChange={(e) => setTaxNumber(e.target.value)}
+                    disabled={formLoading}
+                  />
+                  {fieldErrors.tax_number && (
+                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                      {fieldErrors.tax_number.join(" ")}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Contacts info row */}
@@ -588,46 +589,25 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
                 </div>
               </div>
 
-              {/* Website and Address */}
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="grid gap-1.5">
-                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
-                    <Globe size={12} />
-                    Website url
+              {/* Website and Physical Address */}
+              <div className="grid gap-1.5">
+                <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                  <Globe size={12} />
+                  Website url
+                </span>
+                <Input
+                  type="text"
+                  className={`hh-input h-10 text-sm ${fieldErrors.website ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+                  placeholder="e.g. www.swazipharma.sz"
+                  value={website}
+                  onChange={(e) => setWebsite(e.target.value)}
+                  disabled={formLoading}
+                />
+                {fieldErrors.website && (
+                  <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                    {fieldErrors.website.join(" ")}
                   </span>
-                  <Input
-                    type="text"
-                    className={`hh-input h-10 text-sm ${fieldErrors.website ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-                    placeholder="e.g. www.swazipharma.sz"
-                    value={website}
-                    onChange={(e) => setWebsite(e.target.value)}
-                    disabled={formLoading}
-                  />
-                  {fieldErrors.website && (
-                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
-                      {fieldErrors.website.join(" ")}
-                    </span>
-                  )}
-                </div>
-
-                <div className="grid gap-1.5">
-                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
-                    <Percent size={12} />
-                    Tax Number
-                  </span>
-                  <Input
-                    className={`hh-input h-10 text-sm ${fieldErrors.tax_number ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
-                    placeholder="e.g. TIN-100-244-11"
-                    value={taxNumber}
-                    onChange={(e) => setTaxNumber(e.target.value)}
-                    disabled={formLoading}
-                  />
-                  {fieldErrors.tax_number && (
-                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
-                      {fieldErrors.tax_number.join(" ")}
-                    </span>
-                  )}
-                </div>
+                )}
               </div>
 
               <div className="grid gap-1.5">
