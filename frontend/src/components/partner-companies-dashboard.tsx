@@ -17,7 +17,8 @@ import {
   Briefcase,
   Layers,
   Percent,
-  CreditCard
+  CreditCard,
+  Eye
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -50,6 +51,15 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
   
   // Field Specific Validation Errors (Direct from DRF)
   const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
+
+  // Read-only Details View State
+  const [viewOpen, setViewOpen] = useState(false);
+  const [viewingCompany, setViewingCompany] = useState<PartnerCompany | null>(null);
+
+  const handleViewOpen = (company: PartnerCompany) => {
+    setViewingCompany(company);
+    setViewOpen(true);
+  };
 
   // Form Fields State
   const [name, setName] = useState("");
@@ -333,12 +343,10 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
           <table className="hh-compact-table w-full text-left">
             <thead>
               <tr>
-                <th className="w-24">Company ID</th>
-                <th>Name</th>
+                <th className="w-32">Company ID</th>
+                <th>Company Name</th>
                 <th>Category</th>
-                <th>Contact details</th>
-                <th>Tax & Banking Info</th>
-                <th className="text-right w-24">Actions</th>
+                <th className="text-right w-36">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -362,73 +370,21 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
                     </span>
                   </td>
                   <td>
-                    <div className="space-y-1 text-xs">
-                      {company.phone_number && (
-                        <div className="flex items-center gap-1.5 text-gray-700">
-                          <Phone size={11} className="text-[#66736d]" />
-                          <span>{company.phone_number}</span>
-                        </div>
-                      )}
-                      {company.email && (
-                        <a href={`mailto:${company.email}`} className="flex items-center gap-1.5 text-[var(--hh-purple)] hover:underline">
-                          <Mail size={11} className="text-[#66736d]" />
-                          <span>{company.email}</span>
-                        </a>
-                      )}
-                      {company.website && (
-                        <a href={company.website.startsWith("http") ? company.website : `https://${company.website}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-sky-700 hover:underline">
-                          <Globe size={11} className="text-[#66736d]" />
-                          <span className="truncate max-w-[120px]">{company.website.replace(/^https?:\/\//i, "")}</span>
-                        </a>
-                      )}
-                      {!company.phone_number && !company.email && !company.website && (
-                        <span className="text-gray-400">--</span>
-                      )}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="space-y-1 text-xs">
-                      {company.tax_number && (
-                        <div className="flex items-start gap-1 text-gray-700">
-                          <span className="font-bold text-[#66736d] w-12 shrink-0">Tax:</span>
-                          <span className="font-mono">{company.tax_number}</span>
-                        </div>
-                      )}
-                      {company.bank_name && (
-                        <div className="flex items-start gap-1 text-gray-700">
-                          <span className="font-bold text-[#66736d] w-12 shrink-0">Bank:</span>
-                          <span className="capitalize">{company.bank_name.replaceAll("_", " ")}</span>
-                        </div>
-                      )}
-                      {company.branch_code && (
-                        <div className="flex items-start gap-1 text-gray-700">
-                          <span className="font-bold text-[#66736d] w-12 shrink-0">Branch:</span>
-                          <span className="font-mono">{company.branch_code}</span>
-                        </div>
-                      )}
-                      {company.account_holder && (
-                        <div className="flex items-start gap-1 text-gray-700">
-                          <span className="font-bold text-[#66736d] w-12 shrink-0">Holder:</span>
-                          <span className="truncate max-w-[110px]">{company.account_holder}</span>
-                        </div>
-                      )}
-                      {company.account_number && (
-                        <div className="flex items-start gap-1 text-gray-700">
-                          <span className="font-bold text-[#66736d] w-12 shrink-0">Acc:</span>
-                          <span className="font-mono font-semibold text-[var(--hh-purple)]">{company.account_number}</span>
-                        </div>
-                      )}
-                      {!company.tax_number && !company.bank_name && !company.account_number && (
-                        <span className="text-gray-400">--</span>
-                      )}
-                    </div>
-                  </td>
-                  <td>
                     <div className="flex justify-end gap-1">
                       <Button 
                         size="icon" 
                         variant="ghost" 
                         className="h-8 w-8 text-[#66736d] hover:text-[var(--hh-purple)] hover:bg-[#F5EDFA]/60 rounded-lg"
+                        title="View Full Profile"
+                        onClick={() => handleViewOpen(company)}
+                      >
+                        <Eye size={14} />
+                      </Button>
+                      <Button 
+                        size="icon" 
+                        variant="ghost" 
+                        className="h-8 w-8 text-[#66736d] hover:text-[var(--hh-purple)] hover:bg-[#F5EDFA]/60 rounded-lg"
+                        title="Edit Profile"
                         onClick={() => handleEditOpen(company)}
                       >
                         <Edit size={14} />
@@ -437,6 +393,7 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
                         size="icon" 
                         variant="ghost" 
                         className="h-8 w-8 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg"
+                        title="Delete Record"
                         onClick={() => handleDeleteOpen(company)}
                       >
                         <Trash2 size={14} />
@@ -447,7 +404,7 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
               ))}
               {filteredCompanies.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center py-12 text-[#66736d] text-sm">
+                  <td colSpan={4} className="text-center py-12 text-[#66736d] text-sm">
                     No partner companies found matching your criteria.
                   </td>
                 </tr>
@@ -456,6 +413,166 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
           </table>
         </div>
       </div>
+
+      {/* 3.5. Read-Only Detailed View Modal */}
+      <Dialog open={viewOpen} onOpenChange={setViewOpen}>
+        <DialogContent className="w-[min(94vw,640px)] p-0 overflow-hidden">
+          <div className="flex flex-col">
+            {/* Header */}
+            <div className="border-b border-[var(--hh-border)] bg-[#fdfdfd] px-6 py-5">
+              <div className="flex items-center gap-3">
+                <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--hh-border)] bg-[var(--hh-purple-light)] text-[var(--hh-purple)]">
+                  <Building2 size={20} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <DialogTitle className="text-base font-bold text-[var(--hh-purple-dark)] truncate">
+                      {viewingCompany?.name}
+                    </DialogTitle>
+                    {viewingCompany && (
+                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${getCategoryBadgeClass(viewingCompany.category)}`}>
+                        {viewingCompany.category_label || viewingCompany.category.replaceAll("_", " ")}
+                      </span>
+                    )}
+                  </div>
+                  <DialogDescription className="text-xs text-[#66736d] mt-0.5 font-mono">
+                    ID: {viewingCompany?.company_code}
+                  </DialogDescription>
+                </div>
+                <DialogClose className="rounded-sm opacity-70 transition-opacity hover:opacity-100 focus:outline-none disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+                  <X className="h-4 w-4" />
+                  <span className="sr-only">Close</span>
+                </DialogClose>
+              </div>
+            </div>
+
+            {/* Content Details Grid */}
+            <div className="grid gap-6 p-6 max-h-[64vh] overflow-y-auto">
+              
+              {/* General & Contacts Details Row */}
+              <div className="grid gap-6 md:grid-cols-2">
+                {/* Contact details Card */}
+                <div className="p-4 rounded-xl border border-[var(--hh-border)] bg-gray-50/30 space-y-4">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--hh-purple)] flex items-center gap-1.5">
+                    <Phone size={13} /> Contact Information
+                  </h4>
+                  
+                  <div className="space-y-3 text-sm">
+                    <div>
+                      <span className="text-xs text-[#66736d] block mb-0.5">Phone Number</span>
+                      {viewingCompany?.phone_number ? (
+                        <div className="font-semibold text-gray-800 flex items-center gap-1.5">
+                          <Phone size={14} className="text-[#66736d]" />
+                          {viewingCompany.phone_number}
+                        </div>
+                      ) : (
+                        <span className="text-gray-400 italic">None recorded</span>
+                      )}
+                    </div>
+
+                    <div>
+                      <span className="text-xs text-[#66736d] block mb-0.5">Email Address</span>
+                      {viewingCompany?.email ? (
+                        <a 
+                          href={`mailto:${viewingCompany.email}`} 
+                          className="font-semibold text-[var(--hh-purple)] hover:underline flex items-center gap-1.5 break-all"
+                        >
+                          <Mail size={14} className="text-[#66736d]" />
+                          {viewingCompany.email}
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 italic">None recorded</span>
+                      )}
+                    </div>
+
+                    <div>
+                      <span className="text-xs text-[#66736d] block mb-0.5">Website Domain</span>
+                      {viewingCompany?.website ? (
+                        <a 
+                          href={viewingCompany.website.startsWith("http") ? viewingCompany.website : `https://${viewingCompany.website}`} 
+                          target="_blank" 
+                          rel="noopener noreferrer" 
+                          className="font-semibold text-sky-700 hover:underline flex items-center gap-1.5 break-all"
+                        >
+                          <Globe size={14} className="text-[#66736d]" />
+                          {viewingCompany.website.replace(/^https?:\/\//i, "")}
+                        </a>
+                      ) : (
+                        <span className="text-gray-400 italic">None recorded</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Physical Location Card */}
+                <div className="p-4 rounded-xl border border-[var(--hh-border)] bg-gray-50/30 flex flex-col h-full space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--hh-purple)] flex items-center gap-1.5">
+                    <MapPin size={13} /> Physical Address
+                  </h4>
+                  <div className="flex-1 text-sm bg-white p-3 rounded-lg border border-[var(--hh-border)]/50 text-gray-700 whitespace-pre-line leading-relaxed">
+                    {viewingCompany?.address ? (
+                      viewingCompany.address
+                    ) : (
+                      <span className="text-gray-400 italic">No physical address registered for this company.</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* Financial & Registry Credentials Card */}
+              <div className="p-4 rounded-xl border border-[var(--hh-border)] bg-gray-50/30 space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-[var(--hh-purple)] flex items-center gap-1.5">
+                  <CreditCard size={13} /> Registry & Banking Details
+                </h4>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="bg-white p-3 rounded-lg border border-[var(--hh-border)]/50">
+                    <span className="text-[10px] uppercase font-bold text-[#66736d] block mb-0.5">Tax Registration (TIN)</span>
+                    <span className="text-sm font-semibold font-mono text-gray-800">
+                      {viewingCompany?.tax_number || <span className="text-gray-400 italic font-sans font-normal">Not provided</span>}
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-[var(--hh-border)]/50">
+                    <span className="text-[10px] uppercase font-bold text-[#66736d] block mb-0.5">Bank Institution</span>
+                    <span className="text-sm font-semibold text-gray-800 capitalize">
+                      {viewingCompany?.bank_name ? viewingCompany.bank_name.replaceAll("_", " ") : <span className="text-gray-400 italic font-sans font-normal">Not provided</span>}
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-[var(--hh-border)]/50">
+                    <span className="text-[10px] uppercase font-bold text-[#66736d] block mb-0.5">Account Holder Name</span>
+                    <span className="text-sm font-semibold text-gray-800 truncate block">
+                      {viewingCompany?.account_holder || <span className="text-gray-400 italic font-sans font-normal">Not provided</span>}
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-[var(--hh-border)]/50">
+                    <span className="text-[10px] uppercase font-bold text-[#66736d] block mb-0.5">Branch Code</span>
+                    <span className="text-sm font-semibold font-mono text-gray-800">
+                      {viewingCompany?.branch_code || <span className="text-gray-400 italic font-sans font-normal">Not provided</span>}
+                    </span>
+                  </div>
+
+                  <div className="bg-white p-3 rounded-lg border border-[var(--hh-border)]/50 sm:col-span-2">
+                    <span className="text-[10px] uppercase font-bold text-[#66736d] block mb-0.5">Bank Account Number</span>
+                    <span className="text-base font-bold font-mono text-[var(--hh-purple)]">
+                      {viewingCompany?.account_number || <span className="text-gray-400 italic font-sans font-normal text-sm">Not provided</span>}
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex justify-end bg-[#fdfdfd] border-t border-[var(--hh-border)] px-6 py-4">
+              <Button type="button" onClick={() => setViewOpen(false)} className="bg-[var(--hh-purple)] text-white hover:bg-[var(--hh-purple-dark)] text-sm font-semibold">
+                Close Profile
+              </Button>
+            </div>
+          </div>
+        </div>
+      </Dialog>
 
       {/* 4. Slide-over Sheet Drawer (Creation & Edition Form) */}
       <Dialog open={formOpen} onOpenChange={setFormOpen}>
