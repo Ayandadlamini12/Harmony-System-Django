@@ -846,8 +846,15 @@ class PartnerCompany(TimeStampedModel):
         MEDICAL_AID = "medical_aid", "Medical Aid"
         AFFILIATE = "affiliate", "Affiliate"
 
+    class BankName(models.TextChoices):
+        FNB = "fnb", "First National Bank (FNB)"
+        STANDARD_BANK = "standard_bank", "Standard Bank"
+        NEDBANK = "nedbank", "Nedbank"
+        ESWATINI_BANK = "eswatini_bank", "Eswatini Bank"
+        ESWATINI_BUILDING_SOCIETY = "eswatini_building_society", "Eswatini Building Society"
+
     public_id = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
-    company_code = models.CharField(max_length=100, unique=True)
+    company_code = models.CharField(max_length=100, unique=True, blank=True)
     name = models.CharField(max_length=255)
     category = models.CharField(max_length=50, choices=Category.choices)
     address = models.TextField(blank=True)
@@ -855,6 +862,11 @@ class PartnerCompany(TimeStampedModel):
     website = models.URLField(blank=True)
     phone_number = models.CharField(max_length=50, blank=True)
     tax_number = models.CharField(max_length=100, blank=True)
+    
+    # Banking details (all optional)
+    bank_name = models.CharField(max_length=100, choices=BankName.choices, blank=True, default="")
+    branch_code = models.CharField(max_length=50, blank=True, default="")
+    account_holder = models.CharField(max_length=255, blank=True, default="")
     account_number = models.CharField(max_length=100, blank=True)
 
     class Meta:
@@ -863,4 +875,22 @@ class PartnerCompany(TimeStampedModel):
 
     def __str__(self) -> str:
         return f"{self.name} ({self.get_category_display()})"
+
+    def save(self, *args, **kwargs):
+        if not self.company_code:
+            import re
+            prefix = "COMP-"
+            last_company = PartnerCompany.objects.filter(company_code__startswith=prefix).order_by("-company_code").first()
+            next_num = 1001
+            if last_company:
+                match = re.search(r'\d+', last_company.company_code)
+                if match:
+                    next_num = int(match.group()) + 1
+            
+            while PartnerCompany.objects.filter(company_code=f"{prefix}{next_num}").exists():
+                next_num += 1
+                
+            self.company_code = f"{prefix}{next_num}"
+        super().save(*args, **kwargs)
+
 

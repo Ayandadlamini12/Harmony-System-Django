@@ -950,6 +950,7 @@ class SupportTicketSerializer(serializers.ModelSerializer):
 
 class PartnerCompanySerializer(serializers.ModelSerializer):
     category_label = serializers.CharField(source="get_category_display", read_only=True)
+    company_code = serializers.CharField(required=False, allow_blank=True, allow_null=True)
 
     class Meta:
         model = PartnerCompany
@@ -965,6 +966,9 @@ class PartnerCompanySerializer(serializers.ModelSerializer):
             "website",
             "phone_number",
             "tax_number",
+            "bank_name",
+            "branch_code",
+            "account_holder",
             "account_number",
             "created_at",
             "updated_at",
@@ -975,4 +979,5 @@ class PartnerCompanySerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         )
+
 

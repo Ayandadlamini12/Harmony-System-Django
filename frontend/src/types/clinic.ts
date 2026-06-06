@@ -528,8 +528,12 @@ export type PartnerCompany = {
   website?: string;
   phone_number?: string;
   tax_number?: string;
+  bank_name?: string;
+  branch_code?: string;
+  account_holder?: string;
   account_number?: string;
   created_at: string;
   updated_at: string;
 };
+
 

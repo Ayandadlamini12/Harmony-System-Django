@@ -47,6 +47,9 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
   const [editingCompany, setEditingCompany] = useState<PartnerCompany | null>(null);
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+  
+  // Field Specific Validation Errors (Direct from DRF)
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string[]>>({});
 
   // Form Fields State
   const [companyCode, setCompanyCode] = useState("");
@@ -57,6 +60,11 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
   const [website, setWebsite] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [taxNumber, setTaxNumber] = useState("");
+  
+  // Banking details fields
+  const [bankName, setBankName] = useState("");
+  const [branchCode, setBranchCode] = useState("");
+  const [accountHolder, setAccountHolder] = useState("");
   const [accountNumber, setAccountNumber] = useState("");
 
   // Delete Dialog State
@@ -75,8 +83,12 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
     setWebsite("");
     setPhoneNumber("");
     setTaxNumber("");
+    setBankName("");
+    setBranchCode("");
+    setAccountHolder("");
     setAccountNumber("");
     setFormError(null);
+    setFieldErrors({});
     setFormOpen(true);
   };
 
@@ -91,21 +103,26 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
     setWebsite(company.website || "");
     setPhoneNumber(company.phone_number || "");
     setTaxNumber(company.tax_number || "");
+    setBankName(company.bank_name || "");
+    setBranchCode(company.branch_code || "");
+    setAccountHolder(company.account_holder || "");
     setAccountNumber(company.account_number || "");
     setFormError(null);
+    setFieldErrors({});
     setFormOpen(true);
   };
 
   // Save / Update company handler
   const handleSaveCompany = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!companyCode.trim() || !name.trim()) {
-      setFormError("Company ID/Code and Name are required fields.");
+    if (!name.trim()) {
+      setFormError("Company Legal Name is a required field.");
       return;
     }
 
     setFormLoading(true);
     setFormError(null);
+    setFieldErrors({});
 
     const payload = {
       company_code: companyCode.trim(),
@@ -116,6 +133,9 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
       website: website.trim(),
       phone_number: phoneNumber.trim(),
       tax_number: taxNumber.trim(),
+      bank_name: bankName,
+      branch_code: branchCode.trim(),
+      account_holder: accountHolder.trim(),
       account_number: accountNumber.trim(),
     };
 
@@ -144,8 +164,6 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
         // Refresh server-side state in transition
         startTransition(() => {
           router.refresh();
-          // We also fetch updated client-side list in background or we can let router refresh update initialProps.
-          // Since we want instant local responsiveness, let's update client side state:
           fetch("/api/partner-companies/")
             .then(r => r.json())
             .then((resData: Paginated<PartnerCompany>) => {
@@ -155,17 +173,22 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
             });
         });
       } else {
-        // DRF validation errors standard parser
-        let errorMsg = data.detail || data.non_field_errors?.[0];
-        if (!errorMsg) {
-          const keys = Object.keys(data);
-          if (keys.length > 0) {
-            errorMsg = `${keys[0].replaceAll("_", " ")}: ${data[keys[0]][0] || data[keys[0]]}`;
-          } else {
-            errorMsg = "An error occurred while saving the partner company.";
+        // High-specificity validation errors parser
+        if (data && typeof data === "object" && !data.detail) {
+          setFieldErrors(data);
+          setFormError("Please correct the highlighted errors below.");
+        } else {
+          let errorMsg = data.detail || data.non_field_errors?.[0];
+          if (!errorMsg) {
+            const keys = Object.keys(data);
+            if (keys.length > 0) {
+              errorMsg = `${keys[0].replaceAll("_", " ")}: ${data[keys[0]][0] || data[keys[0]]}`;
+            } else {
+              errorMsg = "An error occurred while saving the partner company.";
+            }
           }
+          setFormError(errorMsg);
         }
-        setFormError(errorMsg);
       }
     } catch (err: any) {
       setFormError(err.message || "An unexpected network error occurred.");
@@ -197,7 +220,6 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
 
         startTransition(() => {
           router.refresh();
-          // Instantly filter out locally for immediate UI updates
           setCompanies(companies.filter(c => c.public_id !== companyToDelete.public_id));
         });
       } else {
@@ -309,7 +331,7 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
                 <th>Name</th>
                 <th>Category</th>
                 <th>Contact details</th>
-                <th>Tax & Account Info</th>
+                <th>Tax & Banking Info</th>
                 <th className="text-right w-24">Actions</th>
               </tr>
             </thead>
@@ -361,18 +383,36 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
                   <td>
                     <div className="space-y-1 text-xs">
                       {company.tax_number && (
-                        <div className="flex items-center gap-1 text-gray-700">
-                          <span className="font-bold text-[#66736d]">Tax:</span>
+                        <div className="flex items-start gap-1 text-gray-700">
+                          <span className="font-bold text-[#66736d] w-12 shrink-0">Tax:</span>
                           <span className="font-mono">{company.tax_number}</span>
                         </div>
                       )}
-                      {company.account_number && (
-                        <div className="flex items-center gap-1 text-gray-700">
-                          <span className="font-bold text-[#66736d]">Acc:</span>
-                          <span className="font-mono">{company.account_number}</span>
+                      {company.bank_name && (
+                        <div className="flex items-start gap-1 text-gray-700">
+                          <span className="font-bold text-[#66736d] w-12 shrink-0">Bank:</span>
+                          <span className="capitalize">{company.bank_name.replaceAll("_", " ")}</span>
                         </div>
                       )}
-                      {!company.tax_number && !company.account_number && (
+                      {company.branch_code && (
+                        <div className="flex items-start gap-1 text-gray-700">
+                          <span className="font-bold text-[#66736d] w-12 shrink-0">Branch:</span>
+                          <span className="font-mono">{company.branch_code}</span>
+                        </div>
+                      )}
+                      {company.account_holder && (
+                        <div className="flex items-start gap-1 text-gray-700">
+                          <span className="font-bold text-[#66736d] w-12 shrink-0">Holder:</span>
+                          <span className="truncate max-w-[110px]">{company.account_holder}</span>
+                        </div>
+                      )}
+                      {company.account_number && (
+                        <div className="flex items-start gap-1 text-gray-700">
+                          <span className="font-bold text-[#66736d] w-12 shrink-0">Acc:</span>
+                          <span className="font-mono font-semibold text-[var(--hh-purple)]">{company.account_number}</span>
+                        </div>
+                      )}
+                      {!company.tax_number && !company.bank_name && !company.account_number && (
                         <span className="text-gray-400">--</span>
                       )}
                     </div>
@@ -444,22 +484,26 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
 
               {/* Company ID and Category Row */}
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-1.5">
+                <div className="grid gap-1.5">
                   <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
                     <Briefcase size={12} />
-                    Company ID / Code <span className="text-red-500">*</span>
+                    Company ID / Code <span className="text-xs text-gray-400 font-normal">(Optional)</span>
                   </span>
                   <Input
-                    className="hh-input h-10 text-sm"
-                    placeholder="e.g. SUP-MED-01, MEDAID-MUT"
+                    className={`hh-input h-10 text-sm ${fieldErrors.company_code ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+                    placeholder="Auto-generated if left blank"
                     value={companyCode}
                     onChange={(e) => setCompanyCode(e.target.value)}
                     disabled={formLoading}
-                    required
                   />
-                </label>
+                  {fieldErrors.company_code && (
+                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                      {fieldErrors.company_code.join(" ")}
+                    </span>
+                  )}
+                </div>
 
-                <label className="grid gap-1.5">
+                <div className="grid gap-1.5">
                   <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
                     <Layers size={12} />
                     Category <span className="text-red-500">*</span>
@@ -468,123 +512,243 @@ export function PartnerCompaniesDashboard({ initialCompanies, userRole }: Partne
                     value={category}
                     onChange={(e) => setCategory(e.target.value as any)}
                     disabled={formLoading}
-                    className="h-10 text-sm bg-white"
+                    className={`h-10 text-sm bg-white ${fieldErrors.category ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                   >
                     <option value="supplier">Supplier</option>
                     <option value="medical_aid">Medical Aid</option>
                     <option value="affiliate">Affiliate</option>
                   </Select>
-                </label>
+                  {fieldErrors.category && (
+                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                      {fieldErrors.category.join(" ")}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Company Name */}
-              <label className="grid gap-1.5">
+              <div className="grid gap-1.5">
                 <span className="text-xs font-bold text-[#3f1d58]">
                   Company Legal Name <span className="text-red-500">*</span>
                 </span>
                 <Input
-                  className="hh-input h-10 text-sm"
+                  className={`hh-input h-10 text-sm ${fieldErrors.name ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                   placeholder="e.g. Swaziland Pharma Supplies Ltd"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   disabled={formLoading}
                   required
                 />
-              </label>
+                {fieldErrors.name && (
+                  <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                    {fieldErrors.name.join(" ")}
+                  </span>
+                )}
+              </div>
 
               {/* Contacts info row */}
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-1.5">
+                <div className="grid gap-1.5">
                   <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
                     <Phone size={12} />
                     Phone number
                   </span>
                   <Input
-                    className="hh-input h-10 text-sm"
+                    className={`hh-input h-10 text-sm ${fieldErrors.phone_number ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     placeholder="e.g. +268 2404 0000"
                     value={phoneNumber}
                     onChange={(e) => setPhoneNumber(e.target.value)}
                     disabled={formLoading}
                   />
-                </label>
+                  {fieldErrors.phone_number && (
+                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                      {fieldErrors.phone_number.join(" ")}
+                    </span>
+                  )}
+                </div>
 
-                <label className="grid gap-1.5">
+                <div className="grid gap-1.5">
                   <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
                     <Mail size={12} />
                     Email address
                   </span>
                   <Input
                     type="email"
-                    className="hh-input h-10 text-sm"
+                    className={`hh-input h-10 text-sm ${fieldErrors.email ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     placeholder="e.g. info@company.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     disabled={formLoading}
                   />
-                </label>
+                  {fieldErrors.email && (
+                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                      {fieldErrors.email.join(" ")}
+                    </span>
+                  )}
+                </div>
               </div>
 
               {/* Website and Address */}
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-1.5">
+                <div className="grid gap-1.5">
                   <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
                     <Globe size={12} />
                     Website url
                   </span>
                   <Input
                     type="text"
-                    className="hh-input h-10 text-sm"
+                    className={`hh-input h-10 text-sm ${fieldErrors.website ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     placeholder="e.g. www.swazipharma.sz"
                     value={website}
                     onChange={(e) => setWebsite(e.target.value)}
                     disabled={formLoading}
                   />
-                </label>
+                  {fieldErrors.website && (
+                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                      {fieldErrors.website.join(" ")}
+                    </span>
+                  )}
+                </div>
 
-                <label className="grid gap-1.5">
+                <div className="grid gap-1.5">
                   <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
                     <Percent size={12} />
                     Tax Number
                   </span>
                   <Input
-                    className="hh-input h-10 text-sm"
+                    className={`hh-input h-10 text-sm ${fieldErrors.tax_number ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
                     placeholder="e.g. TIN-100-244-11"
                     value={taxNumber}
                     onChange={(e) => setTaxNumber(e.target.value)}
                     disabled={formLoading}
                   />
-                </label>
+                  {fieldErrors.tax_number && (
+                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                      {fieldErrors.tax_number.join(" ")}
+                    </span>
+                  )}
+                </div>
               </div>
 
-              {/* Financial Account & Physical Address */}
+              <div className="grid gap-1.5">
+                <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                  <MapPin size={12} />
+                  Physical address
+                </span>
+                <Textarea
+                  className={`h-10 min-h-[40px] text-sm border-[var(--hh-border)] focus:border-[var(--hh-purple)] focus:ring-1 focus:ring-[var(--hh-purple)] leading-normal resize-none py-2 ${
+                    fieldErrors.address ? "border-red-500 focus:border-red-500" : ""
+                  }`}
+                  placeholder="e.g. Suite 4, Plot 12, Gables Mbabane"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  disabled={formLoading}
+                />
+                {fieldErrors.address && (
+                  <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                    {fieldErrors.address.join(" ")}
+                  </span>
+                )}
+              </div>
+
+              {/* SECTION: Banking Details (Optional) */}
+              <div className="relative my-2">
+                <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                  <div className="w-full border-t border-[var(--hh-border)]" />
+                </div>
+                <div className="relative flex justify-start">
+                  <span className="bg-white pr-3 text-[11px] font-bold uppercase tracking-wider text-[var(--hh-purple)]">
+                    Banking Details (Optional)
+                  </span>
+                </div>
+              </div>
+
+              {/* Bank Name & Account Holder */}
               <div className="grid gap-4 md:grid-cols-2">
-                <label className="grid gap-1.5">
+                <div className="grid gap-1.5">
+                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                    <CreditCard size={12} />
+                    Bank Name
+                  </span>
+                  <Select
+                    value={bankName}
+                    onChange={(e) => setBankName(e.target.value)}
+                    disabled={formLoading}
+                    className={`h-10 text-sm bg-white ${fieldErrors.bank_name ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+                  >
+                    <option value="">Select a bank...</option>
+                    <option value="fnb">First National Bank (FNB)</option>
+                    <option value="standard_bank">Standard Bank</option>
+                    <option value="nedbank">Nedbank</option>
+                    <option value="eswatini_bank">Eswatini Bank</option>
+                    <option value="eswatini_building_society">Eswatini Building Society</option>
+                  </Select>
+                  {fieldErrors.bank_name && (
+                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                      {fieldErrors.bank_name.join(" ")}
+                    </span>
+                  )}
+                </div>
+
+                <div className="grid gap-1.5">
+                  <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                    <Building2 size={12} />
+                    Account Holder Name
+                  </span>
+                  <Input
+                    className={`hh-input h-10 text-sm ${fieldErrors.account_holder ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+                    placeholder="e.g. Swaziland Pharma Ltd"
+                    value={accountHolder}
+                    onChange={(e) => setAccountHolder(e.target.value)}
+                    disabled={formLoading}
+                  />
+                  {fieldErrors.account_holder && (
+                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                      {fieldErrors.account_holder.join(" ")}
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Account Number & Branch Code */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className="grid gap-1.5">
                   <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
                     <CreditCard size={12} />
                     Account Number
                   </span>
                   <Input
-                    className="hh-input h-10 text-sm"
-                    placeholder="e.g. Standard Bank 9091102"
+                    className={`hh-input h-10 text-sm ${fieldErrors.account_number ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+                    placeholder="e.g. 62041122334"
                     value={accountNumber}
                     onChange={(e) => setAccountNumber(e.target.value)}
                     disabled={formLoading}
                   />
-                </label>
+                  {fieldErrors.account_number && (
+                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                      {fieldErrors.account_number.join(" ")}
+                    </span>
+                  )}
+                </div>
 
-                <label className="grid gap-1.5">
+                <div className="grid gap-1.5">
                   <span className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
-                    <MapPin size={12} />
-                    Physical address
+                    <Layers size={12} />
+                    Branch Code
                   </span>
-                  <Textarea
-                    className="h-10 min-h-[40px] text-sm border-[var(--hh-border)] focus:border-[var(--hh-purple)] focus:ring-1 focus:ring-[var(--hh-purple)] leading-normal resize-none py-2"
-                    placeholder="e.g. Suite 4, Plot 12, Gables Mbabane"
-                    value={address}
-                    onChange={(e) => setAddress(e.target.value)}
+                  <Input
+                    className={`hh-input h-10 text-sm ${fieldErrors.branch_code ? "border-red-500 focus:border-red-500 focus:ring-red-500" : ""}`}
+                    placeholder="e.g. 280164"
+                    value={branchCode}
+                    onChange={(e) => setBranchCode(e.target.value)}
                     disabled={formLoading}
                   />
-                </label>
+                  {fieldErrors.branch_code && (
+                    <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                      {fieldErrors.branch_code.join(" ")}
+                    </span>
+                  )}
+                </div>
               </div>
             </div>
 
