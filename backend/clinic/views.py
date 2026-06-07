@@ -1199,62 +1199,83 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
         entity_type = self.request.query_params.get("entity_type")
         entity_id = self.request.query_params.get("entity_id")
         
-        if entity_type == "patient" and entity_id:
+        if entity_type == "patient":
+            if not entity_id or str(entity_id).lower() == "undefined":
+                return queryset.none()
+                
+            patient_id = None
+            import uuid
+            from .models import Patient, Visit, Vital, Case, PatientDocument, PatientJourney, PatientCheckIn, Appointment
+            from django.db.models import Q
+            
+            # 1. Try to parse as UUID first
             try:
-                patient_id = int(entity_id)
-                from django.db.models import Q
-                from .models import Visit, Vital, Case, PatientDocument, PatientJourney, Patient, PatientCheckIn, Appointment
-                
-                # Gather related record IDs
-                visit_ids = list(Visit.objects.filter(patient_id=patient_id).values_list("id", flat=True))
-                vital_ids = list(Vital.objects.filter(patient_id=patient_id).values_list("id", flat=True))
-                case_ids = list(Case.objects.filter(patient_id=patient_id).values_list("id", flat=True))
-                doc_ids = list(PatientDocument.objects.filter(patient_id=patient_id).values_list("id", flat=True))
-                journey_ids = list(PatientJourney.objects.filter(patient_id=patient_id).values_list("id", flat=True))
-                checkin_ids = list(PatientCheckIn.objects.filter(patient_id=patient_id).values_list("id", flat=True))
-                appointment_ids = list(Appointment.objects.filter(patient_id=patient_id).values_list("id", flat=True))
-                
-                # Patient Profile logs
-                q_filter = Q(entity_type="patient", entity_id=patient_id)
+                patient_uuid = uuid.UUID(str(entity_id))
                 try:
-                    patient_inst = Patient.objects.get(pk=patient_id)
-                    if hasattr(patient_inst, "profile") and patient_inst.profile:
-                        q_filter |= Q(entity_type="patientprofile", entity_id=patient_inst.profile.pk)
+                    patient_id = Patient.objects.get(public_id=patient_uuid).id
                 except Patient.DoesNotExist:
                     pass
-                
-                # Or any logs for related records
-                if visit_ids:
-                    q_filter |= Q(entity_type="visit", entity_id__in=visit_ids)
-                if vital_ids:
-                    q_filter |= Q(entity_type="vital", entity_id__in=vital_ids)
-                if case_ids:
-                    q_filter |= Q(entity_type="case", entity_id__in=case_ids)
-                if doc_ids:
-                    q_filter |= Q(entity_type="patientdocument", entity_id__in=doc_ids)
-                    q_filter |= Q(entity_type="patient_document", entity_id__in=doc_ids)
-                if journey_ids:
-                    q_filter |= Q(entity_type="patientjourney", entity_id__in=journey_ids)
-                    q_filter |= Q(entity_type="patient_journey", entity_id__in=journey_ids)
-                if checkin_ids:
-                    q_filter |= Q(entity_type="patientcheckin", entity_id__in=checkin_ids)
-                    q_filter |= Q(entity_type="patient_checkin", entity_id__in=checkin_ids)
-                if appointment_ids:
-                    q_filter |= Q(entity_type="appointment", entity_id__in=appointment_ids)
-                
-                queryset = queryset.filter(q_filter)
-                
-                ordering = self.request.query_params.get("ordering")
-                if ordering:
-                    ordering_fields = [f.strip() for f in ordering.split(",")]
-                    valid_ordering = [f for f in ordering_fields if f.replace("-", "") in ["created_at"]]
-                    if valid_ordering:
-                        queryset = queryset.order_by(*valid_ordering)
-                else:
-                    queryset = queryset.order_by("-created_at")
-                return queryset
             except ValueError:
+                # 2. Try to parse as integer PK
+                try:
+                    patient_id = int(entity_id)
+                    if not Patient.objects.filter(pk=patient_id).exists():
+                        patient_id = None
+                except ValueError:
+                    pass
+            
+            if patient_id is None:
+                return queryset.none()
+                
+            # Gather related record IDs
+            visit_ids = list(Visit.objects.filter(patient_id=patient_id).values_list("id", flat=True))
+            vital_ids = list(Vital.objects.filter(patient_id=patient_id).values_list("id", flat=True))
+            case_ids = list(Case.objects.filter(patient_id=patient_id).values_list("id", flat=True))
+            doc_ids = list(PatientDocument.objects.filter(patient_id=patient_id).values_list("id", flat=True))
+            journey_ids = list(PatientJourney.objects.filter(patient_id=patient_id).values_list("id", flat=True))
+            checkin_ids = list(PatientCheckIn.objects.filter(patient_id=patient_id).values_list("id", flat=True))
+            appointment_ids = list(Appointment.objects.filter(patient_id=patient_id).values_list("id", flat=True))
+            
+            # Patient Profile logs
+            q_filter = Q(entity_type="patient", entity_id=patient_id)
+            try:
+                patient_inst = Patient.objects.get(pk=patient_id)
+                if hasattr(patient_inst, "profile") and patient_inst.profile:
+                    q_filter |= Q(entity_type="patientprofile", entity_id=patient_inst.profile.pk)
+            except Patient.DoesNotExist:
                 pass
+            
+            # Or any logs for related records
+            if visit_ids:
+                q_filter |= Q(entity_type="visit", entity_id__in=visit_ids)
+            if vital_ids:
+                q_filter |= Q(entity_type="vital", entity_id__in=vital_ids)
+            if case_ids:
+                q_filter |= Q(entity_type="case", entity_id__in=case_ids)
+            if doc_ids:
+                q_filter |= Q(entity_type="patientdocument", entity_id__in=doc_ids)
+                q_filter |= Q(entity_type="patient_document", entity_id__in=doc_ids)
+            if journey_ids:
+                q_filter |= Q(entity_type="patientjourney", entity_id__in=journey_ids)
+                q_filter |= Q(entity_type="patient_journey", entity_id__in=journey_ids)
+            if checkin_ids:
+                q_filter |= Q(entity_type="patientcheckin", entity_id__in=checkin_ids)
+                q_filter |= Q(entity_type="patient_checkin", entity_id__in=checkin_ids)
+            if appointment_ids:
+                q_filter |= Q(entity_type="appointment", entity_id__in=appointment_ids)
+            
+            queryset = queryset.filter(q_filter)
+            
+            ordering = self.request.query_params.get("ordering")
+            if ordering:
+                ordering_fields = [f.strip() for f in ordering.split(",")]
+                valid_ordering = [f for f in ordering_fields if f.replace("-", "") in ["created_at"]]
+                if valid_ordering:
+                    queryset = queryset.order_by(*valid_ordering)
+            else:
+                queryset = queryset.order_by("-created_at")
+            return queryset
+            
         return super().filter_queryset(queryset)
 
 

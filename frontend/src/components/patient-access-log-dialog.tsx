@@ -332,7 +332,8 @@ export function PatientAccessLogDialog({ patient, userRole }: { patient: Patient
   const fetchLogs = async (pageNum: number, append = false) => {
     try {
       setLoading(true);
-      const res = await fetch(`/api/audit-logs/?entity_type=patient&entity_id=${patient.id}&page=${pageNum}`);
+      const entityId = patient.id || patient.public_id;
+      const res = await fetch(`/api/audit-logs/?entity_type=patient&entity_id=${entityId}&page=${pageNum}`);
       if (!res.ok) throw new Error("Failed to fetch logs");
       
       const data: PaginatedAuditLogs = await res.json();
