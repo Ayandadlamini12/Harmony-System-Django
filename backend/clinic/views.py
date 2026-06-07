@@ -267,6 +267,17 @@ class PatientViewSet(viewsets.ModelViewSet):
             return PatientListSerializer
         return PatientDetailSerializer
 
+    def retrieve(self, request, *args, **kwargs):
+        patient = self.get_object()
+        write_audit_log(
+            request=request,
+            action="view",
+            instance=patient,
+            details="Patient record viewed.",
+        )
+        serializer = self.get_serializer(patient)
+        return Response(serializer.data)
+
     def perform_create(self, serializer):
         patient = serializer.save()
         journey = start_journey_for_registration(patient, self.request)
@@ -1181,6 +1192,8 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.select_related("user")
     serializer_class = AuditLogSerializer
+    filterset_fields = ("entity_type", "entity_id")
+    ordering_fields = ("created_at",)
 
 
 class ElevatedAccessRequestViewSet(viewsets.ModelViewSet):
