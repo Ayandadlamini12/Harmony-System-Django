@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ClipboardList, FileText, IdCard, LockKeyhole, MapPin, Phone, Users, ChevronLeft, ChevronRight } from "lucide-react";
+import { ClipboardList, FileText, IdCard, LockKeyhole, MapPin, Phone, Users, ChevronLeft, ChevronRight, Plus, Building } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -21,6 +21,7 @@ import { CONFIDENTIAL_CONDITIONS } from "@/lib/condition-records";
 import { showActionError } from "@/lib/action-error";
 import { cn } from "@/lib/utils";
 import { RELATIONSHIP_OPTIONS } from "@/lib/relationships";
+import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogClose } from "@/components/ui/dialog";
 
 
 type RegionOption = {
@@ -68,16 +69,53 @@ const patientRegistrationSchema = z.object({
   next_of_kin_email: z.string().trim().email("Use a valid email").or(z.literal("")),
   next_of_kin_relationship: z.string().trim(),
   next_of_kin_relationship_other: z.string().trim(),
-  hiv_status: z.enum(["undisclosed", "unknown", "reactive", "non_reactive"]),
-  children_count: z.string().trim(),
-  past_medical_history: z.string().trim(),
-  family_medical_history: z.string().trim(),
-  allopathic_medication: z.string().trim(),
-  other_important_information: z.string().trim(),
-  conditions: z.record(z.string(), z.object({
-    status: z.enum(["yes", "no"]),
-    note: z.string().trim()
-  }))
+  has_medical_aid: z.boolean().default(false),
+  medical_aid_company: z.string().optional().nullable(),
+  medical_aid_membership_ownership: z.enum(["self", "other"]).default("self"),
+  medical_aid_owner_full_name: z.string().trim().optional(),
+  medical_aid_owner_national_id: z.string().trim().optional(),
+  medical_aid_owner_relationship: z.string().trim().optional(),
+  medical_aid_id_number: z.string().trim().optional(),
+}).superRefine((val, ctx) => {
+  if (val.has_medical_aid) {
+    if (!val.medical_aid_company) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Medical aid company is required",
+        path: ["medical_aid_company"],
+      });
+    }
+    if (!val.medical_aid_id_number || val.medical_aid_id_number.trim() === "") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Medical aid membership/ID number is required",
+        path: ["medical_aid_id_number"],
+      });
+    }
+    if (val.medical_aid_membership_ownership === "other") {
+      if (!val.medical_aid_owner_full_name || val.medical_aid_owner_full_name.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Owner full name is required when ownership is Other",
+          path: ["medical_aid_owner_full_name"],
+        });
+      }
+      if (!val.medical_aid_owner_national_id || val.medical_aid_owner_national_id.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Owner National ID is required when ownership is Other",
+          path: ["medical_aid_owner_national_id"],
+        });
+      }
+      if (!val.medical_aid_owner_relationship || val.medical_aid_owner_relationship.trim() === "") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "Owner relationship is required when ownership is Other",
+          path: ["medical_aid_owner_relationship"],
+        });
+      }
+    }
+  }
 });
 
 type PatientRegistrationValues = z.infer<typeof patientRegistrationSchema>;
@@ -110,8 +148,15 @@ export function PatientRegistrationForm() {
   const [regions, setRegions] = useState<RegionOption[]>([]);
   const [towns, setTowns] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
+  const [partnerCompanies, setPartnerCompanies] = useState<{ id: number; name: string }[]>([]);
+  const [isAddingCompany, setIsAddingCompany] = useState(false);
+  const [newCompanyName, setNewCompanyName] = useState("");
+  const [newCompanyEmail, setNewCompanyEmail] = useState("");
+  const [newCompanyPhone, setNewCompanyPhone] = useState("");
+  const [isSavingCompany, setIsSavingCompany] = useState(false);
+
   const form = useForm<PatientRegistrationValues>({
-    resolver: zodResolver(patientRegistrationSchema),
+    resolver: zodResolver(patientRegistrationSchema) as any,
     mode: "onBlur",
     defaultValues: {
       first_name: "",
@@ -139,22 +184,39 @@ export function PatientRegistrationForm() {
       next_of_kin_email: "",
       next_of_kin_relationship: "",
       next_of_kin_relationship_other: "",
-      hiv_status: "undisclosed",
-      children_count: "",
-      past_medical_history: "",
-      family_medical_history: "",
-      allopathic_medication: "",
-      other_important_information: "",
-      conditions: Object.fromEntries(CONFIDENTIAL_CONDITIONS.map((condition) => [condition.code, { status: "no", note: "" }]))
+      has_medical_aid: false,
+      medical_aid_company: "",
+      medical_aid_membership_ownership: "self",
+      medical_aid_owner_full_name: "",
+      medical_aid_owner_national_id: "",
+      medical_aid_owner_relationship: "",
+      medical_aid_id_number: "",
     }
   });
 
   const primaryDialCode = form.watch("primary_phone.country_code");
   const selectedRegion = form.watch("region");
   const relationship = form.watch("next_of_kin_relationship");
-  const conditionValues = form.watch("conditions");
+  const hasMedicalAid = form.watch("has_medical_aid");
+  const medicalAidOwnership = form.watch("medical_aid_membership_ownership");
   const selectedCountry = useMemo(() => resolveCountryFromDialCode(primaryDialCode || "+268"), [primaryDialCode]);
   const selectedRegionIsoCode = regions.find((region) => region.name === selectedRegion)?.isoCode || "";
+
+  useEffect(() => {
+    async function loadCompanies() {
+      try {
+        const response = await fetch("/api/partner-companies/?category=medical_aid");
+        if (response.ok) {
+          const data = await response.json();
+          const results = Array.isArray(data) ? data : (data?.results || []);
+          setPartnerCompanies(results);
+        }
+      } catch (err) {
+        console.error("Failed to load medical aid companies", err);
+      }
+    }
+    loadCompanies();
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -204,20 +266,12 @@ export function PatientRegistrationForm() {
       fields: ["next_of_kin_full_name", "next_of_kin_phone", "next_of_kin_email", "next_of_kin_relationship", "next_of_kin_relationship_other"] as const
     },
     {
-      id: "clinical",
-      title: "Medical history",
-      description: "Semi-stable medical history and important patient notes.",
+      id: "medical-aid",
+      title: "Medical aid",
+      description: "Medical aid insurance and policy details.",
       icon: ClipboardList,
-      tone: "clinical" as const,
-      fields: ["hiv_status", "children_count", "past_medical_history", "family_medical_history", "allopathic_medication", "other_important_information"] as const
-    },
-    {
-      id: "conditions",
-      title: "Confidential medical records",
-      description: "Sickness record flags. Yes uses a tick; No uses an X.",
-      icon: LockKeyhole,
-      tone: "secure" as const,
-      fields: ["conditions"] as const
+      tone: "identity" as const,
+      fields: ["has_medical_aid", "medical_aid_company", "medical_aid_membership_ownership", "medical_aid_owner_full_name", "medical_aid_owner_national_id", "medical_aid_owner_relationship", "medical_aid_id_number"] as const
     },
     {
       id: "review",
@@ -267,26 +321,13 @@ export function PatientRegistrationForm() {
       region: text(values.region),
       town_or_locality: text(values.town_or_locality),
       village: text(values.village),
-      profile: {
-        hiv_status: values.hiv_status,
-        children_count: text(values.children_count) ? Number(text(values.children_count)) : null,
-        past_medical_history: text(values.past_medical_history),
-        family_medical_history: text(values.family_medical_history),
-        allopathic_medication: text(values.allopathic_medication),
-        other_important_information: text(values.other_important_information)
-      },
-      conditions: CONFIDENTIAL_CONDITIONS.map((condition) => {
-        const value = values.conditions[condition.code] || { status: "no", note: "" };
-        const present = value.status === "yes";
-        return {
-          condition_code: condition.code,
-          condition_label: condition.label,
-          present,
-          is_confidential: true,
-          status: "active",
-          notes: present ? text(value.note) : ""
-        };
-      })
+      has_medical_aid: values.has_medical_aid,
+      medical_aid_company: values.has_medical_aid && values.medical_aid_company ? Number(values.medical_aid_company) : null,
+      medical_aid_membership_ownership: values.has_medical_aid ? values.medical_aid_membership_ownership : "self",
+      medical_aid_owner_full_name: values.has_medical_aid && values.medical_aid_membership_ownership === "other" ? text(values.medical_aid_owner_full_name) : "",
+      medical_aid_owner_national_id: values.has_medical_aid && values.medical_aid_membership_ownership === "other" ? text(values.medical_aid_owner_national_id) : "",
+      medical_aid_owner_relationship: values.has_medical_aid && values.medical_aid_membership_ownership === "other" ? text(values.medical_aid_owner_relationship) : "",
+      medical_aid_id_number: values.has_medical_aid ? text(values.medical_aid_id_number) : ""
     };
 
     try {
@@ -467,70 +508,204 @@ export function PatientRegistrationForm() {
               <datalist id="kin-phone-codes">{countryCodeOptions.map((option) => <option key={`k-${option.country}-${option.dialCode}`} value={option.dialCode}>{option.label}</option>)}</datalist>
             </div>
 
-            <div className={cn(activeStep.id === "clinical" ? "block" : "hidden")}>
-              <div className={twoColumn}>
-                <label className={fieldClass}>
-                  <Label>HIV status</Label>
-                  <Select {...form.register("hiv_status")}>
-                    <option value="undisclosed">Undisclosed</option>
-                    <option value="unknown">Unknown</option>
-                    <option value="reactive">Reactive</option>
-                    <option value="non_reactive">Non-reactive</option>
-                  </Select>
-                  <FieldError />
-                </label>
-                <label className={fieldClass}><Label>Children count</Label><Input type="number" min="0" {...form.register("children_count")} /><FieldError /></label>
-                <label className={fieldClass}><Label>Past medical history</Label><Textarea {...form.register("past_medical_history")} /><FieldError /></label>
-                <label className={fieldClass}><Label>Family medical history</Label><Textarea {...form.register("family_medical_history")} /><FieldError /></label>
-                <label className={fieldClass}><Label>Allopathic medication</Label><Textarea {...form.register("allopathic_medication")} /><FieldError /></label>
-                <label className={fieldClass}><Label>Other important information</Label><Textarea {...form.register("other_important_information")} /><FieldError /></label>
-              </div>
-            </div>
-
-            <div className={cn(activeStep.id === "conditions" ? "block" : "hidden")}>
-              <div className="grid gap-4">
-                <div className="rounded-lg border border-[#e7d7ef] bg-[#f7f0fb] p-4">
-                  <h3 className="text-sm font-bold text-[var(--hh-purple-dark)]">Confidential sickness records</h3>
-                  <p className="mt-1 text-sm leading-6 text-[#66736d]">These records are treated as confidential clinical information and should require elevated access when viewed later.</p>
-                </div>
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {CONFIDENTIAL_CONDITIONS.map((condition) => {
-                    const isPresent = conditionValues?.[condition.code]?.status === "yes";
-                    return (
-                    <div key={condition.code} className="rounded-lg border border-[var(--hh-border)] bg-white p-3">
-                      <div className="text-sm font-bold text-[var(--hh-text)]">{condition.label}</div>
-                      <div className="mt-3 flex overflow-hidden rounded-lg border border-[var(--hh-border)]">
-                        <label className="flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-1.5 border-r border-[var(--hh-border)] text-sm font-bold has-[:checked]:bg-[var(--hh-green-light)] has-[:checked]:text-[var(--hh-green-dark)]">
-                          <input className="sr-only" type="radio" value="yes" {...form.register(`conditions.${condition.code}.status`)} />
-                          Yes
-                        </label>
-                        <label className="flex min-h-10 flex-1 cursor-pointer items-center justify-center gap-1.5 text-sm font-bold has-[:checked]:bg-slate-100 has-[:checked]:text-slate-700">
-                          <input
-                            className="sr-only"
-                            type="radio"
-                            value="no"
-                            {...form.register(`conditions.${condition.code}.status`, {
-                              onChange: () => form.setValue(`conditions.${condition.code}.note`, "")
-                            })}
-                          />
-                          No
-                        </label>
-                      </div>
-                      {isPresent && (
-                        <label className="mt-3 block">
-                          <span className="hh-label">Confidential note</span>
-                          <Textarea
-                            className="min-h-20"
-                            placeholder={`Add ${condition.label.toLowerCase()} details, history, status, or relevant clinical context`}
-                            {...form.register(`conditions.${condition.code}.note`)}
-                          />
-                        </label>
+            <div className={cn(activeStep.id === "medical-aid" ? "block" : "hidden")}>
+              <div className="grid gap-6">
+                {/* Do you have medical aid Toggle */}
+                <div className={fieldClass}>
+                  <Label className="text-sm font-bold text-[var(--hh-text)]">Do you have medical aid?</Label>
+                  <div className="flex gap-4 mt-2">
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex-1 min-h-12 rounded-lg border text-sm font-bold transition-all duration-200 shadow-sm",
+                        hasMedicalAid
+                          ? "bg-[var(--hh-green-light)] border-[#a3d4b2] text-[var(--hh-green-dark)] ring-2 ring-[var(--hh-green-light)]"
+                          : "bg-white border-[var(--hh-border)] text-slate-700 hover:bg-slate-50"
                       )}
-                    </div>
-                    );
-                  })}
+                      onClick={() => form.setValue("has_medical_aid", true)}
+                    >
+                      Yes, I have medical aid
+                    </button>
+                    <button
+                      type="button"
+                      className={cn(
+                        "flex-1 min-h-12 rounded-lg border text-sm font-bold transition-all duration-200 shadow-sm",
+                        !hasMedicalAid
+                          ? "bg-slate-100 border-slate-300 text-slate-800 ring-2 ring-slate-100"
+                          : "bg-white border-[var(--hh-border)] text-slate-700 hover:bg-slate-50"
+                      )}
+                      onClick={() => {
+                        form.setValue("has_medical_aid", false);
+                        form.setValue("medical_aid_company", "");
+                        form.setValue("medical_aid_id_number", "");
+                        form.setValue("medical_aid_membership_ownership", "self");
+                      }}
+                    >
+                      No, I do not have medical aid
+                    </button>
+                  </div>
                 </div>
+
+                {hasMedicalAid && (
+                  <div className="grid gap-5 rounded-lg border border-[var(--hh-border)] bg-[#fdfdfd] p-5 shadow-sm animate-in fade-in slide-in-from-top-3 duration-200">
+                    <div className={twoColumn}>
+                      {/* Organization Dropdown with inline Add Company button */}
+                      <div className={fieldClass}>
+                        <div className="flex items-center justify-between">
+                          <Label>Medical Aid Company</Label>
+                          <button
+                            type="button"
+                            onClick={() => setIsAddingCompany(true)}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-[var(--hh-purple)] hover:underline"
+                          >
+                            <Plus size={13} /> Add new company
+                          </button>
+                        </div>
+                        <Select {...form.register("medical_aid_company")}>
+                          <option value="">Select medical aid company</option>
+                          {partnerCompanies.map((company) => (
+                            <option key={company.id} value={String(company.id)}>
+                              {company.name}
+                            </option>
+                          ))}
+                        </Select>
+                        <FieldError message={errors.medical_aid_company?.message} />
+                      </div>
+
+                      {/* Membership ID */}
+                      <div className={fieldClass}>
+                        <Label>Membership ID Number</Label>
+                        <Input placeholder="e.g. MED-839210-93" {...form.register("medical_aid_id_number")} />
+                        <FieldError message={errors.medical_aid_id_number?.message} />
+                      </div>
+                    </div>
+
+                    <div className={twoColumn}>
+                      {/* Membership Ownership */}
+                      <div className={fieldClass}>
+                        <Label>Membership Ownership</Label>
+                        <Select {...form.register("medical_aid_membership_ownership")}>
+                          <option value="self">Self (Patient is the principal member)</option>
+                          <option value="other">Other (Dependent / Other principal member)</option>
+                        </Select>
+                        <FieldError message={errors.medical_aid_membership_ownership?.message} />
+                      </div>
+                    </div>
+
+                    {medicalAidOwnership === "other" && (
+                      <div className="grid gap-4 border-t border-[var(--hh-border)] pt-4 mt-2 animate-in fade-in slide-in-from-top-3 duration-200">
+                        <h4 className="text-sm font-bold text-slate-800">Principal Member Details</h4>
+                        <div className={threeColumn}>
+                          <div className={fieldClass}>
+                            <Label>Full Names</Label>
+                            <Input placeholder="John Doe" {...form.register("medical_aid_owner_full_name")} />
+                            <FieldError message={errors.medical_aid_owner_full_name?.message} />
+                          </div>
+                          <div className={fieldClass}>
+                            <Label>National / Passport ID</Label>
+                            <Input placeholder="ID or Passport Number" {...form.register("medical_aid_owner_national_id")} />
+                            <FieldError message={errors.medical_aid_owner_national_id?.message} />
+                          </div>
+                          <div className={fieldClass}>
+                            <Label>Relationship</Label>
+                            <Input placeholder="e.g. Spouse, Parent, Guardian" {...form.register("medical_aid_owner_relationship")} />
+                            <FieldError message={errors.medical_aid_owner_relationship?.message} />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
+
+              {/* Inline Dialog for Company Creation */}
+              <Dialog open={isAddingCompany} onOpenChange={setIsAddingCompany}>
+                <DialogContent className="sm:max-w-md">
+                  <div className="p-6">
+                    <DialogTitle className="text-lg font-bold flex items-center gap-2">
+                      <Building className="text-[var(--hh-purple)]" size={20} /> Register Partner Company
+                    </DialogTitle>
+                    <DialogDescription className="text-sm text-slate-500 mt-1">
+                      Add a new partner company under the medical aid category. This will instantly select it for the patient.
+                    </DialogDescription>
+                    <div className="grid gap-4 mt-5">
+                      <div className={fieldClass}>
+                        <Label>Company Legal Name <span className="text-red-500">*</span></Label>
+                        <Input
+                          placeholder="e.g. Swaziland Medisave"
+                          value={newCompanyName}
+                          onChange={(e) => setNewCompanyName(e.target.value)}
+                        />
+                      </div>
+                      <div className={fieldClass}>
+                        <Label>Email (Optional)</Label>
+                        <Input
+                          type="email"
+                          placeholder="e.g. support@medisave.sz"
+                          value={newCompanyEmail}
+                          onChange={(e) => setNewCompanyEmail(e.target.value)}
+                        />
+                      </div>
+                      <div className={fieldClass}>
+                        <Label>Phone Number (Optional)</Label>
+                        <Input
+                          placeholder="e.g. +268 2404 0000"
+                          value={newCompanyPhone}
+                          onChange={(e) => setNewCompanyPhone(e.target.value)}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end gap-3 mt-6">
+                      <DialogClose asChild>
+                        <Button type="button" variant="secondary">Cancel</Button>
+                      </DialogClose>
+                      <LoadingButton
+                        type="button"
+                        onClick={async () => {
+                          if (!newCompanyName.trim()) {
+                            toast.error("Company Name is required.");
+                            return;
+                          }
+                          setIsSavingCompany(true);
+                          try {
+                            const response = await fetch("/api/partner-companies/", {
+                              method: "POST",
+                              headers: { "Content-Type": "application/json" },
+                              body: JSON.stringify({
+                                name: newCompanyName.trim(),
+                                category: "medical_aid",
+                                email: newCompanyEmail.trim(),
+                                phone_number: newCompanyPhone.trim(),
+                              }),
+                            });
+                            const data = await response.json();
+                            if (response.ok) {
+                              toast.success(`Partner company '${newCompanyName}' added successfully.`);
+                              setPartnerCompanies((prev) => [...prev, data]);
+                              form.setValue("medical_aid_company", String(data.id));
+                              setNewCompanyName("");
+                              setNewCompanyEmail("");
+                              setNewCompanyPhone("");
+                              setIsAddingCompany(false);
+                            } else {
+                              const errorMsg = data.detail || (data.name ? data.name[0] : "Failed to save partner company.");
+                              toast.error(errorMsg);
+                            }
+                          } catch (err) {
+                            toast.error("Failed to add partner company inline.");
+                          } finally {
+                            setIsSavingCompany(false);
+                          }
+                        }}
+                        loading={isSavingCompany}
+                        loadingText="Creating..."
+                      >
+                        Add Company
+                      </LoadingButton>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
             </div>
 
             <div className={cn(activeStep.id === "review" ? "block" : "hidden")}>

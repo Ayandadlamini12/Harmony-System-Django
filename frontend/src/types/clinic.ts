@@ -36,6 +36,14 @@ export type Patient = {
   next_of_kin_email?: string;
   next_of_kin_relationship?: string;
   next_of_kin_relationship_other?: string;
+  has_medical_aid?: boolean;
+  medical_aid_company?: number | null;
+  medical_aid_company_name?: string | null;
+  medical_aid_membership_ownership?: "self" | "other";
+  medical_aid_owner_full_name?: string;
+  medical_aid_owner_national_id?: string;
+  medical_aid_owner_relationship?: string;
+  medical_aid_id_number?: string;
   status: string;
   consent_status?: "pending" | "generated" | "signed" | "verified";
   last_visit_date?: string | null;

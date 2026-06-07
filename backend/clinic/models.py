@@ -54,6 +54,27 @@ class Patient(TimeStampedModel):
     region = models.CharField(max_length=120, blank=True)
     town_or_locality = models.CharField(max_length=120, blank=True)
     village = models.CharField(max_length=120, blank=True)
+
+    # Medical Aid Section
+    has_medical_aid = models.BooleanField(default=False)
+    medical_aid_company = models.ForeignKey(
+        "PartnerCompany",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="medical_aid_patients",
+    )
+    medical_aid_membership_ownership = models.CharField(
+        max_length=20,
+        default="self",
+        blank=True,
+        choices=[("self", "Self"), ("other", "Other")],
+    )
+    medical_aid_owner_full_name = models.CharField(max_length=255, blank=True)
+    medical_aid_owner_national_id = models.CharField(max_length=100, blank=True)
+    medical_aid_owner_relationship = models.CharField(max_length=80, blank=True)
+    medical_aid_id_number = models.CharField(max_length=100, blank=True)
+
     status = models.CharField(max_length=30, default="active")
     consent_status = models.CharField(max_length=30, choices=ConsentStatus.choices, default=ConsentStatus.PENDING)
     is_deleted = models.BooleanField(default=False)

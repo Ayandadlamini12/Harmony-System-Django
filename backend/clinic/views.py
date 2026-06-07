@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
 from .document_generation import consent_document_reference, generate_consent_pdf, render_consent_html, save_consent_pdf, sign_consent_document
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, Vital, VisitSymptomProblem
 from .serializers import (
     AuditLogSerializer,
     AppointmentSerializer,
@@ -595,6 +595,22 @@ class VisitViewSet(viewsets.ModelViewSet):
             before_data=before_data,
             details="Visit record deleted.",
         )
+
+    @action(detail=True, methods=["post"], url_path=r"resolve-symptom/(?P<symptom_id>\d+)")
+    def resolve_symptom(self, request, pk=None, symptom_id=None):
+        visit = self.get_object()
+        problem = get_object_or_404(VisitSymptomProblem, id=symptom_id, patient=visit.patient)
+        problem.mark_resolved(visit=visit)
+        
+        # Log audit log
+        write_audit_log(
+            request=request,
+            action="update",
+            instance=problem,
+            entity_type="visit_symptom_problem",
+            details=f"Symptom problem resolved in visit {visit.id}.",
+        )
+        return Response({"status": "resolved", "symptom_id": problem.id})
 
 
 class CaseViewSet(viewsets.ModelViewSet):

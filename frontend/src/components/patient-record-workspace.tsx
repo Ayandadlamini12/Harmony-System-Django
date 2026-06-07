@@ -402,7 +402,7 @@ export function PatientRecordWorkspace({ patient: initialPatient, canCreateVisit
           {/* Dynamic Tab panels */}
           <section className="grid gap-5">
             {activeTab === "overview" && <OverviewTab patient={patient} latestVisit={latestVisit} latestVitals={latestVitals} profile={profile} />}
-            {activeTab === "cases" && <CasesTab patientId={patient.id} initialCases={initialCases} />}
+            {activeTab === "cases" && <CasesTab patient={patient} onUpdatePatient={setPatient} />}
             {activeTab === "assessments" && <AssessmentsTab visits={patient.visits || []} cases={initialCases} />}
             {activeTab === "diagnosis" && <DiagnosisTab visits={patient.visits || []} cases={initialCases} clinicalAccess={patient.clinical_access} />}
             {activeTab === "remedies" && <RemediesTab visits={patient.visits || []} cases={initialCases} />}
@@ -462,214 +462,228 @@ function OverviewTab({ patient, latestVisit, latestVitals, profile }: { patient:
 
 
 
-function CasesTab({ patientId, initialCases }: { patientId: number; initialCases: Case[] }) {
-  const [cases, setCases] = useState<Case[]>(initialCases || []);
+function CasesTab({ patient, onUpdatePatient }: { patient: Patient; onUpdatePatient: (updated: Patient) => void }) {
   const [expandedId, setExpandedId] = useState<number | null>(null);
   const [resolvingId, setResolvingId] = useState<number | null>(null);
 
-  async function resolveCase(caseItem: Case) {
-    setResolvingId(caseItem.id);
+  const visits = patient.visits || [];
+
+  async function resolveSymptom(visitId: number, symptomId: number) {
+    setResolvingId(symptomId);
     try {
-      const res = await fetch(`/api/cases/${caseItem.id}/resolve/`, {
+      const res = await fetch(`/api/visits/${visitId}/resolve-symptom/${symptomId}`, {
         method: "POST",
-        credentials: "include",
         headers: { "Content-Type": "application/json" },
       });
       if (!res.ok) throw new Error();
-      const data = await res.json();
-      const ids: number[] = data.resolved_ids || [caseItem.id];
-      setCases((prev) =>
-        prev.map((c) =>
-          ids.includes(c.id) ? { ...c, status: "resolved" as const } : c
-        )
-      );
-      toast.success("Case resolved");
-    } catch {
-      showActionError({
-        title: "Case could not be resolved",
-        message: "Could not resolve case."
+
+      const updatedVisits = visits.map((v) => {
+        const updatedSymptoms = (v.symptom_problems || []).map((s) => {
+          if (s.id === symptomId) {
+            return {
+              ...s,
+              status: "resolved" as const,
+              resolved_at: new Date().toISOString(),
+            };
+          }
+          return s;
+        });
+        return {
+          ...v,
+          symptom_problems: updatedSymptoms,
+        };
       });
+
+      onUpdatePatient({
+        ...patient,
+        visits: updatedVisits,
+      });
+
+      toast.success("Symptom resolved successfully!");
+    } catch (err) {
+      toast.error("Could not resolve symptom.");
     } finally {
       setResolvingId(null);
     }
   }
 
   return (
-    <ClinicalPanel title="Patient cases" icon={<ClipboardList size={17} />}>
-      {cases.length === 0 ? (
-        <div className="rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-6 text-center">
-          <p className="text-sm font-bold text-[#66736d]">No cases recorded yet</p>
-          <p className="mt-1 text-sm leading-6 text-[#66736d]">Click "New Case" above to create the first clinical case for this patient.</p>
+    <ClinicalPanel title="Patient cases (Encounters & Symptoms)" icon={<ClipboardList size={17} />}>
+      {visits.length === 0 ? (
+        <div className="rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-6 text-center animate-fade-in">
+          <p className="text-sm font-bold text-[#66736d]">No visits recorded yet</p>
+          <p className="mt-1 text-sm leading-6 text-[#66736d]">Please check in the patient to start a clinical visit.</p>
         </div>
       ) : (
         <div className="divide-y divide-[var(--hh-border)]">
-          {cases.map((caseItem) => {
-            const isExpanded = expandedId === caseItem.id;
+          {visits.map((visit) => {
+            const isExpanded = expandedId === visit.id;
+            const visitSymptoms = (visit.symptom_problems || []).filter(
+              (s) => s.opened_visit === visit.id
+            );
+            const hasOpenSymptoms = visitSymptoms.some((s) => s.status === "open");
+            const visitStatus = hasOpenSymptoms ? "open" : "resolved";
+
             return (
-              <div key={caseItem.id} className="py-4 first:pt-0 last:pb-0">
+              <div key={visit.id} className="py-4 first:pt-0 last:pb-0 animate-fade-in">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       <button
                         type="button"
-                        className="cursor-pointer text-left font-bold hover:text-[var(--hh-purple)] text-sm sm:text-base"
-                        onClick={() => setExpandedId(isExpanded ? null : caseItem.id)}
+                        className="cursor-pointer text-left font-bold hover:text-[var(--hh-purple)] text-sm sm:text-base text-[var(--hh-purple-dark)] transition-colors duration-150"
+                        onClick={() => setExpandedId(isExpanded ? null : visit.id)}
                       >
-                        {caseItem.title}
+                        {visit.main_complaint || `Visit on ${formatDate(visit.visit_date)}`}
                       </button>
-                      <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-bold uppercase ${
-                        caseItem.status === "open"
-                          ? "bg-[#fef3c7] text-[#92400e]"
-                          : "bg-[#d1fae5] text-[#065f46]"
-                      }`}>
-                        {caseItem.status}
+                      <span
+                        className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-2xs font-extrabold uppercase tracking-wider border shadow-2xs ${
+                          visitStatus === "open"
+                            ? "bg-amber-50 text-amber-700 border-amber-200 animate-pulse"
+                            : "bg-emerald-50 text-emerald-700 border-emerald-200"
+                        }`}
+                      >
+                        {visitStatus === "open" ? "Open" : "Resolved"}
                       </span>
-                      {caseItem.parent_case && (
-                        <span className="inline-flex items-center rounded-full bg-[#e0e7ff] px-2 py-0.5 text-xs font-bold uppercase text-[#3730a3]">
-                          Follow-up
+                      <span className="inline-flex items-center rounded-full bg-slate-50 border border-slate-200 px-2.5 py-0.5 text-2xs font-bold uppercase tracking-wider text-slate-600">
+                        {visit.visit_type.replaceAll("_", " ")}
+                      </span>
+                    </div>
+                    <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#66736d]">
+                      <span>{formatDate(visit.visit_date)}</span>
+                      {visit.diagnosis && (
+                        <span className="font-semibold text-slate-700">
+                          Diagnosis: {visit.diagnosis}
                         </span>
                       )}
                     </div>
-                    <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-[#66736d]">
-                      <span>{formatDate(caseItem.visit_date || caseItem.created_at)}</span>
-                      {caseItem.patient_name && <span>Patient: {caseItem.patient_name}</span>}
-                      {caseItem.diagnosis && <span>Diagnosis: {caseItem.diagnosis}</span>}
-                    </div>
                   </div>
-                  <div className="flex shrink-0 gap-1">
-                    {caseItem.status === "open" && (
-                      <>
-                        <Button asChild variant="secondary" size="sm">
-                          <Link href={`/visits/new?patient=${patientId}&type=follow_up`}>
-                            Follow-up
-                          </Link>
-                        </Button>
-                        {!caseItem.parent_case && (
-                          <Button size="sm" onClick={() => resolveCase(caseItem)} disabled={resolvingId === caseItem.id}>
-                            {resolvingId === caseItem.id ? "..." : "Resolve"}
-                          </Button>
-                        )}
-                      </>
-                    )}
+                  <div className="flex shrink-0 items-center gap-1">
                     <button
                       type="button"
-                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#53605a] hover:bg-white"
-                      onClick={() => setExpandedId(isExpanded ? null : caseItem.id)}
+                      className="flex h-8 w-8 items-center justify-center rounded-lg text-[#53605a] hover:bg-slate-100 active:scale-95 transition-all duration-150"
+                      onClick={() => setExpandedId(isExpanded ? null : visit.id)}
                     >
-                      {isExpanded ? <ChevronUp size={15} /> : <ChevronDown size={15} />}
+                      {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
                     </button>
                   </div>
                 </div>
+
                 {isExpanded && (
-                  <div className="mt-3 grid gap-3 rounded-lg border border-[var(--hh-border)] bg-[#f7faf8] p-4">
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {caseItem.main_complaint && (
-                        <div>
-                          <div className="text-xs font-bold uppercase text-[#66736d]">Main complaint</div>
-                          <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.main_complaint}</div>
-                        </div>
-                      )}
-                      {caseItem.physical_examination && (
-                        <div>
-                          <div className="text-xs font-bold uppercase text-[#66736d]">Physical examination</div>
-                          <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.physical_examination}</div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      {caseItem.diagnosis && (
-                        <div>
-                          <div className="text-xs font-bold uppercase text-[#66736d]">Diagnosis</div>
-                          <div className="mt-0.5 text-sm font-bold text-[#1f2933]">{caseItem.diagnosis}</div>
-                        </div>
-                      )}
-                      {caseItem.remedy && (
-                        <div>
-                          <div className="text-xs font-bold uppercase text-[#66736d]">Remedy</div>
-                          <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.remedy}</div>
-                        </div>
-                      )}
-                    </div>
-                    {caseItem.reason_for_remedy && (
+                  <div className="mt-4 grid gap-4 rounded-xl border border-[var(--hh-border)] bg-[#f7faf8] p-4 transition-all duration-300 animate-slide-down">
+                    <div className="grid gap-3 sm:grid-cols-2 border-b border-[var(--hh-border)] pb-3">
                       <div>
-                        <div className="text-xs font-bold uppercase text-[#66736d]">Reason for remedy</div>
-                        <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.reason_for_remedy}</div>
-                      </div>
-                    )}
-                    {(caseItem.dietary_recommendation || caseItem.lifestyle_recommendation) && (
-                      <div className="grid gap-3 sm:grid-cols-2">
-                        {caseItem.dietary_recommendation && (
-                          <div>
-                            <div className="text-xs font-bold uppercase text-[#66736d]">Dietary recommendation</div>
-                            <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.dietary_recommendation}</div>
-                          </div>
-                        )}
-                        {caseItem.lifestyle_recommendation && (
-                          <div>
-                            <div className="text-xs font-bold uppercase text-[#66736d]">Lifestyle recommendation</div>
-                            <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.lifestyle_recommendation}</div>
+                        <div className="text-3xs font-extrabold uppercase tracking-widest text-slate-400">Main complaint / History</div>
+                        <div className="mt-1 text-sm text-[#1f2933] leading-relaxed font-medium">
+                          {visit.main_complaint || "No primary complaint details logged."}
+                        </div>
+                        {visit.initial_complaints && (
+                          <div className="mt-1.5 text-xs text-[#53605a] italic">
+                            {visit.initial_complaints}
                           </div>
                         )}
                       </div>
-                    )}
-                    {(caseItem.previous_consult_symptoms || caseItem.dietary_changes || caseItem.lifestyle_changes || caseItem.exercise_notes || caseItem.energy_notes || caseItem.evaluation_notes) && (
-                      <>
-                        <div className="border-t border-[var(--hh-border)] pt-3">
-                          <div className="mb-2 text-xs font-bold uppercase text-[var(--hh-purple)]">
-                            Follow-up evaluation
-                          </div>
-                          <div className="grid gap-3 sm:grid-cols-2">
-                            {caseItem.previous_consult_symptoms && (
-                              <div>
-                                <div className="text-xs font-bold uppercase text-[#66736d]">Previous symptoms</div>
-                                <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.previous_consult_symptoms}</div>
-                              </div>
-                            )}
-                            {caseItem.dietary_changes && (
-                              <div>
-                                <div className="text-xs font-bold uppercase text-[#66736d]">Dietary changes</div>
-                                <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.dietary_changes}</div>
-                              </div>
-                            )}
-                            {caseItem.lifestyle_changes && (
-                              <div>
-                                <div className="text-xs font-bold uppercase text-[#66736d]">Lifestyle changes</div>
-                                <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.lifestyle_changes}</div>
-                              </div>
-                            )}
-                            {caseItem.exercise_notes && (
-                              <div>
-                                <div className="text-xs font-bold uppercase text-[#66736d]">Exercise notes</div>
-                                <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.exercise_notes}</div>
-                              </div>
-                            )}
-                            {caseItem.energy_notes && (
-                              <div>
-                                <div className="text-xs font-bold uppercase text-[#66736d]">Energy notes</div>
-                                <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.energy_notes}</div>
-                              </div>
-                            )}
-                            {caseItem.evaluation_notes && (
-                              <div>
-                                <div className="text-xs font-bold uppercase text-[#66736d]">Evaluation notes</div>
-                                <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.evaluation_notes}</div>
-                              </div>
-                            )}
-                          </div>
+                      {visit.physical_examination && (
+                        <div>
+                          <div className="text-3xs font-extrabold uppercase tracking-widest text-slate-400">Physical examination</div>
+                          <div className="mt-1 text-sm text-[#1f2933] leading-relaxed font-medium">{visit.physical_examination}</div>
                         </div>
-                      </>
-                    )}
-                    {caseItem.notes && (
-                      <div>
-                        <div className="text-xs font-bold uppercase text-[#66736d]">Additional notes</div>
-                        <div className="mt-0.5 text-sm text-[#1f2933]">{caseItem.notes}</div>
+                      )}
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-2 border-b border-[var(--hh-border)] pb-3">
+                      {visit.diagnosis && (
+                        <div>
+                          <div className="text-3xs font-extrabold uppercase tracking-widest text-slate-400">Diagnosis</div>
+                          <div className="mt-1 text-sm font-extrabold text-[var(--hh-purple-dark)]">{visit.diagnosis}</div>
+                        </div>
+                      )}
+                      {visit.remedy && (
+                        <div>
+                          <div className="text-3xs font-extrabold uppercase tracking-widest text-slate-400">Remedy / Treatment</div>
+                          <div className="mt-1 text-sm font-semibold text-emerald-800">{visit.remedy}</div>
+                        </div>
+                      )}
+                    </div>
+
+                    {(visit.dietary_recommendation || visit.lifestyle_recommendation) && (
+                      <div className="grid gap-3 sm:grid-cols-2 border-b border-[var(--hh-border)] pb-3">
+                        {visit.dietary_recommendation && (
+                          <div>
+                            <div className="text-3xs font-extrabold uppercase tracking-widest text-slate-400">Dietary recommendations</div>
+                            <div className="mt-1 text-sm text-[#1f2933]">{visit.dietary_recommendation}</div>
+                          </div>
+                        )}
+                        {visit.lifestyle_recommendation && (
+                          <div>
+                            <div className="text-3xs font-extrabold uppercase tracking-widest text-slate-400">Lifestyle recommendations</div>
+                            <div className="mt-1 text-sm text-[#1f2933]">{visit.lifestyle_recommendation}</div>
+                          </div>
+                        )}
                       </div>
                     )}
-                    {caseItem.resolved_at && (
-                      <div className="rounded-lg border border-[#d1fae5] bg-[#ecfdf5] p-3">
-                        <div className="text-xs font-bold uppercase text-[#065f46]">Resolved on {formatDate(caseItem.resolved_at)}</div>
+
+                    <div>
+                      <div className="mb-2.5 text-2xs font-extrabold uppercase tracking-wider text-[var(--hh-purple)]">
+                        Logged Symptoms & Clinical Problems
                       </div>
-                    )}
+                      {visitSymptoms.length === 0 ? (
+                        <div className="text-xs text-[#66736d] italic bg-white/60 border border-dashed border-slate-200 rounded-lg p-3 text-center">
+                          No specific clinical symptoms or problems were registered for this visit.
+                        </div>
+                      ) : (
+                        <div className="space-y-2">
+                          {visitSymptoms.map((symptom) => (
+                            <div
+                              key={symptom.id}
+                              className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 rounded-lg border border-slate-100 bg-white p-3 shadow-2xs hover:border-slate-200 transition-colors duration-150"
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <span className="font-bold text-slate-800 text-sm">{symptom.description}</span>
+                                  <span
+                                    className={`inline-flex items-center rounded-full px-2 py-0.5 text-3xs font-extrabold uppercase ${
+                                      symptom.status === "open"
+                                        ? "bg-amber-50 text-amber-700 border border-amber-200"
+                                        : "bg-emerald-50 text-emerald-700 border border-emerald-200"
+                                    }`}
+                                  >
+                                    {symptom.status}
+                                  </span>
+                                </div>
+                                {symptom.note && (
+                                  <p className="mt-1 text-xs text-slate-500 font-medium">
+                                    <span className="text-slate-400 font-semibold">Note:</span> {symptom.note}
+                                  </p>
+                                )}
+                                {symptom.status === "resolved" && symptom.resolved_at && (
+                                  <p className="mt-1 text-3xs text-emerald-600 font-bold">
+                                    ✓ Resolved on {formatDate(symptom.resolved_at)}
+                                  </p>
+                                )}
+                              </div>
+                              {symptom.status === "open" && (
+                                <div className="shrink-0 sm:self-center">
+                                  <Button
+                                    size="sm"
+                                    onClick={() => resolveSymptom(visit.id, symptom.id)}
+                                    disabled={resolvingId === symptom.id}
+                                    className="h-8 rounded-lg bg-emerald-600 px-3.5 text-xs font-bold text-white hover:bg-emerald-700 active:scale-95 transition-all duration-150 flex items-center gap-1.5 shadow-2xs"
+                                  >
+                                    {resolvingId === symptom.id ? (
+                                      <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                    ) : (
+                                      <Check size={14} className="stroke-[3]" />
+                                    )}
+                                    Resolve
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>

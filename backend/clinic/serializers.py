@@ -684,6 +684,7 @@ class PatientListSerializer(serializers.ModelSerializer):
     last_visit_date = serializers.SerializerMethodField()
     current_journey = serializers.SerializerMethodField()
     consent_status = serializers.SerializerMethodField()
+    medical_aid_company_name = serializers.CharField(source="medical_aid_company.name", read_only=True)
 
     class Meta:
         model = Patient
@@ -716,6 +717,14 @@ class PatientListSerializer(serializers.ModelSerializer):
             "next_of_kin_email",
             "next_of_kin_relationship",
             "next_of_kin_relationship_other",
+            "has_medical_aid",
+            "medical_aid_company",
+            "medical_aid_company_name",
+            "medical_aid_membership_ownership",
+            "medical_aid_owner_full_name",
+            "medical_aid_owner_national_id",
+            "medical_aid_owner_relationship",
+            "medical_aid_id_number",
             "status",
             "consent_status",
             "last_visit_date",
