@@ -1,0 +1,823 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Harmony Health — Future Clinical Workspace Designs Proposal</title>
+  <!-- Google Fonts: Inter & Outfit -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;700;800&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --hh-purple: #7030A0;
+      --hh-purple-dark: #3f1d58;
+      --hh-purple-light: #F4EEF8;
+      --hh-green: #115e59;
+      --hh-green-light: #eafaf1;
+      --hh-green-dark: #115e59;
+      --hh-accent-emerald: #50B860;
+      --hh-red: #E74C3C;
+      --hh-text: #2B2F38;
+      --hh-soft: #F3F8F4;
+      --hh-surface: #FFFFFF;
+      --hh-section: #F7FBF8;
+      --hh-border: #B8CABE;
+      --hh-border-strong: #9EB4A8;
+      --shadow-premium: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 10px 15px -3px rgba(0, 0, 0, 0.03), 0 20px 25px -5px rgba(0, 0, 0, 0.01), 0 30px 50px -10px rgba(0, 0, 0, 0.02);
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      color: var(--hh-text);
+      background: 
+        radial-gradient(circle at top left, rgba(80, 184, 96, 0.06), transparent 45rem),
+        radial-gradient(circle at top right, rgba(112, 48, 160, 0.05), transparent 45rem),
+        linear-gradient(180deg, #f7fbf8 0%, var(--hh-soft) 100%);
+      line-height: 1.6;
+      padding-bottom: 5rem;
+    }
+
+    .container {
+      max-width: 64rem;
+      margin: 0 auto;
+      padding: 2.5rem 1.5rem;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--hh-purple-dark) 0%, #1a0826 100%);
+      color: #fff;
+      padding: 3rem 2.5rem;
+      border-radius: 20px;
+      margin-bottom: 2.5rem;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 10px 30px rgba(72, 29, 100, 0.15);
+    }
+
+    header::before {
+      content: "";
+      position: absolute;
+      top: -50%;
+      right: -20%;
+      width: 40rem;
+      height: 40rem;
+      background: radial-gradient(circle, rgba(80, 184, 96, 0.15) 0%, transparent 60%);
+      pointer-events: none;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .header-logo svg {
+      color: var(--hh-accent-emerald);
+    }
+
+    .header-logo span {
+      font-family: 'Outfit', sans-serif;
+      font-weight: 800;
+      font-size: 1.5rem;
+      letter-spacing: -0.03em;
+    }
+
+    .header-badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.1);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      padding: 0.35rem 0.75rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 1rem;
+      color: var(--hh-green-light);
+    }
+
+    h1 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 2.3rem;
+      font-weight: 700;
+      line-height: 1.2;
+      margin-bottom: 0.75rem;
+      letter-spacing: -0.02em;
+    }
+
+    .lead {
+      font-size: 1.1rem;
+      color: rgba(255, 255, 255, 0.85);
+      max-width: 45rem;
+    }
+
+    h2 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.5rem;
+      font-weight: 700;
+      color: var(--hh-purple-dark);
+      margin-bottom: 1.25rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      border-bottom: 2px solid var(--hh-purple-light);
+      padding-bottom: 0.5rem;
+    }
+
+    h3 {
+      font-family: 'Outfit', sans-serif;
+      font-size: 1.15rem;
+      font-weight: 700;
+      color: var(--hh-purple-dark);
+      margin-bottom: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.4rem;
+    }
+
+    p {
+      margin-bottom: 1rem;
+      font-size: 0.95rem;
+      color: #4a504c;
+    }
+
+    .card {
+      background: var(--hh-surface);
+      border: 1px solid #e1ebe2;
+      border-radius: 16px;
+      padding: 2rem;
+      margin-bottom: 2.5rem;
+      box-shadow: var(--shadow-premium);
+    }
+
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+
+    @media (min-width: 768px) {
+      .grid-2 {
+        grid-template-columns: 1fr 1fr;
+      }
+    }
+
+    .phase-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      padding: 0.25rem 0.65rem;
+      border-radius: 9999px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      margin-bottom: 1rem;
+    }
+
+    .phase-completed {
+      background: var(--hh-green-light);
+      color: var(--hh-green-dark);
+      border: 1px solid #a3e4d7;
+    }
+
+    .phase-future {
+      background: #FFF9E6;
+      color: #D97706;
+      border: 1px solid #FDE68A;
+    }
+
+    /* Tab Showcase Blocks */
+    .tab-item {
+      border: 1px solid #e2ece4;
+      border-radius: 12px;
+      padding: 1.5rem;
+      background: var(--hh-surface);
+      transition: all 150ms ease;
+    }
+
+    .tab-item:hover {
+      border-color: var(--hh-purple);
+      box-shadow: 0 4px 12px rgba(112, 48, 160, 0.05);
+    }
+
+    .feature-list {
+      list-style-type: none;
+      margin-top: 0.75rem;
+    }
+
+    .feature-list li {
+      position: relative;
+      padding-left: 1.25rem;
+      margin-bottom: 0.5rem;
+      font-size: 0.875rem;
+      color: #4e5551;
+    }
+
+    .feature-list li::before {
+      content: "•";
+      position: absolute;
+      left: 0.25rem;
+      color: var(--hh-purple);
+      font-weight: bold;
+      font-size: 1.1rem;
+      top: -0.1rem;
+    }
+
+    .feature-list.completed li::before {
+      content: "✓";
+      color: var(--hh-accent-emerald);
+      font-size: 0.8rem;
+      top: 0.1rem;
+    }
+
+    .text-muted {
+      color: #66736d;
+    }
+
+    /* Sandbox CSS */
+    .sandbox-container {
+      background: #11141a;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #2d313d;
+      margin-top: 1.5rem;
+    }
+
+    .sandbox-header {
+      background: #1e222b;
+      padding: 1rem 1.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-bottom: 1px solid #2d313d;
+    }
+
+    .sandbox-title {
+      color: #e2e8f0;
+      font-size: 0.85rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .sandbox-tag {
+      background: var(--hh-purple);
+      color: #fff;
+      font-size: 0.7rem;
+      padding: 0.2rem 0.5rem;
+      border-radius: 4px;
+      font-weight: 700;
+    }
+
+    .sandbox-layout {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 1.5rem;
+      padding: 1.5rem;
+    }
+
+    @media (min-width: 768px) {
+      .sandbox-layout {
+        grid-template-columns: 3fr 2fr;
+      }
+    }
+
+    /* Body Map Canvas */
+    .bodymap-canvas {
+      background: #181c24;
+      border: 1px solid #2d313d;
+      border-radius: 12px;
+      min-height: 380px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      cursor: crosshair;
+      user-select: none;
+    }
+
+    .bodymap-title {
+      position: absolute;
+      top: 1rem;
+      left: 1rem;
+      font-size: 0.75rem;
+      color: #94a3b8;
+      background: rgba(15, 23, 42, 0.6);
+      padding: 0.25rem 0.5rem;
+      border-radius: 4px;
+      border: 1px solid #334155;
+    }
+
+    .bodymap-svg-container {
+      width: 140px;
+      height: 300px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      position: relative;
+    }
+
+    .bodymap-svg {
+      width: 100%;
+      height: 100%;
+      fill: none;
+      stroke: #475569;
+      stroke-width: 2.5;
+      transition: all 150ms ease;
+    }
+
+    /* Map spots */
+    .map-spot {
+      position: absolute;
+      width: 14px;
+      height: 14px;
+      background: rgba(239, 68, 68, 0.45);
+      border: 2px solid #ef4444;
+      border-radius: 9999px;
+      transform: translate(-50%, -50%);
+      cursor: pointer;
+      animation: pulseSpot 2s infinite;
+      box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+    }
+
+    .map-spot:hover {
+      background: #ef4444;
+      scale: 1.2;
+      box-shadow: 0 0 15px #ef4444;
+    }
+
+    @keyframes pulseSpot {
+      0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.7); }
+      70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
+    }
+
+    /* Body Map Sidebar Details */
+    .bodymap-sidebar {
+      background: #181c24;
+      border: 1px solid #2d313d;
+      border-radius: 12px;
+      padding: 1.25rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+
+    .detail-card {
+      background: #1e222b;
+      border: 1px solid #2d313d;
+      border-radius: 8px;
+      padding: 1rem;
+      margin-top: 1rem;
+      display: none;
+    }
+
+    .detail-card.active {
+      display: block;
+    }
+
+    .detail-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.25rem;
+    }
+
+    .detail-value {
+      color: #f8fafc;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .detail-text {
+      color: #cbd5e1;
+      font-size: 0.8rem;
+      margin-top: 0.35rem;
+    }
+
+    .bodymap-empty-state {
+      color: #64748b;
+      font-size: 0.8rem;
+      text-align: center;
+      margin: auto 0;
+    }
+
+    /* Print Leaflet CTA */
+    .btn-print-proposal {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      background: var(--hh-purple);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 0.75rem 1.5rem;
+      font-weight: 700;
+      font-size: 0.9rem;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(112, 48, 160, 0.15);
+      transition: all 150ms ease;
+    }
+
+    .btn-print-proposal:hover {
+      background: var(--hh-purple-dark);
+      box-shadow: 0 4px 12px rgba(72, 29, 100, 0.25);
+    }
+
+    .footer-actions {
+      display: flex;
+      justify-content: center;
+      margin-top: 2rem;
+    }
+
+    /* Print Specific Styling */
+    @media print {
+      body {
+        background: none;
+        color: #000;
+        padding-bottom: 0;
+      }
+
+      .container {
+        padding: 0;
+        max-width: 100%;
+      }
+
+      header {
+        background: none !important;
+        color: #000 !important;
+        border: 2px solid #000;
+        border-radius: 0;
+        box-shadow: none !important;
+        padding: 2rem;
+        page-break-after: avoid;
+      }
+
+      header h1, header .lead, header span {
+        color: #000 !important;
+      }
+
+      .header-badge {
+        display: none !important;
+      }
+
+      .card {
+        border-radius: 0;
+        box-shadow: none !important;
+        border: 1px solid #999;
+        page-break-inside: avoid;
+        margin-bottom: 2rem;
+        padding: 1.5rem;
+      }
+
+      .tab-item {
+        border-radius: 0;
+        border: 1px solid #ccc;
+        page-break-inside: avoid;
+        background: none !important;
+        box-shadow: none !important;
+      }
+
+      .btn-print-proposal, .footer-actions, .sandbox-header .sandbox-tag {
+        display: none !important;
+      }
+
+      .sandbox-container {
+        border: 1px solid #000;
+        background: none !important;
+        page-break-inside: avoid;
+      }
+
+      .sandbox-header {
+        border-bottom: 1px solid #000;
+        background: #f0f0f0 !important;
+      }
+
+      .sandbox-title {
+        color: #000 !important;
+      }
+
+      .bodymap-canvas, .bodymap-sidebar {
+        border: 1px solid #666;
+        background: none !important;
+      }
+
+      .bodymap-svg {
+        stroke: #000 !important;
+      }
+
+      .map-spot {
+        background: #000 !important;
+        border-color: #000 !important;
+        box-shadow: none !important;
+        animation: none !important;
+      }
+
+      .detail-card {
+        display: block !important;
+        border: 1px solid #000;
+        background: none !important;
+      }
+
+      .detail-value, .detail-text, .bodymap-empty-state {
+        color: #000 !important;
+      }
+
+      .bodymap-empty-state {
+        display: none;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    
+    <!-- HEADER -->
+    <header>
+      <div class="header-badge">Architecture & Design Specs</div>
+      <div class="header-logo">
+        <!-- SVG Heart Logo -->
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
+        </svg>
+        <span>Harmony Health System</span>
+      </div>
+      <h1>Future Clinical Workspace Designs</h1>
+      <p class="lead">A complete architectural proposal and stakeholder presentation for Phase 2 and Phase 3 expansion of the Harmony Patient Record Workspace.</p>
+    </header>
+
+    <!-- SECTION 1: COMPLETED UX BASELINE -->
+    <div class="card">
+      <div class="phase-badge phase-completed">Phase 1: Baseline Visual UX (Implemented)</div>
+      <h2>Current Active Upgrades</h2>
+      <p>The patient workspace tabs have been upgraded with beautiful, micro-animated visual modules that are live in production. These additions require no server changes and run with high-performance client rendering:</p>
+      
+      <div class="grid-2">
+        <div class="tab-item">
+          <h3>Overview: Critical Allergy Alert</h3>
+          <p>A glassmorphic, glowing warning card at the top of the Overview panel, rendering active clinical allergies and contraindications safely.</p>
+          <ul class="feature-list completed">
+            <li>Type-safe React boundary integrations</li>
+            <li>Double-pulse warning highlight framework</li>
+            <li>Instant visibility on clinical file loading</li>
+          </ul>
+        </div>
+
+        <div class="tab-item">
+          <h3>Vitals: Custom SVG Trend Charts</h3>
+          <p>Dual responsive chart tracking Systolic/Diastolic BP (rose-sky gradients) and Weight (emerald line) over the last 10 visits.</p>
+          <ul class="feature-list completed">
+            <li>Zero external NPM package overhead</li>
+            <li>Fully responsive with high-DPI hover guides</li>
+            <li>Immune to Next.js SSR hydration drift</li>
+          </ul>
+        </div>
+
+        <div class="tab-item">
+          <h3>Remedies: Patient Guidelines Printing</h3>
+          <p>One-click Treatment Leaflets printing. Automatically formats remedies, dietary instructions, and guidelines beautifully on a physical page.</p>
+          <ul class="feature-list completed">
+            <li>Custom CSS @media print layout profiles</li>
+            <li>Clean high-contrast typography</li>
+            <li>Isolates the leaflet text, hiding administrative UI</li>
+          </ul>
+        </div>
+
+        <div class="tab-item">
+          <h3>Notes: Clinical Handovers Bento Grid</h3>
+          <p>Structured clinical handovers arranged into themed sticky-note grids: Administrative, Pharmacological, Genetic, and Chronological notes.</p>
+          <ul class="feature-list completed">
+            <li>Highly scannable CSS Grid bento layout</li>
+            <li>Role-stamped colors (cream, sky, emerald, lavender)</li>
+            <li>Checked-state click actions for archiving</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 2: FUTURE PHASES -->
+    <div class="card">
+      <div class="phase-badge phase-future">Phase 2: Structured Clinical Tooling (Proposed Future)</div>
+      <h2>Clinical Decision Support Modules</h2>
+      <p>Phase 2 shifts from static text inputs to active decision-support elements, enabling standardized diagnostic tracking and system-by-system physical reviews.</p>
+      
+      <div class="grid-2">
+        <div class="tab-item">
+          <h3>🩺 Assessments Tab: System-by-System Exam Templates</h3>
+          <p>Transitions raw physical examination fields into physiological system accordions (HEENT, Cardiovascular, Respiratory, GI, Neuro, Skin).</p>
+          <ul class="feature-list">
+            <li><strong>Smart-Insert Chips</strong>: One-click clinical templates that automatically populate standard observations (e.g. clicking "Normal GI" inserts: <i>"Abdomen soft, non-tender, non-distended, active bowel sounds."</i>).</li>
+            <li><strong>Comparative Slider Panels</strong>: Lock historical exam reports side-by-side to review physical improvement.</li>
+          </ul>
+        </div>
+
+        <div class="tab-item">
+          <h3>🛡️ Diagnosis Tab: ICD-11 Workbench & DDx Workspace</h3>
+          <p>Integrates diagnostic coding and active case synthesis directly into the practitioner's workspace.</p>
+          <ul class="feature-list">
+            <li><strong>ICD-11 Directory Search</strong>: Auto-completing query search to tag WHO clinical codes (e.g. <i>"Essential Hypertension" - BA41</i>) onto diagnoses.</li>
+            <li><strong>Differential Diagnosis (DDx) Whiteboard</strong>: Drafting canvas to list suspect, working, and ruled-out conditions before promotion to primary.</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- SECTION 3: DIGITAL INTAKE & VISUAL MAPPING -->
+    <div class="card" style="page-break-before: always;">
+      <div class="phase-badge phase-future">Phase 3: Intake Automation & Sensory Mapping (Proposed Future)</div>
+      <h2>Structured Cabinets & Anatomical Body Mapping</h2>
+      <p>Phase 3 completes the workspace with secure intake document storage, qualitative scoring trends, and highly advanced spatial injury tracking.</p>
+      
+      <div class="grid-2">
+        <div class="tab-item">
+          <h3>📅 Follow-ups: Subjective Scores & SMS Recalls</h3>
+          <p>Charts qualitative patient progress alongside objective vital data, with recall outreach automation.</p>
+          <ul class="feature-list">
+            <li><strong>Subjective Score Trends</strong>: Tracks patient-rated metrics (Sleep, Energy, Mood, Appetite) on 1-10 timelines.</li>
+            <li><strong>Auto-Recall SMS</strong>: Compiles the next scheduled date, doctor, and symptom into pre-formatted clinic SMS/WhatsApp templates.</li>
+          </ul>
+        </div>
+
+        <div class="tab-item">
+          <h3>📁 Documents: Organized Lab Cabinets & Signature Pads</h3>
+          <p>A full digital filing cabinet organizing files into structured drawers.</p>
+          <ul class="feature-list">
+            <li><strong>Category Sub-drawers</strong>: Direct organization into Consent, Lab Reports, Radiology, and Medical Certificates.</li>
+            <li><strong>Witness signature module</strong>: On-screen digital verification captures signatures for legal, high-risk, or parental agreements.</li>
+          </ul>
+        </div>
+      </div>
+
+      <!-- VISUAL ANATOMICAL BODY MAPPING (HIGH-FIDELITY CONCEPT) -->
+      <div style="margin-top: 1.5rem; padding-top: 1.5rem; border-top: 1px solid var(--hh-purple-light);">
+        <h3>🧍 Interactive Visual Body Mapping (High-Fidelity Concept)</h3>
+        <p>This proposed module replaces textual symptom location notes with an interactive SVG anatomical coordinate map in the Assessments workspace. Doctors double-click body regions to pinpoint pain, skin lesions, or tension, mapping those exact points on chronological progress graphs.</p>
+        
+        <!-- Live Demo Playground -->
+        <div class="sandbox-container">
+          <div class="sandbox-header">
+            <div class="sandbox-title">
+              <!-- SVG Pin Icon -->
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
+              Live Conceptual Sandbox (Interactive Mockup)
+            </div>
+            <div class="sandbox-tag">Interactive HTML Preview</div>
+          </div>
+          <div class="sandbox-layout">
+            
+            <!-- Body SVG Canvas -->
+            <div class="bodymap-canvas" onclick="alertClickEmpty()">
+              <div class="bodymap-title">Anatomical Model Map (Click red spots to test)</div>
+              
+              <div class="bodymap-svg-container" onclick="event.stopPropagation()">
+                <!-- Simplified Body outline -->
+                <svg class="bodymap-svg" viewBox="0 0 100 200">
+                  <!-- Head -->
+                  <circle cx="50" cy="20" r="12" />
+                  <!-- Neck -->
+                  <line x1="50" y1="32" x2="50" y2="40" />
+                  <!-- Torso Outline -->
+                  <path d="M 35,40 L 65,40 L 60,110 L 40,110 Z" />
+                  <!-- Left Arm -->
+                  <path d="M 35,40 L 20,80 L 15,115" />
+                  <!-- Right Arm -->
+                  <path d="M 65,40 L 80,80 L 85,115" />
+                  <!-- Left Leg -->
+                  <path d="M 42,110 L 38,150 L 35,190" />
+                  <!-- Right Leg -->
+                  <path d="M 58,110 L 62,150 L 65,190" />
+                </svg>
+
+                <!-- Hotspots -->
+                <div class="map-spot" style="top: 20%; left: 50%;" onclick="selectHotspot(event, 'head')"></div>
+                <div class="map-spot" style="top: 38%; left: 35%;" onclick="selectHotspot(event, 'shoulder')"></div>
+                <div class="map-spot" style="top: 55%; left: 50%;" onclick="selectHotspot(event, 'lower-back')"></div>
+                <div class="map-spot" style="top: 75%; left: 62%;" onclick="selectHotspot(event, 'knee')"></div>
+              </div>
+            </div>
+
+            <!-- Body Map Sidebar -->
+            <div class="bodymap-sidebar">
+              <div>
+                <h3 style="color: #f1f5f9; font-size: 0.95rem; margin-bottom: 0.5rem;">Symptom Hotspot Details</h3>
+                <p style="color: #94a3b8; font-size: 0.75rem; margin-bottom: 0;">Click on any pulsing red node on the anatomical map to view registered symptoms, historical severity metrics, and remedy tracking.</p>
+              </div>
+
+              <!-- Sidebar Empty State -->
+              <div class="bodymap-empty-state" id="empty-state">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem; opacity: 0.5;"><circle cx="12" cy="12" r="10"/><path d="m15 9-6 6"/><path d="m9 9 6 6"/></svg>
+                <br>No spot selected
+              </div>
+
+              <!-- Spot Detail Cards -->
+              <div class="detail-card" id="detail-head">
+                <div class="detail-label">Coordinate Node</div>
+                <div class="detail-value">Node #01: Cranial / Frontal</div>
+                <div class="detail-text"><strong>Logged Complaint:</strong> Frontal sinus pressure & chronic headache. Catarrh is thick and yellow.</div>
+                <div class="detail-text"><strong>Timeline Severity:</strong> 7 / 10</div>
+                <div class="detail-text"><strong>Assigned Remedy:</strong> Pulsatilla 30C</div>
+              </div>
+
+              <div class="detail-card" id="detail-shoulder">
+                <div class="detail-label">Coordinate Node</div>
+                <div class="detail-value">Node #02: Left Acromioclavicular</div>
+                <div class="detail-text"><strong>Logged Complaint:</strong> Dull, radiating muscular strain from desk-work fatigue. Aggravated by cold air.</div>
+                <div class="detail-text"><strong>Timeline Severity:</strong> 5 / 10</div>
+                <div class="detail-text"><strong>Assigned Remedy:</strong> Rhus Tox 200CH</div>
+              </div>
+
+              <div class="detail-card" id="detail-lower-back">
+                <div class="detail-label">Coordinate Node</div>
+                <div class="detail-value">Node #03: Lumbar L4-L5 Region</div>
+                <div class="detail-text"><strong>Logged Complaint:</strong> Acute localized spasm upon rising from a seated position. Better with continuous walking.</div>
+                <div class="detail-text"><strong>Timeline Severity:</strong> 8 / 10</div>
+                <div class="detail-text"><strong>Assigned Remedy:</strong> Nux Vomica 200C</div>
+              </div>
+
+              <div class="detail-card" id="detail-knee">
+                <div class="detail-label">Coordinate Node</div>
+                <div class="detail-value">Node #04: Right Patella Tendon</div>
+                <div class="detail-text"><strong>Logged Complaint:</strong> Crepitus and localized mild inflammation after physical activity. Better with firm bandages.</div>
+                <div class="detail-text"><strong>Timeline Severity:</strong> 4 / 10</div>
+                <div class="detail-text"><strong>Assigned Remedy:</strong> Bryonia Alba 30C</div>
+              </div>
+
+              <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #2d313d; display: flex; justify-content: space-between; font-size: 0.75rem; color: #94a3b8;">
+                <span>Total Pinned: 4 spots</span>
+                <span>Active Filters: All</span>
+              </div>
+            </div>
+
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- PRINT CALLOUT -->
+    <div class="footer-actions">
+      <button class="btn-print-proposal" onclick="window.print()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M6 9V2h12v7"/>
+          <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/>
+          <rect x="6" y="14" width="12" height="8"/>
+        </svg>
+        Save Proposal PDF for Stakeholder Discussion
+      </button>
+    </div>
+
+  </div>
+
+  <!-- INTERACTIVE JAVASCRIPT -->
+  <script>
+    function selectHotspot(event, spotId) {
+      event.stopPropagation();
+      
+      // Hide empty state
+      document.getElementById('empty-state').style.display = 'none';
+      
+      // Hide all detail cards
+      const cards = document.querySelectorAll('.detail-card');
+      cards.forEach(card => card.classList.remove('active'));
+      
+      // Show selected card
+      const activeCard = document.getElementById('detail-' + spotId);
+      if (activeCard) {
+        activeCard.classList.add('active');
+      }
+    }
+
+    function alertClickEmpty() {
+      // Hide empty state
+      document.getElementById('empty-state').style.display = 'none';
+      
+      // Hide all detail cards
+      const cards = document.querySelectorAll('.detail-card');
+      cards.forEach(card => card.classList.remove('active'));
+      
+      // Show empty state again but with custom instructions
+      const emptyState = document.getElementById('empty-state');
+      emptyState.style.display = 'block';
+      emptyState.innerHTML = `
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-bottom: 0.5rem; opacity: 0.5;"><circle cx="12" cy="12" r="10"/><path d="M12 8v4"/><path d="M12 16h.01"/></svg>
+        <br><span style="color: #e2e8f0; font-weight:600;">Custom Pin Placement</span><br>Double-clicking empty space in the live model will create a new Node pin coordinate.
+      `;
+    }
+  </script>
+</body>
+</html>

@@ -685,16 +685,94 @@ If local Next.js renders plain HTML with no CSS after a build, stop the dev serv
 
 ## 22. Future Work Roadmap
 
-Planned or proposed:
+The Harmony Health MIS clinical workspace is designed to transition from a basic electronic health record (EHR) into an elite, highly interactive, and visually stunning clinical dashboard. This transformation is organized into three progressive development phases.
 
-- API/token manager with scopes for n8n, Telegram, WhatsApp, mobile apps, and external partners
-- scanned paper form to AI/OCR draft workflow
-- full Keycloak provisioning from MIS user management
-- device/accessibility and allowed-location controls
-- maintenance mode and user notifications
-- document renewal rules for consent forms
-- report templates with branded headers, QR verification, stamps, and signatures
-- message delivery integrations through n8n/provider APIs
-- richer appointment reminders and follow-up workflows
-- full clinical visit model redesign with symptom/problem tracking as the main case continuity mechanism
+```mermaid
+graph TD
+    %% Define Theme Styles %%
+    classDef main fill:#3f1d58,stroke:#1a0826,stroke-width:2px,color:#fff;
+    classDef completed fill:#eafaf1,stroke:#a3e4d7,stroke-width:1.5px,color:#115e59;
+    classDef future fill:#fef9e7,stroke:#f5b041,stroke-width:1.5px,color:#7e5109;
+
+    subgraph Timeline ["Harmony Workspace Roadmap Phases"]
+        P1[Phase 1: Baseline Visual UX - COMPLETED]:::completed
+        P2[Phase 2: Structured Clinical Tooling - FUTURE]:::future
+        P3[Phase 3: Digital Intake & Visual Mapping - FUTURE]:::future
+    end
+
+    %% Phase 1 Connections %%
+    P1 --> F1[Allergy Warning Banner]
+    P1 --> F2[SVG Vitals Trend Charts]
+    P1 --> F3[Remedies Print Leaflet]
+    P1 --> F4[Bento Handover Notes]
+
+    %% Phase 2 Connections %%
+    P2 --> F5[System-by-System Exam Templates]
+    P2 --> F6[ICD-11 Search Directory & DDx Workbench]
+
+    %% Phase 3 Connections %%
+    P3 --> F7[Subjective Score Progress Charts]
+    P3 --> F8[Structured Document Cabinets & Witness Signature]
+    P3 --> F9[Interactive 3D/2D Visual Body Mapping]
+```
+
+### Phase 1: Visual Tracking & Baseline UX (Fully Deployed)
+The immediate visual baseline for the core clinical tabs has been implemented with type-safe, premium React components inside the patient workspace:
+
+1. **Overview Tab — Critical Allergy Warning Banner**
+   - *Design*: A glassmorphic, pulsing red-amber indicator at the top of the patient record when severe allergies or contraindications are active.
+   - *Implementation*: Instantly alerts clinicians of high-risk substances before prescribing, keeping patient safety front and center.
+2. **Vitals Tab — SVG Physiological Trend Charts**
+   - *Design*: Custom, ultra-responsive native SVG charting that displays blood pressure trends (systolic/diastolic dual line with rose and sky gradients) and weight progress (emerald line) over the last 10 visits.
+   - *Implementation*: Zero bulky JS charting packages; completely immune to hydration mismatches or container performance degradation. Fully responsive with responsive grid-lines, scales, and high-DPI hover highlights.
+3. **Remedies Tab — Patient Care Guidelines & Leaflet Printing**
+   - *Design*: High-fidelity prescription cards with an integrated "Print Leaflet" action button.
+   - *Implementation*: Launches an isolated browser print window rendering a beautiful, high-contrast, clinic-branded patient leaflet. Fully styled with `@media print` rules, formatting remedies, lifestyle notes, and dietary recommendations for clean physical printer output.
+4. **Notes Tab — Clinical Handovers & Bento Notice Board**
+   - *Design*: Pinned pastel index cards (Cream, Lavender, Sky-Blue, Emerald) arranged in a responsive CSS Grid bento layout.
+   - *Implementation*: Structures collaborative handovers by administrative, pharmacological, genetic, and general categories. Replaces raw text dumps with highly scannable, role-stamped clinician notes.
+
+---
+
+### Phase 2: Structured Clinical Tooling & Coding (Future Designs)
+Planned implementation of advanced diagnostic assistance and structured observation components:
+
+1. **Assessments Tab — System-by-System Examination Templates**
+   - *Interactive System Accordions*: Break down physical assessment inputs into distinct physiological systems (*HEENT, Cardiovascular, Respiratory, Gastrointestinal, Musculoskeletal, Neurological, Integumentary/Skin*).
+   - *Smart-Insert Templates*: Quick-fill action chips for standard findings (e.g., clicking *"Normal HEENT"* instantly populates the text field with: *"Pupils equal, round, reactive to light (PERRLA). EOM intact. Sclera clear. Oral mucosa moist and pink."*).
+   - *Comparative Historical Sliders*: A split-panel side-by-side assessment module allowing clinicians to lock a past physical assessment on the left while drafting the current assessment on the right to compare healing states.
+
+2. **Diagnosis Tab — ICD-11 Workbench & DDx Workspace**
+   - *ICD-11 Directory Search API*: Integrates a rapid auto-complete search widget querying the local or WHO ICD-11 coding APIs, enabling direct tagging of standardized clinical codes (e.g., `ICD-11: CA40` for Essential Hypertension) onto patient files.
+   - *Differential Diagnosis (DDx) Workspace*: A clinical whiteboard component inside the tab where clinicians can draft and track "Suspected", "Working", and "Ruled Out" conditions with inline validation checklists, clicking a single "Promote" trigger to establish the primary diagnosis once clinical thresholds are met.
+   - *Chronological Diagnostic Lifespan*: Automatic timeline tracking of chronic vs. acute conditions, transitioning acute infections to "Resolved" after an elapsed standard window or clinician-triggered follow-up.
+
+---
+
+### Phase 3: Digital Intake, Recalls & Visual Mapping (Future Designs)
+Advanced administrative workflow automation and sensory clinical tracking:
+
+1. **Follow-ups Tab — Subjective Progress Charts & SMS Recalls**
+   - *Continuous Subjective Score Tracker*: Plotting subjective client indicators (Sleep Quality, Energy Level, Appetite, Mood/Mental clarity) on 1-to-10 sliding metrics across successive consultations.
+   - *Multidimensional Progress Canvas*: Overlaying subjective recovery metrics (e.g., Sleep Score) on top of objective physiological vitals (e.g., Systolic BP) in a dual-axis line graph to show qualitative and quantitative proof of treatment efficacy.
+   - *Auto-Recall SMS Generator*: An automated messaging box that compiles the patient’s next scheduled follow-up, assigned clinician, and primary symptom into a localized clinic-ready SMS/WhatsApp template, queuing it for dispatch via the n8n Celery queue.
+
+2. **Documents Tab — Structured File Cabinets & Digital Signature Pads**
+   - *Structured Document Cabinets*: Visual folders grouping patient uploads into four structured sub-drawers: (1) *Signed Legal & Consent Forms*, (2) *Laboratory & Pathology Results*, (3) *Radiology & Medical Imaging*, and (4) *Referrals & Medical Certificates*.
+   - *Drag-and-Drop file Uploader*: Premium React dropzones supporting drag-and-drop uploading of multi-page PDFs or image scans with automatic backend virus scanning and mime-type categorization.
+   - *Witness Signature Module*: On-screen digital signature pad utilizing `signature_pad` for legal and clinical witness verification when signing high-risk therapeutic disclosures on mobile or tablet devices.
+
+3. **Interactive Visual Body Mapping (High-Fidelity Concept)**
+   - *Interactive 2D/3D SVG Anatomical Maps*: A clickable front-and-back human anatomical model integrated into the Assessments tab.
+   - *Symptom Hotspots*: Clinicians can double-click specific body regions (e.g., lumbar spine, left knee, abdomen) to log localized pain, eczema, or tension. The system pins a glowing color-coded node onto the canvas.
+   - *Hotspot Chronology*: Clicking on a pinned node opens a popover detailing previous complaints, pain levels (1-10 slider), and topical remedy applications for that specific physical coordinate over time.
+
+---
+
+### Core System Integration Requirements
+To deploy Phase 2 and Phase 3 features safely on the production server without container performance degradation:
+- **Zero Package Bloat**: All interactive charts, body mappings, and sliders must be built utilizing native SVG/CSS and lightweight React primitives rather than adding heavy charting packages.
+- **Strict Keycloak Access Scoping**: Clinical workspaces must read Keycloak roles (`clinician`, `receptionist`) before initializing sensitive tabs (Assessments, Diagnosis, Remedies, and Notes), hiding or locking inputs dynamically based on token claims.
+- **RESTful Endpoints & Schema Extensions**: All new structured forms (like system-by-system examinations or subjective scores) will store their structured data under JSONField schemas on the `Visit` or `Case` models, avoiding painful PostgreSQL migrations during rapid UI prototyping.
+
 

@@ -405,7 +405,7 @@ export function PatientRecordWorkspace({ patient: initialPatient, canCreateVisit
             {activeTab === "cases" && <CasesTab patient={patient} onUpdatePatient={setPatient} />}
             {activeTab === "assessments" && <AssessmentsTab visits={patient.visits || []} cases={initialCases} />}
             {activeTab === "diagnosis" && <DiagnosisTab visits={patient.visits || []} cases={initialCases} clinicalAccess={patient.clinical_access} />}
-            {activeTab === "remedies" && <RemediesTab visits={patient.visits || []} cases={initialCases} />}
+            {activeTab === "remedies" && <RemediesTab visits={patient.visits || []} cases={initialCases} patient={patient} />}
             {activeTab === "vitals" && <VitalsTab vitals={allVitals(patient)} patient={patient} />}
             {activeTab === "follow_ups" && <FollowUpsTab visits={patient.visits || []} cases={initialCases} />}
             {activeTab === "documents" && <DocumentsTab patient={patient} documents={documents} onDocumentsChange={setDocuments} />}
@@ -420,6 +420,24 @@ export function PatientRecordWorkspace({ patient: initialPatient, canCreateVisit
 function OverviewTab({ patient, latestVisit, latestVitals, profile }: { patient: Patient; latestVisit?: Visit; latestVitals?: Vital & { visitLabel: string }; profile?: PatientProfile | null }) {
   return (
     <div className="grid gap-6 animate-fade-in">
+      {/* Allergy Alert Warning Banner */}
+      {patient.allergies && (
+        <div className="relative overflow-hidden rounded-xl border border-red-200 bg-red-50/50 p-4 shadow-xs">
+          <div className="absolute top-0 left-0 h-full w-1.5 bg-red-500 animate-pulse"></div>
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-red-100 p-1.5 text-red-700 shrink-0 mt-0.5">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+            </div>
+            <div>
+              <h4 className="text-[10px] font-extrabold uppercase tracking-widest text-red-800">Critical Clinical Warning</h4>
+              <p className="mt-1 text-sm font-black text-red-950">
+                Allergies / Contraindications: <span className="underline decoration-red-500 decoration-2">{patient.allergies}</span>
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 1. Visual Vitals indicators Dashboard */}
       <LatestVitalsPanel vitals={latestVitals} />
 
@@ -740,7 +758,133 @@ function DiagnosisTab({ visits, cases, clinicalAccess }: { visits: Visit[]; case
   );
 }
 
-function RemediesTab({ visits, cases }: { visits: Visit[]; cases: Case[] }) {
+function printRemedyLeaflet(patientName: string, patientCode: string, item: any) {
+  const printWindow = window.open("", "_blank", "width=800,height=600");
+  if (!printWindow) return;
+  printWindow.document.write(`
+    <html>
+      <head>
+        <title>Harmony Health — Patient Care Guidelines</title>
+        <style>
+          body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            padding: 40px;
+            color: #1a221d;
+            background: #fff;
+          }
+          .header {
+            border-bottom: 2px solid #3f1d58;
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+          }
+          .logo {
+            font-size: 24px;
+            font-weight: 800;
+            color: #3f1d58;
+          }
+          .clinic-info {
+            text-align: right;
+            font-size: 12px;
+            color: #555;
+          }
+          .patient-card {
+            background: #f8f4f9;
+            border-radius: 8px;
+            padding: 15px;
+            margin-bottom: 30px;
+            border-left: 4px solid #3f1d58;
+          }
+          .patient-title {
+            font-size: 11px;
+            text-transform: uppercase;
+            font-weight: bold;
+            color: #888;
+            margin-bottom: 5px;
+          }
+          .patient-name {
+            font-size: 18px;
+            font-weight: bold;
+            color: #1a0826;
+          }
+          .section-title {
+            font-size: 14px;
+            text-transform: uppercase;
+            font-weight: 800;
+            color: #3f1d58;
+            border-bottom: 1px solid #e2e8f0;
+            padding-bottom: 6px;
+            margin-top: 30px;
+            margin-bottom: 12px;
+          }
+          .content-text {
+            font-size: 15px;
+            line-height: 1.6;
+            margin: 0;
+            white-space: pre-wrap;
+          }
+          .footer {
+            margin-top: 50px;
+            border-top: 1px solid #e2e8f0;
+            padding-top: 20px;
+            font-size: 11px;
+            color: #777;
+            text-align: center;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div class="logo">Harmony Health MIS</div>
+          <div class="clinic-info">
+            <strong>Harmony Health Clinic</strong><br/>
+            Eswatini<br/>
+            https://mis.harmonyhealthsz.com
+          </div>
+        </div>
+        <div class="patient-card">
+          <div class="patient-title">Patient Treatment Leaflet</div>
+          <div class="patient-name">\${patientName} (\${patientCode})</div>
+          <div style="font-size:12px; color:#555; margin-top:5px;">Date Issued: \${new Intl.DateTimeFormat('en', {dateStyle: 'long'}).format(new Date(item.date))}</div>
+        </div>
+        
+        <div class="section-title">Prescribed Remedy / Protocol</div>
+        <p class="content-text" style="font-weight:bold; font-size:17px; color:#115e59;">\${item.remedy || 'No specific remedy recorded'}</p>
+        
+        \${item.reason && item.reason !== '--' ? \`
+          <div class="section-title">Clinical Reasoning / Notes</div>
+          <p class="content-text">\${item.reason}</p>
+        \` : ''}
+
+        \${item.dietary && item.dietary !== '--' ? \`
+          <div class="section-title">Dietary Guidelines</div>
+          <p class="content-text">\${item.dietary}</p>
+        \` : ''}
+
+        \${item.lifestyle && item.lifestyle !== '--' ? \`
+          <div class="section-title">Lifestyle Guidelines</div>
+          <p class="content-text">\${item.lifestyle}</p>
+        \` : ''}
+
+        <div class="footer">
+          This document is generated by Harmony Health Management Information System. 
+          Please follow guidelines exactly as specified by your healthcare practitioner.
+        </div>
+        <script>
+          window.onload = function() {
+            window.print();
+            setTimeout(function() { window.close(); }, 500);
+          }
+        </script>
+      </body>
+    </html>
+  `);
+  printWindow.document.close();
+}
+
+function RemediesTab({ visits, cases, patient }: { visits: Visit[]; cases: Case[]; patient: Patient }) {
   const visitItems = visits.filter((v) => v.remedy || v.dietary_recommendation || v.lifestyle_recommendation).map((v) => ({
     key: `v-${v.id}`, date: v.visit_date, remedy: v.remedy, reason: v.reason_for_remedy,
     dietary: v.dietary_recommendation, lifestyle: v.lifestyle_recommendation
@@ -756,9 +900,20 @@ function RemediesTab({ visits, cases }: { visits: Visit[]; cases: Case[] }) {
       <div className="divide-y divide-[var(--hh-border)]">
         {items.map((item) => (
           <div key={item.key} className="grid gap-3 py-4 first:pt-0 last:pb-0">
-            <div>
-              <div className="font-bold">{value(item.remedy)}</div>
-              <div className="mt-1 text-xs font-bold uppercase text-[#66736d]">{formatDate(item.date)}</div>
+            <div className="flex justify-between items-start gap-4">
+              <div>
+                <div className="font-extrabold text-[#111827] text-base">{value(item.remedy)}</div>
+                <div className="mt-1 text-xs font-bold uppercase text-[#66736d]">{formatDate(item.date)}</div>
+              </div>
+              <Button
+                size="sm"
+                variant="secondary"
+                className="text-xs h-8 border-[var(--hh-border)] hover:bg-slate-50 font-bold"
+                onClick={() => printRemedyLeaflet(patient.full_name_display, patient.patient_code, item)}
+              >
+                <Printer size={13} className="mr-1" />
+                Print Leaflet
+              </Button>
             </div>
             <InfoGrid
               rows={[
@@ -777,9 +932,203 @@ function RemediesTab({ visits, cases }: { visits: Visit[]; cases: Case[] }) {
   );
 }
 
+function VitalsTrendCharts({ vitals }: { vitals: Array<Vital & { visitLabel: string }> }) {
+  const reversed = [...vitals].reverse().slice(-10); // get last 10 readings
+  const chartData = reversed.map((v) => {
+    const date = formatDate(v.recorded_at || v.created_at);
+    const sys = parseInt(v.bp_first_reading || "0", 10) || undefined;
+    const dia = parseInt(v.bp_second_reading || "0", 10) || undefined;
+    const weight = parseFloat(v.weight || "") || undefined;
+    return { date, sys, dia, weight };
+  }).filter(d => d.sys !== undefined || d.dia !== undefined || d.weight !== undefined);
+
+  if (chartData.length < 2) {
+    return (
+      <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center text-xs text-slate-500 mb-6">
+        📊 Chart requires at least 2 historical vitals entries to plot trends.
+      </div>
+    );
+  }
+
+  // BP Chart calculation
+  const bpData = chartData.filter(d => d.sys !== undefined && d.dia !== undefined);
+  const sysValues = bpData.map(d => d.sys!);
+  const diaValues = bpData.map(d => d.dia!);
+  const bpMax = Math.max(...sysValues, 150) + 10;
+  const bpMin = Math.min(...diaValues, 60) - 10;
+
+  // Weight Chart calculation
+  const wData = chartData.filter(d => d.weight !== undefined);
+  const wValues = wData.map(d => d.weight!);
+  const wMax = Math.max(...wValues, 80) + 5;
+  const wMin = Math.min(...wValues, 40) - 5;
+
+  const w = 500;
+  const h = 180;
+  const paddingL = 45;
+  const paddingR = 20;
+  const paddingTop = 25;
+  const paddingBottom = 30;
+
+  const getX = (index: number, total: number) => {
+    if (total <= 1) return paddingL;
+    return paddingL + (index / (total - 1)) * (w - paddingL - paddingR);
+  };
+
+  const getY = (val: number, min: number, max: number) => {
+    return h - paddingBottom - ((val - min) / (max - min)) * (h - paddingTop - paddingBottom);
+  };
+
+  return (
+    <div className="grid gap-5 md:grid-cols-2 mb-6">
+      {/* BP Trend Card */}
+      {bpData.length >= 2 ? (
+        <div className="rounded-xl border border-[var(--hh-border)] bg-white p-4 shadow-2xs">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-extrabold uppercase tracking-wider text-[var(--hh-purple)] flex items-center gap-1.5">
+              <span>🩺</span> Blood Pressure Trends (mmHg)
+            </h4>
+            <div className="flex gap-3 text-3xs font-extrabold uppercase">
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-rose-500"></span> Systolic</span>
+              <span className="flex items-center gap-1"><span className="h-2 w-2 rounded-full bg-sky-500"></span> Diastolic</span>
+            </div>
+          </div>
+          <div className="relative">
+            <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto overflow-visible">
+              {/* Grid lines */}
+              {[4, 2, 0].map((step) => {
+                const val = bpMin + (step / 4) * (bpMax - bpMin);
+                const y = getY(val, bpMin, bpMax);
+                return (
+                  <g key={step} className="opacity-45">
+                    <line x1={paddingL} y1={y} x2={w - paddingR} y2={y} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
+                    <text x={paddingL - 8} y={y + 4} textAnchor="end" className="text-[10px] font-bold fill-slate-400">{Math.round(val)}</text>
+                  </g>
+                );
+              })}
+
+              {/* Systolic Line */}
+              {(() => {
+                const points = bpData.map((d, i) => `${getX(i, bpData.length)},${getY(d.sys!, bpMin, bpMax)}`).join(" ");
+                return (
+                  <>
+                    <polyline fill="none" stroke="url(#sysGradient)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={points} className="drop-shadow-xs" />
+                    {bpData.map((d, i) => (
+                      <g key={i}>
+                        <circle cx={getX(i, bpData.length)} cy={getY(d.sys!, bpMin, bpMax)} r="4" fill="#f43f5e" stroke="#fff" strokeWidth="1.5" />
+                        <title>{`Systolic: ${d.sys} mmHg on ${d.date}`}</title>
+                      </g>
+                    ))}
+                  </>
+                );
+              })()}
+
+              {/* Diastolic Line */}
+              {(() => {
+                const points = bpData.map((d, i) => `${getX(i, bpData.length)},${getY(d.dia!, bpMin, bpMax)}`).join(" ");
+                return (
+                  <>
+                    <polyline fill="none" stroke="url(#diaGradient)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={points} />
+                    {bpData.map((d, i) => (
+                      <g key={i}>
+                        <circle cx={getX(i, bpData.length)} cy={getY(d.dia!, bpMin, bpMax)} r="4" fill="#0ea5e9" stroke="#fff" strokeWidth="1.5" />
+                        <title>{`Diastolic: ${d.dia} mmHg on ${d.date}`}</title>
+                      </g>
+                    ))}
+                  </>
+                );
+              })()}
+
+              {/* X Axis Labels */}
+              {bpData.map((d, i) => (
+                <text key={i} x={getX(i, bpData.length)} y={h - 8} textAnchor="middle" className="text-[9px] font-extrabold fill-slate-400 rotate-12">{d.date.split(" ")[0]} {d.date.split(" ")[1]}</text>
+              ))}
+
+              <defs>
+                <linearGradient id="sysGradient" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#f43f5e" />
+                  <stop offset="100%" stopColor="#ec4899" />
+                </linearGradient>
+                <linearGradient id="diaGradient" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#0ea5e9" />
+                  <stop offset="100%" stopColor="#3b82f6" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-500">
+          No blood pressure trends available.
+        </div>
+      )}
+
+      {/* Weight Trend Card */}
+      {wData.length >= 2 ? (
+        <div className="rounded-xl border border-[var(--hh-border)] bg-white p-4 shadow-2xs">
+          <div className="flex items-center justify-between mb-3">
+            <h4 className="text-xs font-extrabold uppercase tracking-wider text-[var(--hh-purple)] flex items-center gap-1.5">
+              <span>⚖️</span> Weight Trends (kg)
+            </h4>
+            <span className="text-3xs font-extrabold uppercase text-slate-500 bg-slate-100 rounded-full px-2 py-0.5">Scale</span>
+          </div>
+          <div className="relative">
+            <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-auto overflow-visible">
+              {/* Grid lines */}
+              {[4, 2, 0].map((step) => {
+                const val = wMin + (step / 4) * (wMax - wMin);
+                const y = getY(val, wMin, wMax);
+                return (
+                  <g key={step} className="opacity-45">
+                    <line x1={paddingL} y1={y} x2={w - paddingR} y2={y} stroke="#e2e8f0" strokeWidth="1" strokeDasharray="4 4" />
+                    <text x={paddingL - 8} y={y + 4} textAnchor="end" className="text-[10px] font-bold fill-slate-400">{Math.round(val)}</text>
+                  </g>
+                );
+              })}
+
+              {/* Weight Line */}
+              {(() => {
+                const points = wData.map((d, i) => `${getX(i, wData.length)},${getY(d.weight!, wMin, wMax)}`).join(" ");
+                return (
+                  <>
+                    <polyline fill="none" stroke="url(#wGradient)" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={points} />
+                    {wData.map((d, i) => (
+                      <g key={i}>
+                        <circle cx={getX(i, wData.length)} cy={getY(d.weight!, wMin, wMax)} r="4" fill="#10b981" stroke="#fff" strokeWidth="1.5" />
+                        <title>{`Weight: ${d.weight} kg on ${d.date}`}</title>
+                      </g>
+                    ))}
+                  </>
+                );
+              })()}
+
+              {/* X Axis Labels */}
+              {wData.map((d, i) => (
+                <text key={i} x={getX(i, wData.length)} y={h - 8} textAnchor="middle" className="text-[9px] font-extrabold fill-slate-400 rotate-12">{d.date.split(" ")[0]} {d.date.split(" ")[1]}</text>
+              ))}
+
+              <defs>
+                <linearGradient id="wGradient" x1="0" y1="0" x2="1" y2="0">
+                  <stop offset="0%" stopColor="#10b981" />
+                  <stop offset="100%" stopColor="#059669" />
+                </linearGradient>
+              </defs>
+            </svg>
+          </div>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-4 text-center text-xs text-slate-500">
+          No weight trends available.
+        </div>
+      )}
+    </div>
+  );
+}
+
 function VitalsTab({ vitals, patient }: { vitals: Array<Vital & { visitLabel: string }>; patient: Patient }) {
   return (
     <ClinicalPanel title="Vitals history" icon={<HeartPulse size={17} />}>
+      <VitalsTrendCharts vitals={vitals} />
       <div className="overflow-x-auto">
         <table className="hh-compact-table">
           <thead>
@@ -1409,17 +1758,81 @@ function ConsentSignatureDialog({
 }
 
 function NotesTab({ patient, profile, latestVisit }: { patient: Patient; profile?: PatientProfile | null; latestVisit?: Visit }) {
+  const notes = [
+    {
+      title: "📌 Key Clinical Notes",
+      content: profile?.other_important_information || latestVisit?.main_complaint || "",
+      bg: "bg-amber-50/70 border-amber-200 text-amber-950",
+      accent: "bg-amber-400",
+      tag: "ADMIN / WARNING",
+    },
+    {
+      title: "💊 Allopathic Medications",
+      content: profile?.allopathic_medication || "",
+      bg: "bg-violet-50/70 border-violet-200 text-violet-950",
+      accent: "bg-violet-400",
+      tag: "PHARMACOLOGY",
+    },
+    {
+      title: "🧬 Family Medical History",
+      content: profile?.family_medical_history || "",
+      bg: "bg-sky-50/70 border-sky-200 text-sky-950",
+      accent: "bg-sky-400",
+      tag: "HEREDITY",
+    },
+    {
+      title: "📜 Past Medical History",
+      content: profile?.past_medical_history || "",
+      bg: "bg-emerald-50/70 border-emerald-200 text-emerald-950",
+      accent: "bg-emerald-400",
+      tag: "CHRONOLOGY",
+    }
+  ];
+
   return (
-    <ClinicalPanel title="Patient notes" icon={<ClipboardList size={17} />}>
-      <InfoGrid
-        rows={[
-          ["Key notes", value(profile?.other_important_information || latestVisit?.main_complaint)],
-          ["Allopathic medication", value(profile?.allopathic_medication)],
-          ["Family medical history", value(profile?.family_medical_history)],
-          ["Past medical history", value(profile?.past_medical_history)]
-        ]}
-      />
-    </ClinicalPanel>
+    <div className="grid gap-5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-extrabold text-[var(--hh-purple-dark)] uppercase tracking-wider">
+          🗒️ Interactive Clinical Handovers & Notice Board
+        </h3>
+        <span className="text-3xs font-extrabold uppercase bg-[var(--hh-purple-light)] text-[var(--hh-purple-dark)] px-2.5 py-1 rounded-full border border-[var(--hh-purple)]">
+          Collaborative Hub
+        </span>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {notes.map((note, index) => {
+          const hasContent = note.content && note.content !== "--" && note.content.trim() !== "";
+          return (
+            <div 
+              key={index} 
+              className={`relative overflow-hidden rounded-xl border p-5 shadow-2xs hover:shadow-md transition-all duration-300 hover:scale-[1.01] ${note.bg}`}
+            >
+              {/* Colored tag bar representing sticky look */}
+              <div className="absolute top-0 left-0 right-0 h-1.5 flex">
+                <div className={`h-full w-12 ${note.accent}`}></div>
+                <div className="h-full flex-1 opacity-20 bg-slate-300"></div>
+              </div>
+              
+              <div className="flex justify-between items-start mb-2.5 mt-1">
+                <h4 className="text-sm font-black tracking-tight">{note.title}</h4>
+                <span className="text-[9px] font-extrabold tracking-widest px-2 py-0.5 rounded-md bg-white/80 uppercase">
+                  {note.tag}
+                </span>
+              </div>
+
+              <div className="text-xs leading-relaxed font-medium">
+                {hasContent ? (
+                  <p className="whitespace-pre-wrap">{note.content}</p>
+                ) : (
+                  <p className="italic text-slate-400">No disclosures or notes recorded yet in this category.</p>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
