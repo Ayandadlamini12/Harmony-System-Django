@@ -1040,9 +1040,22 @@ function VitalsTrendCharts({ vitals }: { vitals: Array<Vital & { visitLabel: str
               })()}
 
               {/* X Axis Labels */}
-              {bpData.map((d, i) => (
-                <text key={i} x={getX(i, bpData.length)} y={h - 8} textAnchor="middle" className="text-[9px] font-extrabold fill-slate-400 rotate-12">{d.date.split(" ")[0]} {d.date.split(" ")[1]}</text>
-              ))}
+              {bpData.map((d, i) => {
+                const xVal = getX(i, bpData.length);
+                const yVal = h - 8;
+                return (
+                  <text
+                    key={i}
+                    x={xVal}
+                    y={yVal}
+                    textAnchor="middle"
+                    className="text-[9px] font-extrabold fill-slate-400"
+                    transform={`rotate(12, ${xVal}, ${yVal})`}
+                  >
+                    {d.date.split(" ")[0]} {d.date.split(" ")[1]}
+                  </text>
+                );
+              })}
 
               <defs>
                 <linearGradient id="sysGradient" x1="0" y1="0" x2="1" y2="0">
@@ -1103,9 +1116,22 @@ function VitalsTrendCharts({ vitals }: { vitals: Array<Vital & { visitLabel: str
               })()}
 
               {/* X Axis Labels */}
-              {wData.map((d, i) => (
-                <text key={i} x={getX(i, wData.length)} y={h - 8} textAnchor="middle" className="text-[9px] font-extrabold fill-slate-400 rotate-12">{d.date.split(" ")[0]} {d.date.split(" ")[1]}</text>
-              ))}
+              {wData.map((d, i) => {
+                const xVal = getX(i, wData.length);
+                const yVal = h - 8;
+                return (
+                  <text
+                    key={i}
+                    x={xVal}
+                    y={yVal}
+                    textAnchor="middle"
+                    className="text-[9px] font-extrabold fill-slate-400"
+                    transform={`rotate(12, ${xVal}, ${yVal})`}
+                  >
+                    {d.date.split(" ")[0]} {d.date.split(" ")[1]}
+                  </text>
+                );
+              })}
 
               <defs>
                 <linearGradient id="wGradient" x1="0" y1="0" x2="1" y2="0">
