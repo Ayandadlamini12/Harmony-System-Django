@@ -1,7 +1,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { ClipboardList, FileText, IdCard, LockKeyhole, MapPin, Phone, Users, ChevronLeft, ChevronRight, Plus, Building } from "lucide-react";
+import { ClipboardList, FileText, IdCard, LockKeyhole, MapPin, Phone, Users, ChevronLeft, ChevronRight, Plus, Building, Layers, Percent, Mail, Globe, CreditCard, Building2, AlertCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { useForm } from "react-hook-form";
@@ -153,6 +153,14 @@ export function PatientRegistrationForm() {
   const [newCompanyName, setNewCompanyName] = useState("");
   const [newCompanyEmail, setNewCompanyEmail] = useState("");
   const [newCompanyPhone, setNewCompanyPhone] = useState("");
+  const [newCompanyTaxNumber, setNewCompanyTaxNumber] = useState("");
+  const [newCompanyWebsite, setNewCompanyWebsite] = useState("");
+  const [newCompanyAddress, setNewCompanyAddress] = useState("");
+  const [newCompanyBankName, setNewCompanyBankName] = useState("");
+  const [newCompanyAccountHolder, setNewCompanyAccountHolder] = useState("");
+  const [newCompanyAccountNumber, setNewCompanyAccountNumber] = useState("");
+  const [newCompanyBranchCode, setNewCompanyBranchCode] = useState("");
+  const [inlineFieldErrors, setInlineFieldErrors] = useState<Record<string, string[]>>({});
   const [isSavingCompany, setIsSavingCompany] = useState(false);
 
   const form = useForm<PatientRegistrationValues>({
@@ -620,89 +628,310 @@ export function PatientRegistrationForm() {
 
               {/* Inline Dialog for Company Creation */}
               <Dialog open={isAddingCompany} onOpenChange={setIsAddingCompany}>
-                <DialogContent className="sm:max-w-md">
-                  <div className="p-6">
-                    <DialogTitle className="text-lg font-bold flex items-center gap-2">
-                      <Building className="text-[var(--hh-purple)]" size={20} /> Register Partner Company
-                    </DialogTitle>
-                    <DialogDescription className="text-sm text-slate-500 mt-1">
-                      Add a new partner company under the medical aid category. This will instantly select it for the patient.
-                    </DialogDescription>
-                    <div className="grid gap-4 mt-5">
-                      <div className={fieldClass}>
-                        <Label>Company Legal Name <span className="text-red-500">*</span></Label>
-                        <Input
-                          placeholder="e.g. Swaziland Medisave"
-                          value={newCompanyName}
-                          onChange={(e) => setNewCompanyName(e.target.value)}
-                        />
+                <DialogContent className="w-[min(94vw,620px)] p-0 overflow-hidden">
+                  <div className="bg-[#fcfafc] border-b border-[var(--hh-border)] px-6 py-4 flex items-start gap-4">
+                    <div className="rounded-xl bg-[#f4eef5] p-3 text-[var(--hh-purple)] shrink-0">
+                      <Building size={24} />
+                    </div>
+                    <div>
+                      <DialogTitle className="text-base font-bold text-[#3f1d58]">Register Partner Company</DialogTitle>
+                      <DialogDescription className="text-xs text-[#66736d] mt-0.5">
+                        Create a directory file containing legal, financial, and contact identifiers for this medical aid company.
+                      </DialogDescription>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-4 p-6 max-h-[60vh] overflow-y-auto">
+                    {/* Name */}
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs font-bold text-[#3f1d58]">
+                        Company Legal Name <span className="text-red-500">*</span>
+                      </Label>
+                      <Input
+                        className={`hh-input h-10 text-sm ${inlineFieldErrors.name ? "border-red-500 focus:border-red-500" : ""}`}
+                        placeholder="e.g. Swaziland Medisave Ltd"
+                        value={newCompanyName}
+                        onChange={(e) => setNewCompanyName(e.target.value)}
+                      />
+                      {inlineFieldErrors.name && (
+                        <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                          {inlineFieldErrors.name.join(" ")}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Category and Tax Number Row */}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                          <Layers size={12} /> Category
+                        </Label>
+                        <Input className="hh-input h-10 text-sm" value="Medical Aid" disabled readOnly />
                       </div>
-                      <div className={fieldClass}>
-                        <Label>Email (Optional)</Label>
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                          <Percent size={12} /> Tax Number
+                        </Label>
                         <Input
-                          type="email"
-                          placeholder="e.g. support@medisave.sz"
-                          value={newCompanyEmail}
-                          onChange={(e) => setNewCompanyEmail(e.target.value)}
+                          className={`hh-input h-10 text-sm ${inlineFieldErrors.tax_number ? "border-red-500 focus:border-red-500" : ""}`}
+                          placeholder="e.g. TIN-100-244-11"
+                          value={newCompanyTaxNumber}
+                          onChange={(e) => setNewCompanyTaxNumber(e.target.value)}
                         />
+                        {inlineFieldErrors.tax_number && (
+                          <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                            {inlineFieldErrors.tax_number.join(" ")}
+                          </span>
+                        )}
                       </div>
-                      <div className={fieldClass}>
-                        <Label>Phone Number (Optional)</Label>
+                    </div>
+
+                    {/* Contacts Row */}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                          <Phone size={12} /> Phone Number
+                        </Label>
                         <Input
+                          className={`hh-input h-10 text-sm ${inlineFieldErrors.phone_number ? "border-red-500 focus:border-red-500" : ""}`}
                           placeholder="e.g. +268 2404 0000"
                           value={newCompanyPhone}
                           onChange={(e) => setNewCompanyPhone(e.target.value)}
                         />
+                        {inlineFieldErrors.phone_number && (
+                          <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                            {inlineFieldErrors.phone_number.join(" ")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                          <Mail size={12} /> Email Address
+                        </Label>
+                        <Input
+                          type="email"
+                          className={`hh-input h-10 text-sm ${inlineFieldErrors.email ? "border-red-500 focus:border-red-500" : ""}`}
+                          placeholder="e.g. support@medisave.sz"
+                          value={newCompanyEmail}
+                          onChange={(e) => setNewCompanyEmail(e.target.value)}
+                        />
+                        {inlineFieldErrors.email && (
+                          <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                            {inlineFieldErrors.email.join(" ")}
+                          </span>
+                        )}
                       </div>
                     </div>
-                    <div className="flex justify-end gap-3 mt-6">
-                      <DialogClose asChild>
-                        <Button type="button" variant="secondary">Cancel</Button>
-                      </DialogClose>
-                      <LoadingButton
-                        type="button"
-                        onClick={async () => {
-                          if (!newCompanyName.trim()) {
-                            toast.error("Company Name is required.");
-                            return;
-                          }
-                          setIsSavingCompany(true);
-                          try {
-                            const response = await fetch("/api/partner-companies/", {
-                              method: "POST",
-                              headers: { "Content-Type": "application/json" },
-                              body: JSON.stringify({
-                                name: newCompanyName.trim(),
-                                category: "medical_aid",
-                                email: newCompanyEmail.trim(),
-                                phone_number: newCompanyPhone.trim(),
-                              }),
-                            });
-                            const data = await response.json();
-                            if (response.ok) {
-                              toast.success(`Partner company '${newCompanyName}' added successfully.`);
-                              setPartnerCompanies((prev) => [...prev, data]);
-                              form.setValue("medical_aid_company", String(data.id));
-                              setNewCompanyName("");
-                              setNewCompanyEmail("");
-                              setNewCompanyPhone("");
-                              setIsAddingCompany(false);
-                            } else {
-                              const errorMsg = data.detail || (data.name ? data.name[0] : "Failed to save partner company.");
-                              toast.error(errorMsg);
-                            }
-                          } catch (err) {
-                            toast.error("Failed to add partner company inline.");
-                          } finally {
-                            setIsSavingCompany(false);
-                          }
-                        }}
-                        loading={isSavingCompany}
-                        loadingText="Creating..."
-                      >
-                        Add Company
-                      </LoadingButton>
+
+                    {/* Website */}
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                        <Globe size={12} /> Website URL
+                      </Label>
+                      <Input
+                        className={`hh-input h-10 text-sm ${inlineFieldErrors.website ? "border-red-500 focus:border-red-500" : ""}`}
+                        placeholder="e.g. www.medisave.sz"
+                        value={newCompanyWebsite}
+                        onChange={(e) => setNewCompanyWebsite(e.target.value)}
+                      />
+                      {inlineFieldErrors.website && (
+                        <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                          {inlineFieldErrors.website.join(" ")}
+                        </span>
+                      )}
                     </div>
+
+                    {/* Address */}
+                    <div className="grid gap-1.5">
+                      <Label className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                        <MapPin size={12} /> Physical Address
+                      </Label>
+                      <Textarea
+                        className={`h-10 min-h-[40px] text-sm border-[var(--hh-border)] focus:border-[var(--hh-purple)] focus:ring-1 focus:ring-[var(--hh-purple)] leading-normal resize-none py-2 ${
+                          inlineFieldErrors.address ? "border-red-500 focus:border-red-500" : ""
+                        }`}
+                        placeholder="e.g. Suite 4, Plot 12, Gables Mbabane"
+                        value={newCompanyAddress}
+                        onChange={(e) => setNewCompanyAddress(e.target.value)}
+                      />
+                      {inlineFieldErrors.address && (
+                        <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                          {inlineFieldErrors.address.join(" ")}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Banking Section Divider */}
+                    <div className="relative my-2">
+                      <div className="absolute inset-0 flex items-center" aria-hidden="true">
+                        <div className="w-full border-t border-[var(--hh-border)]" />
+                      </div>
+                      <div className="relative flex justify-start">
+                        <span className="bg-white pr-3 text-[11px] font-bold uppercase tracking-wider text-[var(--hh-purple)]">
+                          Banking Details (Optional)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Bank Name and Account Holder */}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                          <CreditCard size={12} /> Bank Name
+                        </Label>
+                        <Select
+                          value={newCompanyBankName}
+                          onChange={(e) => setNewCompanyBankName(e.target.value)}
+                          className={`h-10 text-sm bg-white ${inlineFieldErrors.bank_name ? "border-red-500 focus:border-red-500" : ""}`}
+                        >
+                          <option value="">Select a bank...</option>
+                          <option value="fnb">First National Bank (FNB)</option>
+                          <option value="standard_bank">Standard Bank</option>
+                          <option value="nedbank">Nedbank</option>
+                          <option value="eswatini_bank">Eswatini Bank</option>
+                          <option value="eswatini_building_society">Eswatini Building Society</option>
+                        </Select>
+                        {inlineFieldErrors.bank_name && (
+                          <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                            {inlineFieldErrors.bank_name.join(" ")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                          <Building2 size={12} /> Account Holder Name
+                        </Label>
+                        <Input
+                          className={`hh-input h-10 text-sm ${inlineFieldErrors.account_holder ? "border-red-500 focus:border-red-500" : ""}`}
+                          placeholder="e.g. Swaziland Medisave Ltd"
+                          value={newCompanyAccountHolder}
+                          onChange={(e) => setNewCompanyAccountHolder(e.target.value)}
+                        />
+                        {inlineFieldErrors.account_holder && (
+                          <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                            {inlineFieldErrors.account_holder.join(" ")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Account Number and Branch Code */}
+                    <div className="grid gap-4 md:grid-cols-2">
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                          <CreditCard size={12} /> Account Number
+                        </Label>
+                        <Input
+                          className={`hh-input h-10 text-sm ${inlineFieldErrors.account_number ? "border-red-500 focus:border-red-500" : ""}`}
+                          placeholder="e.g. 62041122334"
+                          value={newCompanyAccountNumber}
+                          onChange={(e) => setNewCompanyAccountNumber(e.target.value)}
+                        />
+                        {inlineFieldErrors.account_number && (
+                          <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                            {inlineFieldErrors.account_number.join(" ")}
+                          </span>
+                        )}
+                      </div>
+                      <div className="grid gap-1.5">
+                        <Label className="text-xs font-bold text-[#3f1d58] flex items-center gap-1">
+                          <Layers size={12} /> Branch Code
+                        </Label>
+                        <Input
+                          className={`hh-input h-10 text-sm ${inlineFieldErrors.branch_code ? "border-red-500 focus:border-red-500" : ""}`}
+                          placeholder="e.g. 280164"
+                          value={newCompanyBranchCode}
+                          onChange={(e) => setNewCompanyBranchCode(e.target.value)}
+                        />
+                        {inlineFieldErrors.branch_code && (
+                          <span className="text-red-600 text-[10px] font-semibold mt-0.5 leading-none">
+                            {inlineFieldErrors.branch_code.join(" ")}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="border-t border-[var(--hh-border)] bg-[#fcfafc] px-6 py-4 flex justify-end gap-3">
+                    <DialogClose asChild>
+                      <Button type="button" variant="secondary" className="h-10 text-xs font-bold">Cancel</Button>
+                    </DialogClose>
+                    <LoadingButton
+                      type="button"
+                      className="h-10 text-xs font-bold"
+                      onClick={async () => {
+                        if (!newCompanyName.trim()) {
+                          toast.error("Company Legal Name is required.");
+                          setInlineFieldErrors({ name: ["This field is required."] });
+                          return;
+                        }
+                        setIsSavingCompany(true);
+                        setInlineFieldErrors({});
+
+                        let websiteUrl = newCompanyWebsite.trim();
+                        if (websiteUrl && !websiteUrl.startsWith("http://") && !websiteUrl.startsWith("https://")) {
+                          websiteUrl = `https://${websiteUrl}`;
+                        }
+
+                        try {
+                          const response = await fetch("/api/partner-companies/", {
+                            method: "POST",
+                            headers: { "Content-Type": "application/json" },
+                            body: JSON.stringify({
+                              name: newCompanyName.trim(),
+                              category: "medical_aid",
+                              tax_number: newCompanyTaxNumber.trim(),
+                              phone_number: newCompanyPhone.trim(),
+                              email: newCompanyEmail.trim(),
+                              website: websiteUrl,
+                              address: newCompanyAddress.trim(),
+                              bank_name: newCompanyBankName || null,
+                              account_holder: newCompanyAccountHolder.trim(),
+                              account_number: newCompanyAccountNumber.trim(),
+                              branch_code: newCompanyBranchCode.trim(),
+                            }),
+                          });
+                          const data = await response.json();
+                          if (response.ok) {
+                            toast.success(`Partner company '${newCompanyName}' added successfully.`);
+                            setPartnerCompanies((prev) => [...prev, data]);
+                            form.setValue("medical_aid_company", String(data.id));
+
+                            // Reset state
+                            setNewCompanyName("");
+                            setNewCompanyEmail("");
+                            setNewCompanyPhone("");
+                            setNewCompanyTaxNumber("");
+                            setNewCompanyWebsite("");
+                            setNewCompanyAddress("");
+                            setNewCompanyBankName("");
+                            setNewCompanyAccountHolder("");
+                            setNewCompanyAccountNumber("");
+                            setNewCompanyBranchCode("");
+                            setInlineFieldErrors({});
+
+                            setIsAddingCompany(false);
+                          } else {
+                            if (response.status === 400 && typeof data === "object") {
+                              setInlineFieldErrors(data);
+                              const firstError = Object.values(data)[0];
+                              const errorMsg = Array.isArray(firstError) ? firstError[0] : "Please check highlighted fields.";
+                              toast.error(errorMsg);
+                            } else {
+                              toast.error(data.detail || "Failed to save partner company.");
+                            }
+                          }
+                        } catch (err) {
+                          toast.error("Failed to add partner company inline.");
+                        } finally {
+                          setIsSavingCompany(false);
+                        }
+                      }}
+                      loading={isSavingCompany}
+                      loadingText="Creating..."
+                    >
+                      Add Company
+                    </LoadingButton>
                   </div>
                 </DialogContent>
               </Dialog>
