@@ -1205,7 +1205,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
                 
             patient_id = None
             import uuid
-            from .models import Patient, Visit, Vital, Case, PatientDocument, PatientJourney, PatientCheckIn, Appointment
+            from .models import Patient, Visit, Vital, Case, PatientDocument, PatientJourney, PatientCheckIn, Appointment, ElevatedAccessRequest
             from django.db.models import Q
             
             # 1. Try to parse as UUID first
@@ -1235,6 +1235,7 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             journey_ids = list(PatientJourney.objects.filter(patient_id=patient_id).values_list("id", flat=True))
             checkin_ids = list(PatientCheckIn.objects.filter(patient_id=patient_id).values_list("id", flat=True))
             appointment_ids = list(Appointment.objects.filter(patient_id=patient_id).values_list("id", flat=True))
+            access_request_ids = list(ElevatedAccessRequest.objects.filter(patient_id=patient_id).values_list("id", flat=True))
             
             # Patient Profile logs
             q_filter = Q(entity_type="patient", entity_id=patient_id)
@@ -1263,6 +1264,9 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
                 q_filter |= Q(entity_type="patient_checkin", entity_id__in=checkin_ids)
             if appointment_ids:
                 q_filter |= Q(entity_type="appointment", entity_id__in=appointment_ids)
+            if access_request_ids:
+                q_filter |= Q(entity_type="elevated_access_request", entity_id__in=access_request_ids)
+                q_filter |= Q(entity_type="elevatedaccessrequest", entity_id__in=access_request_ids)
             
             queryset = queryset.filter(q_filter)
             
