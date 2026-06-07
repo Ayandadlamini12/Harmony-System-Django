@@ -92,7 +92,7 @@ export default async function PatientDetailPage({ params }: { params: Promise<{ 
         </div>
 
         <div className="px-4 pb-5 sm:px-6">
-          <PatientRecordWorkspace patient={patient} canCreateVisit={canCreateVisit} initialCases={cases.results} />
+          <PatientRecordWorkspace patient={patient} canCreateVisit={canCreateVisit} initialCases={cases.results} userRole={session.role} />
         </div>
       </section>
     </AppShell>

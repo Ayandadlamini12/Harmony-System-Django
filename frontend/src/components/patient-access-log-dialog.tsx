@@ -53,7 +53,7 @@ function formatLogDateTime(text?: string | null) {
   }).format(new Date(text));
 }
 
-export function PatientAccessLogDialog({ patient }: { patient: Patient }) {
+export function PatientAccessLogDialog({ patient, userRole }: { patient: Patient; userRole?: string }) {
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
@@ -63,7 +63,7 @@ export function PatientAccessLogDialog({ patient }: { patient: Patient }) {
   const [totalCount, setTotalCount] = useState(0);
 
   // Check authorization role (admin or clinician only)
-  const role = getCookie("harmony_role") || "receptionist";
+  const role = userRole || getCookie("harmony_role") || "receptionist";
   const isAuthorized = role === "admin" || role === "clinician";
 
   // Fetch access logs

@@ -180,7 +180,7 @@ function getGlucoseStatus(glucoseVal?: string | null, context?: string) {
   }
 }
 
-export function PatientRecordWorkspace({ patient: initialPatient, canCreateVisit, initialCases }: { patient: Patient; canCreateVisit: boolean; initialCases: Case[] }) {
+export function PatientRecordWorkspace({ patient: initialPatient, canCreateVisit, initialCases, userRole }: { patient: Patient; canCreateVisit: boolean; initialCases: Case[]; userRole?: string }) {
   const router = useRouter();
   const [patient, setPatient] = useState(initialPatient);
   const [activeTab, setActiveTab] = useState<RecordTab>("overview");
@@ -394,7 +394,7 @@ export function PatientRecordWorkspace({ patient: initialPatient, canCreateVisit
               Print summary
             </Button>
             <PatientAppointmentDialog patient={patient} />
-            <PatientAccessLogDialog patient={patient} />
+            <PatientAccessLogDialog patient={patient} userRole={userRole} />
           </div>
 
           {/* Dynamic Tab panels */}
