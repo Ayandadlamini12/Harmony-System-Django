@@ -7,18 +7,14 @@ export async function GET(request: NextRequest) {
   const entityId = searchParams.get("entity_id");
   const page = searchParams.get("page") || "1";
 
-  if (!entityType || !entityId) {
-    return NextResponse.json(
-      { success: false, detail: "Missing entity_type or entity_id query parameters." },
-      { status: 400 }
-    );
+  const queryParams = new URLSearchParams();
+  if (entityType) {
+    queryParams.set("entity_type", entityType);
   }
-
-  const queryParams = new URLSearchParams({
-    entity_type: entityType,
-    entity_id: entityId,
-    page: page,
-  });
+  if (entityId) {
+    queryParams.set("entity_id", entityId);
+  }
+  queryParams.set("page", page);
 
   const response = await apiFetchWithAuth(`/audit-logs/?${queryParams.toString()}`);
 

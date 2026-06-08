@@ -16,6 +16,7 @@ import { notFound } from "next/navigation";
 
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
+import { AdminAuditLogsViewer } from "@/components/admin-audit-logs-viewer";
 
 type SectionConfig = {
   title: string;
@@ -175,13 +176,19 @@ export default async function AdministrationSectionPage({
           </Button>
         </div>
 
-        <div className="mt-6 grid gap-3 md:grid-cols-2">
-          {config.focus.map((item) => (
-            <div key={item} className="rounded-lg border border-[var(--hh-border-strong)] bg-[#f7faf8] px-4 py-3 text-sm font-semibold text-[#24302b]">
-              {item}
-            </div>
-          ))}
-        </div>
+        {section === "audit-logs" ? (
+          <div className="mt-6">
+            <AdminAuditLogsViewer />
+          </div>
+        ) : (
+          <div className="mt-6 grid gap-3 md:grid-cols-2">
+            {config.focus.map((item) => (
+              <div key={item} className="rounded-lg border border-[var(--hh-border-strong)] bg-[#f7faf8] px-4 py-3 text-sm font-semibold text-[#24302b]">
+                {item}
+              </div>
+            ))}
+          </div>
+        )}
       </section>
     </AppShell>
   );
