@@ -454,7 +454,7 @@ function OverviewTab({ patient, latestVisit, latestVitals, profile, userRole, on
           <ClinicalPanel 
             title="History of present complaint" 
             icon={<ClipboardList size={17} />} 
-            action={userRole === "clinician" && !!latestVisit}
+            action={(userRole === "clinician" || userRole === "admin") && !!latestVisit}
             onAction={() => latestVisit && setEditVisit(latestVisit)}
           >
             <div className="space-y-4 text-sm leading-6 text-[#3f4d47]">
@@ -466,7 +466,7 @@ function OverviewTab({ patient, latestVisit, latestVitals, profile, userRole, on
           <ClinicalPanel 
             title="Clinical assessment" 
             icon={<Stethoscope size={17} />} 
-            action={userRole === "clinician" && !!latestVisit}
+            action={(userRole === "clinician" || userRole === "admin") && !!latestVisit}
             onAction={() => latestVisit && setEditVisit(latestVisit)}
           >
             {latestVisit ? (
@@ -2176,21 +2176,22 @@ function LatestVitalsPanel({ vitals }: { vitals?: Vital & { visitLabel: string }
 }
 
 function VisitTimeline({ visits, userRole, onEditVisit }: { visits: Visit[]; userRole?: string; onEditVisit: (v: Visit) => void }) {
+  const isClinician = userRole === "clinician" || userRole === "admin";
   return (
     <ClinicalPanel title="Visit timeline" icon={<ClipboardList size={17} />}>
       <div className="divide-y divide-[var(--hh-border)]">
         {visits.map((visit) => (
-          <div key={visit.id} className="group relative grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[110px_1fr] pr-8">
+          <div key={visit.id} className="group relative grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[110px_1fr] pr-12">
             <div className="text-xs font-bold uppercase text-[#66736d]">{formatDate(visit.visit_date)}</div>
             <div>
               <div className="font-bold capitalize">{visit.visit_type.replaceAll("_", " ")}</div>
               <p className="mt-1 text-sm leading-6 text-[#53605a]">{visit.main_complaint}</p>
             </div>
-            {userRole === "clinician" && (
+            {isClinician && (
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-[var(--hh-purple)] hover:bg-[#eef4f1] transition-all"
                 onClick={() => onEditVisit(visit)}
                 type="button"
                 aria-label="Edit visit"
