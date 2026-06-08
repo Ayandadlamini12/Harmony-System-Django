@@ -30,6 +30,7 @@ import { toast } from "sonner";
 
 import { ActionErrorDialog } from "@/components/action-error-dialog";
 import { ClinicalPanel } from "@/components/clinical-panel";
+import { PatientAccessLogDialog } from "@/components/patient-access-log-dialog";
 import { PatientAppointmentDialog } from "@/components/patient-appointment-dialog";
 import { PatientMedicalHistoryDialog } from "@/components/patient-medical-history-dialog";
 import { PatientVitalsDialog } from "@/components/patient-vitals-dialog";
@@ -393,6 +394,7 @@ export function PatientRecordWorkspace({ patient: initialPatient, canCreateVisit
               Print summary
             </Button>
             <PatientAppointmentDialog patient={patient} />
+            <PatientAccessLogDialog patient={patient} userRole={userRole} />
           </div>
 
           {/* Dynamic Tab panels */}
