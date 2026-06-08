@@ -8,12 +8,16 @@ export function ClinicalPanel({
   title,
   icon,
   children,
-  action = false
+  action = false,
+  onAction,
+  actionNode
 }: {
   title: string;
   icon: React.ReactNode;
   children: React.ReactNode;
   action?: boolean;
+  onAction?: () => void;
+  actionNode?: React.ReactNode;
 }) {
   return (
     <Card>
@@ -22,9 +26,11 @@ export function ClinicalPanel({
           {icon}
           {title}
         </div>
-        <Button aria-label={action ? `Edit ${title}` : `${title} actions`} size="icon" type="button" variant="ghost">
-          {action ? <Pencil size={15} /> : <MoreHorizontal size={16} />}
-        </Button>
+        {actionNode ? actionNode : (
+          <Button onClick={onAction} aria-label={action ? `Edit ${title}` : `${title} actions`} size="icon" type="button" variant="ghost">
+            {action ? <Pencil size={15} /> : <MoreHorizontal size={16} />}
+          </Button>
+        )}
       </CardHeader>
       <CardContent className="p-4">{children}</CardContent>
     </Card>

@@ -556,6 +556,16 @@ class VisitViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Only clinical users can create visits."}, status=status.HTTP_403_FORBIDDEN)
         return super().create(request, *args, **kwargs)
 
+    def update(self, request, *args, **kwargs):
+        if not is_clinical_user(request.user):
+            return Response({"detail": "Only clinical users can edit visits."}, status=status.HTTP_403_FORBIDDEN)
+        return super().update(request, *args, **kwargs)
+
+    def partial_update(self, request, *args, **kwargs):
+        if not is_clinical_user(request.user):
+            return Response({"detail": "Only clinical users can edit visits."}, status=status.HTTP_403_FORBIDDEN)
+        return super().partial_update(request, *args, **kwargs)
+
     def perform_create(self, serializer):
         visit = serializer.save()
         journey = transition_active_patient_journey(

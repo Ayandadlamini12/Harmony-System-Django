@@ -14,6 +14,7 @@ import {
   HeartPulse,
   ListChecks,
   LockKeyhole,
+  Pencil,
   PenLine,
   Printer,
   Scale,
@@ -31,6 +32,7 @@ import { toast } from "sonner";
 import { ActionErrorDialog } from "@/components/action-error-dialog";
 import { ClinicalPanel } from "@/components/clinical-panel";
 import { PatientAccessLogDialog } from "@/components/patient-access-log-dialog";
+import { VisitEditDialog } from "@/components/visit-edit-dialog";
 import { PatientAppointmentDialog } from "@/components/patient-appointment-dialog";
 import { PatientMedicalHistoryDialog } from "@/components/patient-medical-history-dialog";
 import { PatientVitalsDialog } from "@/components/patient-vitals-dialog";
@@ -399,7 +401,7 @@ export function PatientRecordWorkspace({ patient: initialPatient, canCreateVisit
 
           {/* Dynamic Tab panels */}
           <section className="grid gap-5">
-            {activeTab === "overview" && <OverviewTab patient={patient} latestVisit={latestVisit} latestVitals={latestVitals} profile={profile} />}
+            {activeTab === "overview" && <OverviewTab patient={patient} latestVisit={latestVisit} latestVitals={latestVitals} profile={profile} userRole={userRole} onUpdatePatient={setPatient} />}
             {activeTab === "cases" && <CasesTab patient={patient} onUpdatePatient={setPatient} />}
             {activeTab === "assessments" && <AssessmentsTab visits={patient.visits || []} cases={initialCases} />}
             {activeTab === "diagnosis" && <DiagnosisTab visits={patient.visits || []} cases={initialCases} clinicalAccess={patient.clinical_access} />}
@@ -415,7 +417,14 @@ export function PatientRecordWorkspace({ patient: initialPatient, canCreateVisit
   );
 }
 
-function OverviewTab({ patient, latestVisit, latestVitals, profile }: { patient: Patient; latestVisit?: Visit; latestVitals?: Vital & { visitLabel: string }; profile?: PatientProfile | null }) {
+function OverviewTab({ patient, latestVisit, latestVitals, profile, userRole, onUpdatePatient }: { patient: Patient; latestVisit?: Visit; latestVitals?: Vital & { visitLabel: string }; profile?: PatientProfile | null; userRole?: string; onUpdatePatient: (updated: Patient) => void }) {
+  const [editingVisit, setEditVisit] = useState<Visit | null>(null);
+
+  const handleVisitUpdated = (updatedVisit: Visit) => {
+    const newVisits = (patient.visits || []).map((v) => (v.id === updatedVisit.id ? updatedVisit : v));
+    onUpdatePatient({ ...patient, visits: newVisits });
+  };
+
   return (
     <div className="grid gap-6 animate-fade-in">
       {/* Allergy Alert Warning Banner */}
@@ -442,14 +451,24 @@ function OverviewTab({ patient, latestVisit, latestVitals, profile }: { patient:
       {/* 2. Responsive Bento Split Grid */}
       <div className="grid gap-5 md:grid-cols-2">
         <div className="space-y-5">
-          <ClinicalPanel title="History of present complaint" icon={<ClipboardList size={17} />} action>
+          <ClinicalPanel 
+            title="History of present complaint" 
+            icon={<ClipboardList size={17} />} 
+            action={userRole === "clinician" && !!latestVisit}
+            onAction={() => latestVisit && setEditVisit(latestVisit)}
+          >
             <div className="space-y-4 text-sm leading-6 text-[#3f4d47]">
               <p>{latestVisit?.initial_complaints || latestVisit?.main_complaint || "No complaint history recorded yet."}</p>
               {latestVisit?.physical_examination && <p>{latestVisit.physical_examination}</p>}
             </div>
           </ClinicalPanel>
 
-          <ClinicalPanel title="Clinical assessment" icon={<Stethoscope size={17} />} action>
+          <ClinicalPanel 
+            title="Clinical assessment" 
+            icon={<Stethoscope size={17} />} 
+            action={userRole === "clinician" && !!latestVisit}
+            onAction={() => latestVisit && setEditVisit(latestVisit)}
+          >
             {latestVisit ? (
               <InfoGrid
                 rows={[
@@ -466,12 +485,21 @@ function OverviewTab({ patient, latestVisit, latestVitals, profile }: { patient:
         </div>
 
         <div className="space-y-5">
-          <VisitTimeline visits={patient.visits || []} />
+          <VisitTimeline visits={patient.visits || []} userRole={userRole} onEditVisit={setEditVisit} />
         </div>
       </div>
 
       {/* 3. Confidential disclosures section */}
       <ConfidentialRecords patient={patient} profile={profile} />
+
+      {editingVisit && (
+        <VisitEditDialog
+          visit={editingVisit}
+          isOpen={!!editingVisit}
+          setIsOpen={(open) => !open && setEditVisit(null)}
+          onVisitUpdated={handleVisitUpdated}
+        />
+      )}
     </div>
   );
 }
@@ -2147,17 +2175,29 @@ function LatestVitalsPanel({ vitals }: { vitals?: Vital & { visitLabel: string }
   );
 }
 
-function VisitTimeline({ visits }: { visits: Visit[] }) {
+function VisitTimeline({ visits, userRole, onEditVisit }: { visits: Visit[]; userRole?: string; onEditVisit: (v: Visit) => void }) {
   return (
     <ClinicalPanel title="Visit timeline" icon={<ClipboardList size={17} />}>
       <div className="divide-y divide-[var(--hh-border)]">
         {visits.map((visit) => (
-          <div key={visit.id} className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[110px_1fr]">
+          <div key={visit.id} className="group relative grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[110px_1fr] pr-8">
             <div className="text-xs font-bold uppercase text-[#66736d]">{formatDate(visit.visit_date)}</div>
             <div>
               <div className="font-bold capitalize">{visit.visit_type.replaceAll("_", " ")}</div>
               <p className="mt-1 text-sm leading-6 text-[#53605a]">{visit.main_complaint}</p>
             </div>
+            {userRole === "clinician" && (
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="absolute right-0 top-1/2 -translate-y-1/2 opacity-0 transition-opacity group-hover:opacity-100"
+                onClick={() => onEditVisit(visit)}
+                type="button"
+                aria-label="Edit visit"
+              >
+                <Pencil size={15} />
+              </Button>
+            )}
           </div>
         ))}
         {visits.length === 0 && <p className="text-sm text-[#66736d]">No visit history visible.</p>}
