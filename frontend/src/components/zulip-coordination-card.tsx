@@ -91,6 +91,7 @@ interface ZulipCoordinationCardProps {
   patientCode?: string;
   userRole?: "clinician" | "receptionist" | "admin" | "other";
   onPostSuccess?: (msg: string) => void;
+  forceTemplateOnly?: boolean;
 }
 
 // Default initial seeds for the Communication Context Service (recent messages)
@@ -305,7 +306,8 @@ export function ZulipCoordinationCard({
   linkedEntityName,
   patientCode,
   userRole = "receptionist",
-  onPostSuccess
+  onPostSuccess,
+  forceTemplateOnly = false
 }: ZulipCoordinationCardProps) {
   // Real dynamic states loaded from Next.js proxy endpoints
   const [messages, setMessages] = useState<ZulipOutboundEvent[]>([]);
@@ -418,6 +420,17 @@ export function ZulipCoordinationCard({
     return userRole === "receptionist" || userRole === "clinician" || userRole === "admin";
   }, [channel, userRole]);
 
+  const isPostButtonDisabled = useMemo(() => {
+    if (isPosting) return true;
+    if (!inputText.trim()) return true;
+    if (forceTemplateOnly) {
+      if (!selectedTemplateId) return true;
+      const activeTemplate = templates.find((t) => t.id === selectedTemplateId);
+      if (!activeTemplate || inputText.trim() !== activeTemplate.text.trim()) return true;
+    }
+    return false;
+  }, [isPosting, inputText, forceTemplateOnly, selectedTemplateId, templates]);
+
   // Deep Link Navigation Resolver
   const handleOpenInZulip = () => {
     // If we have messages, we can use the open_in_zulip_url of the latest message
@@ -438,6 +451,18 @@ export function ZulipCoordinationCard({
 
     const payload = inputText.trim();
     if (!payload) return;
+
+    if (forceTemplateOnly) {
+      if (!selectedTemplateId) {
+        toast.error("Template Required: Please select an operational action template before posting.");
+        return;
+      }
+      const activeTemplate = templates.find((t) => t.id === selectedTemplateId);
+      if (!activeTemplate || payload !== activeTemplate.text.trim()) {
+        toast.error("Operational Constraint: Modifications to the structured template payload are restricted.");
+        return;
+      }
+    }
 
     setIsPosting(true);
 
@@ -804,7 +829,7 @@ export function ZulipCoordinationCard({
               </Button>
               <Button
                 type="submit"
-                disabled={isPosting || !inputText.trim()}
+                disabled={isPostButtonDisabled}
                 className="bg-[var(--hh-purple)] hover:bg-[var(--hh-purple-dark)] text-white font-bold h-9 px-4 text-xs cursor-pointer"
               >
                 <Send size={13} className="mr-1" />
@@ -816,11 +841,27 @@ export function ZulipCoordinationCard({
           {/* Custom Message Input */}
           <div className="space-y-1.5">
             <textarea
-              className="w-full min-h-[50px] p-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--hh-purple)] leading-normal"
-              placeholder="Post a customized update... (Clinical keywords will be scrubbed)"
+              className={`w-full min-h-[50px] p-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--hh-purple)] leading-normal ${
+                forceTemplateOnly ? "bg-slate-50 text-slate-500 cursor-not-allowed select-none" : ""
+              }`}
+              placeholder={
+                forceTemplateOnly
+                  ? "Select a template above to generate structured message payload..."
+                  : "Post a customized update... (Clinical keywords will be scrubbed)"
+              }
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
+              disabled={forceTemplateOnly}
             />
+
+            {forceTemplateOnly && (
+              <div className="text-[11px] text-[#4b5563] bg-slate-50/80 p-2.5 rounded-lg border border-slate-200/60 flex items-start gap-1.5 leading-relaxed animate-in fade-in duration-200">
+                <Lock size={12} className="text-[#6b7280] shrink-0 mt-0.5" />
+                <span>
+                  <strong>Standardized Logging Policy</strong>: Custom free-text entry is restricted in this workflow. Select an approved action template above to automatically generate a compliant message payload.
+                </span>
+              </div>
+            )}
 
             {/* Privacy Compliance Scrubber Panel */}
             {inputText.trim() && (

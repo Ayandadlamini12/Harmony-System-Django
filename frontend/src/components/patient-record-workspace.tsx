@@ -31,6 +31,7 @@ import { toast } from "sonner";
 
 import { ActionErrorDialog } from "@/components/action-error-dialog";
 import { ClinicalPanel } from "@/components/clinical-panel";
+import { ZulipCoordinationCard } from "@/components/zulip-coordination-card";
 import { PatientAccessLogDialog } from "@/components/patient-access-log-dialog";
 import { VisitEditDialog } from "@/components/visit-edit-dialog";
 import { PatientAppointmentDialog } from "@/components/patient-appointment-dialog";
@@ -408,7 +409,7 @@ export function PatientRecordWorkspace({ patient: initialPatient, canCreateVisit
             {activeTab === "remedies" && <RemediesTab visits={patient.visits || []} cases={initialCases} patient={patient} />}
             {activeTab === "vitals" && <VitalsTab vitals={allVitals(patient)} patient={patient} />}
             {activeTab === "follow_ups" && <FollowUpsTab visits={patient.visits || []} cases={initialCases} />}
-            {activeTab === "documents" && <DocumentsTab patient={patient} documents={documents} onDocumentsChange={setDocuments} />}
+            {activeTab === "documents" && <DocumentsTab patient={patient} documents={documents} onDocumentsChange={setDocuments} userRole={userRole} />}
             {activeTab === "notes" && <NotesTab patient={patient} latestVisit={latestVisit} profile={profile} />}
           </section>
 
@@ -1302,7 +1303,7 @@ function FollowUpsTab({ visits, cases }: { visits: Visit[]; cases: Case[] }) {
   );
 }
 
-function DocumentsTab({ patient, documents, onDocumentsChange }: { patient: Patient; documents: PatientDocument[]; onDocumentsChange: (docs: PatientDocument[]) => void }) {
+function DocumentsTab({ patient, documents, onDocumentsChange, userRole }: { patient: Patient; documents: PatientDocument[]; onDocumentsChange: (docs: PatientDocument[]) => void; userRole?: string }) {
   const router = useRouter();
   const setDocuments = onDocumentsChange;
   const [generating, setGenerating] = useState(false);
@@ -1524,6 +1525,19 @@ function DocumentsTab({ patient, documents, onDocumentsChange }: { patient: Pati
             </Button>
           </div>
         )}
+
+        <div className="mt-4">
+          <ZulipCoordinationCard
+            channel="front-desk"
+            topic={`CONSENT | ${patient.patient_code} | ${new Date().toISOString().split("T")[0]}`}
+            linkedEntityType="patient"
+            linkedEntityId={patient.patient_code}
+            linkedEntityName={patient.full_name_display}
+            patientCode={patient.patient_code}
+            userRole={userRole as any}
+            forceTemplateOnly={userRole === "receptionist"}
+          />
+        </div>
 
         {/* Expandable Historical Documents Table */}
         {historicalDocs.length > 0 && (

@@ -3,9 +3,12 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { PatientFlowLookup } from "@/components/patient-flow-lookup";
 import { Button } from "@/components/ui/button";
+import { getSessionUser } from "@/lib/session";
 
 export default async function PatientFlowPage({ searchParams }: { searchParams: Promise<{ identifier?: string }> }) {
   const params = await searchParams;
+  const session = await getSessionUser();
+  
   return (
     <AppShell
       title="Patient flow tracking"
@@ -20,7 +23,8 @@ export default async function PatientFlowPage({ searchParams }: { searchParams: 
         </>
       }
     >
-      <PatientFlowLookup initialIdentifier={params.identifier || ""} />
+      <PatientFlowLookup initialIdentifier={params.identifier || ""} userRole={session.role} />
     </AppShell>
   );
 }
+

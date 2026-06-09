@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { showActionError } from "@/lib/action-error";
 import type { PatientJourney } from "@/types/clinic";
+import { ZulipCoordinationCard } from "@/components/zulip-coordination-card";
 
 type LookupResponse = {
   patient: {
@@ -65,7 +66,7 @@ function formatDateTime(value?: string) {
   return new Intl.DateTimeFormat("en", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }).format(new Date(value));
 }
 
-export function PatientFlowLookup({ initialIdentifier = "" }: { initialIdentifier?: string }) {
+export function PatientFlowLookup({ initialIdentifier = "", userRole }: { initialIdentifier?: string; userRole?: string }) {
   const inferredIdentifierType = initialIdentifier.toUpperCase().startsWith("HHPAT-") ? "patient_code" : identifierOptions[0].value;
   const [identifierType, setIdentifierType] = useState(inferredIdentifierType);
   const [identifier, setIdentifier] = useState(initialIdentifier);
@@ -181,29 +182,42 @@ export function PatientFlowLookup({ initialIdentifier = "" }: { initialIdentifie
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="px-5 py-4">
-              <div className="font-bold">Recent process history</div>
-            </CardHeader>
-            <CardContent className="p-5 pt-0">
-              <div className="grid gap-3">
-                {result.recent_journeys.map((journey) => (
-                  <div key={journey.id} className="rounded-lg border border-[var(--hh-border)] bg-white p-3">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="font-bold">{journey.current_stage_label}</div>
-                      <Badge variant={journey.is_active ? "success" : "default"}>{journey.is_active ? "Active" : "Closed"}</Badge>
+          <div className="flex flex-col gap-5">
+            <Card>
+              <CardHeader className="px-5 py-4">
+                <div className="font-bold">Recent process history</div>
+              </CardHeader>
+              <CardContent className="p-5 pt-0">
+                <div className="grid gap-3">
+                  {result.recent_journeys.map((journey) => (
+                    <div key={journey.id} className="rounded-lg border border-[var(--hh-border)] bg-white p-3">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="font-bold">{journey.current_stage_label}</div>
+                        <Badge variant={journey.is_active ? "success" : "default"}>{journey.is_active ? "Active" : "Closed"}</Badge>
+                      </div>
+                      <div className="mt-2 grid gap-1 text-sm text-[#66736d]">
+                        <span>{formatDate(journey.service_date)}</span>
+                        <span>{journey.flow_type_label}</span>
+                        {journey.queue_number && <span>Queue #{journey.queue_number}</span>}
+                      </div>
                     </div>
-                    <div className="mt-2 grid gap-1 text-sm text-[#66736d]">
-                      <span>{formatDate(journey.service_date)}</span>
-                      <span>{journey.flow_type_label}</span>
-                      {journey.queue_number && <span>Queue #{journey.queue_number}</span>}
-                    </div>
-                  </div>
-                ))}
-                {result.recent_journeys.length === 0 && <p className="text-sm text-[#66736d]">No process history has been recorded for this patient.</p>}
-              </div>
-            </CardContent>
-          </Card>
+                  ))}
+                  {result.recent_journeys.length === 0 && <p className="text-sm text-[#66736d]">No process history has been recorded for this patient.</p>}
+                </div>
+              </CardContent>
+            </Card>
+
+            <ZulipCoordinationCard
+              channel="front-desk"
+              topic={`PATIENT FLOW | ${result.patient.patient_code} | ${result.current_journey?.service_date || new Date().toISOString().split('T')[0]}`}
+              linkedEntityType="patient"
+              linkedEntityId={result.patient.patient_code}
+              linkedEntityName={result.patient.full_name_display}
+              patientCode={result.patient.patient_code}
+              userRole={userRole as any}
+              forceTemplateOnly={userRole === "receptionist"}
+            />
+          </div>
         </div>
       )}
     </div>

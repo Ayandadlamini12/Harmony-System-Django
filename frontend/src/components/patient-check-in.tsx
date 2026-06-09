@@ -474,12 +474,13 @@ export function PatientCheckIn({
           <ZulipCoordinationCard
             key={checkInTrigger}
             channel="front-desk"
-            topic={`PATIENT FLOW | ${lastCheckedInName || "Reception Desk"} | 2026-06-08`}
+            topic={`PATIENT FLOW | ${lastCheckedInCode || "RECEPTION"} | ${new Date().toISOString().split('T')[0]}`}
             linkedEntityType="patient"
             linkedEntityId={lastCheckedInCode || "RECEPTION"}
             linkedEntityName={lastCheckedInName || "Front Desk Queue"}
             patientCode={lastCheckedInCode}
             userRole="receptionist"
+            forceTemplateOnly={true}
           />
         </div>
       )}
