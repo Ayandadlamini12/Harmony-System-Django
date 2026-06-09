@@ -3,7 +3,7 @@ $Headers = @{ "X-API-Key" = $ApiKey }
 $BaseUri = "https://portainer.fmtagency.online/api/endpoints/5/docker"
 
 try {
-    $Info = Invoke-RestMethod -Uri "$BaseUri/containers/harmony-django-frontend/json" -Headers $Headers -Method Get
+    $Info = Invoke-RestMethod -Uri "$BaseUri/containers/harmony-django-backend/json" -Headers $Headers -Method Get
     
     [PSCustomObject]@{
         Name = $Info.Name
