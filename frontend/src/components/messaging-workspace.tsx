@@ -33,6 +33,40 @@ interface Props {
   recipients: MessageRecipient[];
 }
 
+export function formatBackendError(errData: any, defaultMsg: string = "An error occurred"): string {
+  if (!errData) return defaultMsg;
+  if (typeof errData === "string") return errData;
+  if (errData.detail) return errData.detail;
+
+  if (typeof errData === "object") {
+    const errorParts: string[] = [];
+    for (const [key, value] of Object.entries(errData)) {
+      if (key === "non_field_errors" && Array.isArray(value)) {
+        errorParts.push(value.join(" "));
+      } else if (Array.isArray(value)) {
+        const formattedKey = key
+          .split("_")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+        errorParts.push(`${formattedKey}: ${value.join(" ")}`);
+      } else if (typeof value === "string") {
+        const formattedKey = key
+          .split("_")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+        errorParts.push(`${formattedKey}: ${value}`);
+      } else if (typeof value === "object" && value !== null) {
+        errorParts.push(`${key}: ${JSON.stringify(value)}`);
+      }
+    }
+    if (errorParts.length > 0) {
+      return errorParts.join(" | ");
+    }
+  }
+
+  return defaultMsg;
+}
+
 // ==========================================
 // Types & Channel Definitions
 // ==========================================
@@ -126,7 +160,6 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
   const [inputText, setInputText] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
-  // 6. Dynamic Channels Database (State-driven CCS for listing only)
   const [channels, setChannels] = useState<ChannelContext[]>([
     {
       id: "front-desk",
@@ -135,14 +168,14 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       category: "operational",
       unreadCount: 1,
       lastActivityTime: "10:22 AM",
-      lastMessagePreview: "Vitals recorded for Queue #14. Ready for review.",
-      topic: "PATIENT FLOW | Zahara Dlamini | 2026-06-08",
+      lastMessagePreview: "Vitals recorded for Abandze Dlamini. Ready for review.",
+      topic: "PATIENT | HHPAT-10326696106 | 2026-06-08",
       entityType: "patient",
-      entityId: "14",
-      entityName: "Zahara Dlamini",
-      patientCode: "PAT-2026-000001",
+      entityId: "379b65c7-2353-4365-972c-fafcfb7e969b",
+      entityName: "Abandze Dlamini",
+      patientCode: "HHPAT-10326696106",
       details: {
-        "Queue Number": "#14",
+        "Patient Code": "HHPAT-10326696106",
         "Check-In Time": "10:15 AM",
         "Flow Stage": "Vitals Completed",
         "Assigned Room": "Consultation Room 2",
@@ -157,14 +190,14 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       category: "operational",
       unreadCount: 2,
       lastActivityTime: "08:15 AM",
-      lastMessagePreview: "Patient PAT-2026-000412 stabilized.",
-      topic: "HANDOVER | PAT-2026-000412 | 2026-06-08",
+      lastMessagePreview: "Patient HHPAT-10426815451 stabilized.",
+      topic: "PATIENT | HHPAT-10426815451 | 2026-06-08",
       entityType: "patient",
-      entityId: "412",
-      entityName: "Thabo Maseko",
-      patientCode: "PAT-2026-000412",
+      entityId: "e7112481-dbdd-41b3-913a-17ae9614bf3b",
+      entityName: "komesi Suka",
+      patientCode: "HHPAT-10426815451",
       details: {
-        "Patient ID": "PAT-2026-000412",
+        "Patient Code": "HHPAT-10426815451",
         "Discharge Status": "Stabilized",
         "Ward Location": "Observation Ward A",
         "Attending Clinician": "Dr. Dlamini",
@@ -179,13 +212,14 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       category: "operational",
       unreadCount: 0,
       lastActivityTime: "11:00 AM",
-      lastMessagePreview: "Follow-up visit scheduled for PAT-2026-000001.",
-      topic: "FOLLOW-UP | PAT-2026-000001 | 2026-06-10",
+      lastMessagePreview: "Follow-up visit scheduled for HHPAT-10326696106.",
+      topic: "APPOINTMENT | HHPAT-10326696106 | 2026-06-10",
       entityType: "appointment",
-      entityId: "APP-0412",
-      entityName: "Zahara Dlamini Follow-Up",
-      patientCode: "PAT-2026-000001",
+      entityId: "1",
+      entityName: "Abandze Dlamini Follow-Up",
+      patientCode: "HHPAT-10326696106",
       details: {
+        "Appointment ID": "1",
         "Appointment Date": "2026-06-10",
         "Scheduled Time": "09:00 AM",
         "Clinician Assigned": "Dr. Dlamini",
@@ -202,12 +236,12 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       unreadCount: 1,
       lastActivityTime: "Yesterday",
       lastMessagePreview: "Pending signature reminder sent to patient.",
-      topic: "CONSENT | HH-CONS-041",
+      topic: "CONSENT | 9ac43f15-7318-418b-9a74-008e1aff4aa7",
       entityType: "consent",
-      entityId: "HH-CONS-041",
+      entityId: "9ac43f15-7318-418b-9a74-008e1aff4aa7",
       entityName: "Electronic Medical Consent",
       details: {
-        "Consent ID": "HH-CONS-041",
+        "Consent ID": "9ac43f15-7318-418b-9a74-008e1aff4aa7",
         "Form Type": "General Discretionary",
         "Signature Status": "Pending Signature",
         "Recipient Cell": "+268 7604 1234",
@@ -223,12 +257,12 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       unreadCount: 0,
       lastActivityTime: "09:41 AM",
       lastMessagePreview: "Investigating the latency spikes on Redis.",
-      topic: "TICKET | SUPPORT-0142",
+      topic: "TICKET | TICKET-1",
       entityType: "ticket",
-      entityId: "142",
-      entityName: "Cache latency on production ARM64 host",
+      entityId: "1",
+      entityName: "Patient Registration Support Ticket",
       details: {
-        "Ticket ID": "SUPPORT-0142",
+        "Ticket ID": "TICKET-1",
         "Priority": "High Critical",
         "Assigned Group": "DevOps",
         "Status": "Open",
@@ -244,9 +278,9 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       unreadCount: 0,
       lastActivityTime: "06/07/26",
       lastMessagePreview: "Audited access requests for new ward terminals.",
-      topic: "EMPLOYEE | HH2005341",
+      topic: "EMPLOYEE | 1",
       entityType: "employee",
-      entityId: "HH2005341",
+      entityId: "1",
       entityName: "Nurse Enrollment Audits",
       details: {
         "Department": "Clinical Wards",
@@ -320,6 +354,19 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       entityName: activeChannel.entityName,
       patientCode: activeChannel.patientCode
     };
+
+    const isInteger = (val: any) => {
+      if (val === undefined || val === null) return false;
+      return /^\d+$/.test(String(val));
+    };
+
+    const patientRef = isInteger(context.entityId) 
+      ? `Queue #${context.entityId}` 
+      : `Patient ${context.patientCode || "PATIENT"}`;
+
+    const patientInitials = context.entityName 
+      ? context.entityName.split(" ").map(n => n[0]).join("") 
+      : "PAT";
     
     switch (activeChannel.id) {
       case "front-desk":
@@ -328,19 +375,19 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
             id: "fd_ready",
             label: "Mark Patient Ready",
             roleRequired: ["receptionist", "admin"],
-            text: `📢 **PATIENT READY**: Queue #${context.entityId || "XX"} is ready for clinician room handover. Initials: ${context.entityName.split(" ").map(n => n[0]).join("")}.`
+            text: `📢 **PATIENT READY**: ${patientRef} is ready for clinician room handover. Initials: ${patientInitials}.`
           },
           {
             id: "fd_vitals",
             label: "Request Vitals Update",
             roleRequired: ["receptionist", "clinician", "admin"],
-            text: `⏱️ **VITALS REQUESTED**: Please record vitals for Queue #${context.entityId || "XX"} (${context.entityName.split(" ").map(n => n[0]).join("")}).`
+            text: `⏱️ **VITALS REQUESTED**: Please record vitals for ${patientRef} (${patientInitials}).`
           },
           {
             id: "fd_checkout",
             label: "Notify Checkout",
             roleRequired: ["receptionist", "admin"],
-            text: `✅ **FLOW COMPLETE**: Patient Queue #${context.entityId || "XX"} checked out. Folder archived.`
+            text: `✅ **FLOW COMPLETE**: ${patientRef} checked out. Folder archived.`
           }
         ];
       case "system-support":
@@ -349,13 +396,13 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
             id: "ss_escalate",
             label: "Escalate Ticket",
             roleRequired: ["admin"],
-            text: `🚨 **TICKET ESCALATION**: Ticket #SUPPORT-${context.entityId || "XXXX"} escalated to Senior DevOps.`
+            text: `🚨 **TICKET ESCALATION**: Ticket #TICKET-${context.entityId || "XXXX"} escalated to Senior DevOps.`
           },
           {
             id: "ss_alert",
             label: "Notify Specialist",
             roleRequired: ["admin"],
-            text: `⚠️ **ATTENTION NEEDED**: Ticket #SUPPORT-${context.entityId || "XXXX"} requires priority intervention. [Secure MIS Link](https://mis.harmonyhealthsz.com/administration/support-tickets)`
+            text: `⚠️ **ATTENTION NEEDED**: Ticket #TICKET-${context.entityId || "XXXX"} requires priority intervention. [Secure MIS Link](https://mis.harmonyhealthsz.com/administration/support-tickets)`
           }
         ];
       case "appointments":
@@ -505,7 +552,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
         }));
       } else {
         const errData = await res.json().catch(() => ({}));
-        toast.error(errData.detail || "Failed to queue operational update.");
+        toast.error(formatBackendError(errData, "Failed to queue operational update."));
       }
     } catch (err) {
       toast.error("Network Error: Could not connect to API proxy.");
@@ -563,7 +610,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
         toast.success("Delivery retry triggered successfully!");
       } else {
         const errData = await res.json().catch(() => ({}));
-        toast.error(errData.detail || "Failed to trigger retry.");
+        toast.error(formatBackendError(errData, "Failed to trigger retry."));
       }
     } catch (err) {
       toast.error("Network Error: Could not connect to retry API.");

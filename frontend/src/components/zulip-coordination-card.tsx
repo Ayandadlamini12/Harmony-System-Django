@@ -22,6 +22,40 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
+export function formatBackendError(errData: any, defaultMsg: string = "An error occurred"): string {
+  if (!errData) return defaultMsg;
+  if (typeof errData === "string") return errData;
+  if (errData.detail) return errData.detail;
+
+  if (typeof errData === "object") {
+    const errorParts: string[] = [];
+    for (const [key, value] of Object.entries(errData)) {
+      if (key === "non_field_errors" && Array.isArray(value)) {
+        errorParts.push(value.join(" "));
+      } else if (Array.isArray(value)) {
+        const formattedKey = key
+          .split("_")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+        errorParts.push(`${formattedKey}: ${value.join(" ")}`);
+      } else if (typeof value === "string") {
+        const formattedKey = key
+          .split("_")
+          .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+          .join(" ");
+        errorParts.push(`${formattedKey}: ${value}`);
+      } else if (typeof value === "object" && value !== null) {
+        errorParts.push(`${key}: ${JSON.stringify(value)}`);
+      }
+    }
+    if (errorParts.length > 0) {
+      return errorParts.join(" | ");
+    }
+  }
+
+  return defaultMsg;
+}
+
 // ==========================================
 // 1. Core Interfaces & Mock Data Types
 // ==========================================
@@ -166,6 +200,15 @@ function getTemplatesForChannel(channel: string, context: { entityId?: string | 
     ? context.entityName.split(" ").map(n => n[0]).join("") 
     : "PAT";
     
+  const isInteger = (val: any) => {
+    if (val === undefined || val === null) return false;
+    return /^\d+$/.test(String(val));
+  };
+
+  const patientRef = isInteger(context.entityId) 
+    ? `Queue #${context.entityId}` 
+    : `Patient ${context.patientCode || "PATIENT"}`;
+
   switch (channel) {
     case "front-desk":
       return [
@@ -173,19 +216,19 @@ function getTemplatesForChannel(channel: string, context: { entityId?: string | 
           id: "fd_ready",
           label: "Mark Patient Ready",
           roleRequired: ["receptionist", "admin"],
-          text: `📢 **PATIENT READY**: Queue #${context.entityId || "XX"} is ready for clinician room handover. Initials: ${patientInitials}.`
+          text: `📢 **PATIENT READY**: ${patientRef} is ready for clinician room handover. Initials: ${patientInitials}.`
         },
         {
           id: "fd_vitals",
           label: "Request Vitals Update",
           roleRequired: ["receptionist", "clinician", "admin"],
-          text: `⏱️ **VITALS REQUESTED**: Please record vitals for Queue #${context.entityId || "XX"} (${patientInitials}).`
+          text: `⏱️ **VITALS REQUESTED**: Please record vitals for ${patientRef} (${patientInitials}).`
         },
         {
           id: "fd_checkout",
           label: "Notify Checkout",
           roleRequired: ["receptionist", "admin"],
-          text: `✅ **FLOW COMPLETE**: Patient Queue #${context.entityId || "XX"} checked out. Folder archived.`
+          text: `✅ **FLOW COMPLETE**: ${patientRef} checked out. Folder archived.`
         }
       ];
     case "system-support":
@@ -194,13 +237,13 @@ function getTemplatesForChannel(channel: string, context: { entityId?: string | 
           id: "ss_escalate",
           label: "Escalate Ticket",
           roleRequired: ["admin"],
-          text: `🚨 **TICKET ESCALATION**: Ticket #SUPPORT-${context.entityId || "XXXX"} escalated to Senior DevOps.`
+          text: `🚨 **TICKET ESCALATION**: Ticket #TICKET-${context.entityId || "XXXX"} escalated to Senior DevOps.`
         },
         {
           id: "ss_alert",
           label: "Notify Specialist",
           roleRequired: ["admin"],
-          text: `⚠️ **ATTENTION NEEDED**: Ticket #SUPPORT-${context.entityId || "XXXX"} requires priority intervention. [Secure MIS Link](https://mis.harmonyhealthsz.com/administration/support-tickets)`
+          text: `⚠️ **ATTENTION NEEDED**: Ticket #TICKET-${context.entityId || "XXXX"} requires priority intervention. [Secure MIS Link](https://mis.harmonyhealthsz.com/administration/support-tickets)`
         }
       ];
     case "appointments":
@@ -445,7 +488,7 @@ export function ZulipCoordinationCard({
         }
       } else {
         const errData = await res.json().catch(() => ({}));
-        toast.error(errData.detail || "Failed to queue operational update.");
+        toast.error(formatBackendError(errData, "Failed to queue operational update."));
       }
     } catch (err) {
       toast.error("Network Error: Could not connect to API proxy.");
@@ -505,7 +548,7 @@ export function ZulipCoordinationCard({
         toast.success("Delivery retry triggered successfully!");
       } else {
         const errData = await res.json().catch(() => ({}));
-        toast.error(errData.detail || "Failed to trigger retry.");
+        toast.error(formatBackendError(errData, "Failed to trigger retry."));
       }
     } catch (err) {
       toast.error("Network Error: Could not connect to retry API.");

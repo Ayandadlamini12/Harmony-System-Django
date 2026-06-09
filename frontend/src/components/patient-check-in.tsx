@@ -476,7 +476,7 @@ export function PatientCheckIn({
             channel="front-desk"
             topic={`PATIENT FLOW | ${lastCheckedInName || "Reception Desk"} | 2026-06-08`}
             linkedEntityType="patient"
-            linkedEntityId={lastCheckedInQueue || "RECEPTION"}
+            linkedEntityId={lastCheckedInCode || "RECEPTION"}
             linkedEntityName={lastCheckedInName || "Front Desk Queue"}
             patientCode={lastCheckedInCode}
             userRole="receptionist"
