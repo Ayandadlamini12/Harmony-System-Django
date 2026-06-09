@@ -17,6 +17,7 @@ import { TablePagination } from "@/components/table-pagination";
 import { Dialog, DialogContent, DialogTitle, DialogClose } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { LoadingButton } from "@/components/harmony-loading";
+import { ZulipCoordinationCard } from "@/components/zulip-coordination-card";
 import type { Paginated, SupportTicket } from "@/types/clinic";
 
 interface TicketsClientProps {
@@ -324,6 +325,19 @@ export function TicketsClient({ initialTickets, currentStatus, currentSearch }: 
                   <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-[#2b2f38] whitespace-pre-wrap leading-relaxed max-h-72 overflow-y-auto font-sans shadow-inner">
                     {selectedTicket.description}
                   </div>
+                </div>
+
+                {/* Zulip Contextual Coordination Surface */}
+                <div className="space-y-1.5 pt-2">
+                  <div className="text-xs font-bold text-[#3f1d58] uppercase tracking-wider">Zulip Contextual Coordination</div>
+                  <ZulipCoordinationCard
+                    channel="system-support"
+                    topic={`TICKET | SUPPORT-${selectedTicket.id}`}
+                    linkedEntityType="ticket"
+                    linkedEntityId={selectedTicket.id}
+                    linkedEntityName={selectedTicket.title}
+                    userRole="admin"
+                  />
                 </div>
               </div>
 
