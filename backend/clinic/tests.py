@@ -1,10 +1,11 @@
 from datetime import timedelta
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientProfile, Visit, VisitSymptomProblem, Vital
+from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientProfile, Visit, VisitSymptomProblem, Vital, ZulipOutboundEvent
 
 User = get_user_model()
 
@@ -646,5 +647,98 @@ class ClinicalAccessTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 1)
+
+
+class ZulipCoordinationApiTests(APITestCase):
+    def setUp(self):
+        self.receptionist = User.objects.create_user(
+            username="zulip_reception",
+            password="password123",
+            role="receptionist",
+            first_name="Reception",
+            last_name="Agent",
+        )
+        self.admin = User.objects.create_user(
+            username="zulip_admin",
+            password="password123",
+            role="admin",
+            first_name="Admin",
+            last_name="Agent",
+        )
+        self.patient = Patient.objects.create(
+            first_name="Zahara",
+            last_name="Dlamini",
+            gender="female",
+            primary_phone="+26876001048",
+        )
+        self.client.force_authenticate(self.receptionist)
+
+    @patch("clinic.views.post_to_zulip_task.delay")
+    def test_post_update_creates_sanitized_event_and_queues_delivery(self, mock_delay):
+        response = self.client.post(
+            "/api/zulip/post-update/",
+            {
+                "linked_entity_type": "patient",
+                "linked_entity_id": str(self.patient.public_id),
+                "template_key": "patient_checked_in",
+                "raw_payload": "Patient reports diagnosis of HIV and severe headache.",
+                "metadata": {"queue_number": 4},
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 202)
+        event = ZulipOutboundEvent.objects.get()
+        self.assertEqual(event.actor, self.receptionist)
+        self.assertEqual(event.channel, "front-desk")
+        self.assertEqual(event.linked_entity_type, "patient")
+        self.assertIn("[clinical detail redacted for privacy]", event.sanitized_payload.lower())
+        self.assertEqual(event.status, ZulipOutboundEvent.Status.PENDING)
+        mock_delay.assert_called_once_with(event.id)
+        self.assertTrue(AuditLog.objects.filter(entity_type="zulip_outbound_event", action="create").exists())
+
+    def test_non_admin_cannot_post_to_management_channel(self):
+        response = self.client.post(
+            "/api/zulip/post-update/",
+            {
+                "channel": "management",
+                "topic": "EMPLOYEE | HH2005572",
+                "linked_entity_type": "employee",
+                "linked_entity_id": "HH2005572",
+                "raw_payload": "Provision new staff account.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_messages_endpoint_returns_only_visible_events(self):
+        own_event = ZulipOutboundEvent.objects.create(
+            actor=self.receptionist,
+            channel="front-desk",
+            topic="PATIENT FLOW | Zahara Dlamini | 2026-06-09",
+            linked_entity_type="patient",
+            linked_entity_id=str(self.patient.public_id),
+            raw_payload="Patient checked in.",
+            sanitized_payload="Patient checked in.",
+        )
+        ZulipOutboundEvent.objects.create(
+            actor=self.admin,
+            channel="management",
+            topic="EMPLOYEE | HH2005572",
+            linked_entity_type="employee",
+            linked_entity_id="HH2005572",
+            raw_payload="Admin-only update.",
+            sanitized_payload="Admin-only update.",
+        )
+
+        response = self.client.get(
+            "/api/zulip/messages/",
+            {"channel": "front-desk", "topic": own_event.topic},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.data["results"]), 1)
+        self.assertEqual(response.data["results"][0]["id"], own_event.id)
 
 # Create your tests here.

@@ -1,7 +1,7 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import AppointmentViewSet, AuditLogViewSet, CaseViewSet, ElevatedAccessRequestViewSet, FormDraftViewSet, MessageThreadViewSet, PartnerCompanyViewSet, PatientCheckInViewSet, PatientDocumentViewSet, PatientJourneyViewSet, PatientViewSet, SupportTicketViewSet, VisitViewSet, VitalViewSet, dashboard_stats, patient_import_webhook
+from .views import AppointmentViewSet, AuditLogViewSet, CaseViewSet, ElevatedAccessRequestViewSet, FormDraftViewSet, MessageThreadViewSet, PartnerCompanyViewSet, PatientCheckInViewSet, PatientDocumentViewSet, PatientJourneyViewSet, PatientViewSet, SupportTicketViewSet, VisitViewSet, VitalViewSet, ZulipMessagesViewSet, ZulipOutboundEventViewSet, ZulipPostUpdateViewSet, ZulipRetryPostViewSet, dashboard_stats, patient_import_webhook
 
 router = DefaultRouter()
 router.register("patients", PatientViewSet, basename="patients")
@@ -18,9 +18,13 @@ router.register("access-requests", ElevatedAccessRequestViewSet, basename="acces
 router.register("audit-logs", AuditLogViewSet, basename="audit-logs")
 router.register("support-tickets", SupportTicketViewSet, basename="support-tickets")
 router.register("partner-companies", PartnerCompanyViewSet, basename="partner-companies")
+router.register("zulip/outbound-events", ZulipOutboundEventViewSet, basename="zulip-outbound-events")
 
 urlpatterns = [
     path("dashboard/stats/", dashboard_stats, name="dashboard-stats"),
     path("webhooks/patient-import/", patient_import_webhook, name="patient-import-webhook"),
+    path("zulip/messages/", ZulipMessagesViewSet.as_view({"get": "list"}), name="zulip-messages"),
+    path("zulip/post-update/", ZulipPostUpdateViewSet.as_view({"post": "create"}), name="zulip-post-update"),
+    path("zulip/retry-post/", ZulipRetryPostViewSet.as_view({"post": "create"}), name="zulip-retry-post"),
 ] + router.urls
 

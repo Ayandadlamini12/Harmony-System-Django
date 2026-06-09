@@ -832,6 +832,48 @@ class AuditLog(models.Model):
         return f"{self.action} {self.entity_type}#{self.entity_id}"
 
 
+class ZulipOutboundEvent(TimeStampedModel):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending delivery"
+        SUCCESS = "success", "Delivered successfully"
+        FAILED = "failed", "Delivery failed"
+        RETRY_BUFFERED = "retry_buffered", "Buffered for retry"
+
+    class LinkedType(models.TextChoices):
+        PATIENT = "patient", "Patient"
+        TICKET = "ticket", "Support Ticket"
+        APPOINTMENT = "appointment", "Appointment"
+        CONSENT = "consent", "Consent Form"
+        EMPLOYEE = "employee", "Employee / Staff"
+
+    actor = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="zulip_events",
+    )
+    channel = models.CharField(max_length=80)
+    topic = models.CharField(max_length=255)
+    linked_entity_type = models.CharField(max_length=40, choices=LinkedType.choices)
+    linked_entity_id = models.CharField(max_length=100)
+    raw_payload = models.TextField()
+    sanitized_payload = models.TextField()
+    template_key = models.CharField(max_length=80, default="generic_update", blank=True)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING)
+    response_metadata = models.JSONField(default=dict, blank=True)
+    retry_count = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["status", "created_at"]),
+            models.Index(fields=["channel", "topic"]),
+            models.Index(fields=["linked_entity_type", "linked_entity_id"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.channel} | {self.topic} ({self.status})"
+
+
 class SupportTicket(TimeStampedModel):
     class TicketStatus(models.TextChoices):
         OPEN = "open", "Open"

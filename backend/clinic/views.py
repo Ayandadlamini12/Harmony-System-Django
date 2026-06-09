@@ -17,7 +17,7 @@ from rest_framework.response import Response
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
 from .document_generation import consent_document_reference, generate_consent_pdf, render_consent_html, save_consent_pdf, sign_consent_document
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, Vital, VisitSymptomProblem
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, Vital, VisitSymptomProblem, ZulipOutboundEvent
 from .serializers import (
     AuditLogSerializer,
     AppointmentSerializer,
@@ -36,7 +36,12 @@ from .serializers import (
     VisitSerializer,
     VitalSerializer,
     PartnerCompanySerializer,
+    ZulipMessagesQuerySerializer,
+    ZulipOutboundEventSerializer,
+    ZulipPostUpdateSerializer,
 )
+from .tasks import post_to_zulip_task
+from .zulip import LINKED_TYPE_CHANNEL_DEFAULTS, build_topic, clean_clinical_payload, format_operational_message, user_can_access_channel
 
 User = get_user_model()
 
@@ -225,6 +230,44 @@ def transition_active_patient_journey(patient, stage, request=None, note="", vis
     journey.save()
     create_journey_event(journey, stage, request, note)
     return journey
+
+
+def resolve_linked_entity_label(linked_entity_type: str, linked_entity_id: str) -> str:
+    if linked_entity_type == ZulipOutboundEvent.LinkedType.PATIENT:
+        patient = Patient.objects.filter(Q(public_id=linked_entity_id) | Q(patient_code=linked_entity_id)).first()
+        return patient.patient_code if patient else linked_entity_id
+    if linked_entity_type == ZulipOutboundEvent.LinkedType.APPOINTMENT:
+        appointment = Appointment.objects.filter(pk=linked_entity_id).select_related("patient").first()
+        return appointment.patient.patient_code if appointment and appointment.patient else linked_entity_id
+    if linked_entity_type == ZulipOutboundEvent.LinkedType.CONSENT:
+        document = PatientDocument.objects.filter(document_id=linked_entity_id).select_related("patient").first()
+        return document.patient.patient_code if document and document.patient else linked_entity_id
+    if linked_entity_type == ZulipOutboundEvent.LinkedType.TICKET:
+        ticket = SupportTicket.objects.filter(pk=linked_entity_id).first()
+        return f"TICKET-{ticket.pk}" if ticket else linked_entity_id
+    if linked_entity_type == ZulipOutboundEvent.LinkedType.EMPLOYEE:
+        user = User.objects.filter(pk=linked_entity_id).first()
+        return user.username if user else linked_entity_id
+    return linked_entity_id
+
+
+def resolve_secure_link(linked_entity_type: str, linked_entity_id: str) -> str:
+    public_base = getattr(settings, "HARMONY_PUBLIC_URL", "").rstrip("/")
+    if not public_base:
+        return ""
+    if linked_entity_type == ZulipOutboundEvent.LinkedType.PATIENT:
+        patient = Patient.objects.filter(Q(public_id=linked_entity_id) | Q(patient_code=linked_entity_id)).first()
+        if patient:
+            return f"{public_base}/patients/{patient.public_id}"
+    if linked_entity_type == ZulipOutboundEvent.LinkedType.APPOINTMENT:
+        return f"{public_base}/appointments"
+    if linked_entity_type == ZulipOutboundEvent.LinkedType.CONSENT:
+        return f"{public_base}/patients"
+    if linked_entity_type == ZulipOutboundEvent.LinkedType.TICKET:
+        return f"{public_base}/administration/support-tickets"
+    if linked_entity_type == ZulipOutboundEvent.LinkedType.EMPLOYEE:
+        return f"{public_base}/users"
+    return ""
 
 
 class PatientViewSet(viewsets.ModelViewSet):
@@ -1436,6 +1479,125 @@ def patient_import_webhook(request):
         },
         status=status.HTTP_201_CREATED,
     )
+
+
+class ZulipMessagesViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def list(self, request):
+        query = ZulipMessagesQuerySerializer(data=request.query_params)
+        query.is_valid(raise_exception=True)
+        validated = query.validated_data
+        channel = validated["channel"]
+        topic = validated["topic"]
+        if not user_can_access_channel(request.user, channel):
+            return Response({"detail": "You do not have access to this coordination channel."}, status=status.HTTP_403_FORBIDDEN)
+
+        events = ZulipOutboundEvent.objects.filter(channel=channel, topic=topic).select_related("actor").order_by("-created_at")[
+            : validated["limit"]
+        ]
+        serializer = ZulipOutboundEventSerializer(events, many=True, context={"request": request})
+        return Response(
+            {
+                "channel": channel,
+                "topic": topic,
+                "results": serializer.data,
+            }
+        )
+
+
+class ZulipOutboundEventViewSet(viewsets.ReadOnlyModelViewSet):
+    serializer_class = ZulipOutboundEventSerializer
+    permission_classes = [permissions.IsAuthenticated]
+    filterset_fields = ("status", "channel", "linked_entity_type")
+    search_fields = ("topic", "raw_payload", "sanitized_payload", "actor__username", "actor__first_name", "actor__last_name")
+    ordering_fields = ("created_at", "updated_at", "retry_count")
+
+    def get_queryset(self):
+        queryset = ZulipOutboundEvent.objects.select_related("actor")
+        if getattr(self.request.user, "role", "") == "admin":
+            return queryset
+        return queryset.filter(actor=self.request.user)
+
+
+class ZulipPostUpdateViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def create(self, request):
+        serializer = ZulipPostUpdateSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        payload = serializer.validated_data
+        channel = payload.get("channel") or LINKED_TYPE_CHANNEL_DEFAULTS.get(payload["linked_entity_type"], "")
+        if not channel:
+            return Response({"detail": "No default channel is configured for this linked entity type."}, status=status.HTTP_400_BAD_REQUEST)
+        if not user_can_access_channel(request.user, channel):
+            return Response({"detail": "You do not have permission to post to this coordination channel."}, status=status.HTTP_403_FORBIDDEN)
+
+        metadata = payload.get("metadata") or {}
+        linked_label = resolve_linked_entity_label(payload["linked_entity_type"], payload["linked_entity_id"])
+        topic = payload.get("topic") or build_topic(
+            linked_entity_type=payload["linked_entity_type"],
+            linked_entity_label=linked_label,
+            service_date=str(timezone.localdate()),
+        )
+        metadata.setdefault("secure_link", resolve_secure_link(payload["linked_entity_type"], payload["linked_entity_id"]))
+        sanitized_content = clean_clinical_payload(payload["raw_payload"])
+        formatted_message = format_operational_message(
+            user=request.user,
+            template_key=payload.get("template_key") or "generic_update",
+            content=sanitized_content,
+            metadata=metadata,
+        )
+        event = ZulipOutboundEvent.objects.create(
+            actor=request.user,
+            channel=channel,
+            topic=topic,
+            linked_entity_type=payload["linked_entity_type"],
+            linked_entity_id=payload["linked_entity_id"],
+            raw_payload=payload["raw_payload"],
+            sanitized_payload=formatted_message,
+            template_key=payload.get("template_key") or "generic_update",
+            status=ZulipOutboundEvent.Status.PENDING,
+        )
+        write_audit_log(
+            request=request,
+            action="create",
+            instance=event,
+            entity_type="zulip_outbound_event",
+            after_data=snapshot_instance(event),
+            details="Zulip outbound event created.",
+            change_summary={"channel": channel, "topic": topic},
+        )
+        post_to_zulip_task.delay(event.id)
+        response_serializer = ZulipOutboundEventSerializer(event, context={"request": request})
+        return Response(response_serializer.data, status=status.HTTP_202_ACCEPTED)
+
+
+class ZulipRetryPostViewSet(viewsets.ViewSet):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def create(self, request):
+        event_id = request.data.get("event_id")
+        if not event_id:
+            return Response({"event_id": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
+        event = get_object_or_404(ZulipOutboundEvent, pk=event_id)
+        if getattr(request.user, "role", "") != "admin" and event.actor_id != request.user.id:
+            return Response({"detail": "You do not have permission to retry this coordination event."}, status=status.HTTP_403_FORBIDDEN)
+        before_data = snapshot_instance(event)
+        event.status = ZulipOutboundEvent.Status.PENDING
+        event.response_metadata = {}
+        event.save(update_fields=["status", "response_metadata", "updated_at"])
+        write_audit_log(
+            request=request,
+            action="retry",
+            instance=event,
+            entity_type="zulip_outbound_event",
+            before_data=before_data,
+            after_data=snapshot_instance(event),
+            details="Zulip outbound event manually retried.",
+        )
+        post_to_zulip_task.delay(event.id)
+        return Response(ZulipOutboundEventSerializer(event, context={"request": request}).data, status=status.HTTP_202_ACCEPTED)
 
 
 class SupportTicketViewSet(viewsets.ModelViewSet):

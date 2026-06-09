@@ -18,6 +18,13 @@ services:
       CELERY_RESULT_BACKEND: redis://redis:6379/1
       HARMONY_WEBHOOK_SECRET: ${HARMONY_WEBHOOK_SECRET}
       HARMONY_PUBLIC_URL: ${APP_URL}
+      ZULIP_SITE: ${ZULIP_SITE:-}
+      ZULIP_BOT_EMAIL: ${ZULIP_BOT_EMAIL:-}
+      ZULIP_BOT_API_KEY: ${ZULIP_BOT_API_KEY:-}
+      ZULIP_BOT_TIMEOUT: ${ZULIP_BOT_TIMEOUT:-10}
+      ZULIP_RETRY_LIMIT: ${ZULIP_RETRY_LIMIT:-5}
+      ZULIP_RETRY_BATCH_SIZE: ${ZULIP_RETRY_BATCH_SIZE:-25}
+      ZULIP_RETRY_WINDOW_MINUTES: ${ZULIP_RETRY_WINDOW_MINUTES:-5}
     volumes:
       - backend_django_media:/app/media
     depends_on:
@@ -43,6 +50,13 @@ services:
       POSTGRES_HOST: postgres
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ZULIP_SITE: ${ZULIP_SITE:-}
+      ZULIP_BOT_EMAIL: ${ZULIP_BOT_EMAIL:-}
+      ZULIP_BOT_API_KEY: ${ZULIP_BOT_API_KEY:-}
+      ZULIP_BOT_TIMEOUT: ${ZULIP_BOT_TIMEOUT:-10}
+      ZULIP_RETRY_LIMIT: ${ZULIP_RETRY_LIMIT:-5}
+      ZULIP_RETRY_BATCH_SIZE: ${ZULIP_RETRY_BATCH_SIZE:-25}
+      ZULIP_RETRY_WINDOW_MINUTES: ${ZULIP_RETRY_WINDOW_MINUTES:-5}
     command: celery -A config worker -l info
     depends_on:
       - backend
@@ -65,6 +79,13 @@ services:
       POSTGRES_HOST: postgres
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ZULIP_SITE: ${ZULIP_SITE:-}
+      ZULIP_BOT_EMAIL: ${ZULIP_BOT_EMAIL:-}
+      ZULIP_BOT_API_KEY: ${ZULIP_BOT_API_KEY:-}
+      ZULIP_BOT_TIMEOUT: ${ZULIP_BOT_TIMEOUT:-10}
+      ZULIP_RETRY_LIMIT: ${ZULIP_RETRY_LIMIT:-5}
+      ZULIP_RETRY_BATCH_SIZE: ${ZULIP_RETRY_BATCH_SIZE:-25}
+      ZULIP_RETRY_WINDOW_MINUTES: ${ZULIP_RETRY_WINDOW_MINUTES:-5}
     command: celery -A config beat -l info
     depends_on:
       - backend

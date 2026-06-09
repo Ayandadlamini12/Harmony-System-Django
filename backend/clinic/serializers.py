@@ -4,7 +4,8 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, VisitSymptomProblem, Vital
+from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, VisitSymptomProblem, Vital, ZulipOutboundEvent
+from .zulip import zulip_message_url
 from .workflow import build_patient_workflow_actions
 
 User = get_user_model()
@@ -955,6 +956,68 @@ class SupportTicketSerializer(serializers.ModelSerializer):
         if request and request.user and request.user.is_authenticated:
             validated_data["created_by"] = request.user
         return super().create(validated_data)
+
+
+class ZulipOutboundEventSerializer(serializers.ModelSerializer):
+    actor_name = serializers.SerializerMethodField()
+    actor_role = serializers.CharField(source="actor.role", read_only=True)
+    open_in_zulip_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ZulipOutboundEvent
+        fields = (
+            "id",
+            "actor",
+            "actor_name",
+            "actor_role",
+            "channel",
+            "topic",
+            "linked_entity_type",
+            "linked_entity_id",
+            "raw_payload",
+            "sanitized_payload",
+            "template_key",
+            "status",
+            "response_metadata",
+            "retry_count",
+            "open_in_zulip_url",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = (
+            "id",
+            "actor",
+            "actor_name",
+            "sanitized_payload",
+            "status",
+            "response_metadata",
+            "retry_count",
+            "open_in_zulip_url",
+            "created_at",
+            "updated_at",
+        )
+
+    def get_actor_name(self, obj):
+        return obj.actor.get_full_name() or obj.actor.username
+
+    def get_open_in_zulip_url(self, obj):
+        return zulip_message_url(obj.channel, obj.topic)
+
+
+class ZulipPostUpdateSerializer(serializers.Serializer):
+    channel = serializers.CharField(max_length=80, required=False, allow_blank=True)
+    topic = serializers.CharField(max_length=255, required=False, allow_blank=True)
+    linked_entity_type = serializers.ChoiceField(choices=ZulipOutboundEvent.LinkedType.choices)
+    linked_entity_id = serializers.CharField(max_length=100)
+    raw_payload = serializers.CharField()
+    template_key = serializers.CharField(max_length=80, required=False, allow_blank=True, default="generic_update")
+    metadata = serializers.JSONField(required=False, default=dict)
+
+
+class ZulipMessagesQuerySerializer(serializers.Serializer):
+    channel = serializers.CharField(max_length=80)
+    topic = serializers.CharField(max_length=255)
+    limit = serializers.IntegerField(required=False, min_value=1, max_value=100, default=20)
 
 
 class PartnerCompanySerializer(serializers.ModelSerializer):

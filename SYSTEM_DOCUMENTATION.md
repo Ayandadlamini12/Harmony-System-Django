@@ -199,6 +199,7 @@ Current employee User ID rule:
 | `Case` | Legacy/transition case model; future model may be adjusted |
 | `Vital` | Vitals linked to a visit; supports multiple vitals per visit |
 | `MessageThread`, `Message`, `MessageParticipant`, `MessageDelivery` | Internal messaging foundation and future external delivery channels |
+| `ZulipOutboundEvent` | Audited operational coordination event posted asynchronously to Zulip |
 | `AuditLog` | Create/update/delete/access traceability |
 | `SupportTicket` | Internal support request tracking |
 
@@ -540,7 +541,21 @@ Current intent:
 - later connect delivery records to Telegram, WhatsApp, and email through n8n/provider workflows
 - keep Harmony as the source of truth for message context
 
-External chat platform work is parked for now. Zulip, Mattermost, Nextcloud Talk, and lighter alternatives were discussed, but not adopted as the primary system communication layer yet.
+Operational communication is now being formalized around a Zulip integration layer.
+
+Current backend design:
+
+- MIS remains the source of truth
+- Zulip is the communication engine for coordination only
+- a single bot account posts outbound operational messages
+- outbound posts are persisted in `ZulipOutboundEvent`
+- Celery delivers and retries messages asynchronously
+- server-side policy filtering redacts sensitive clinical terms before any outbound post
+
+Privacy rule:
+
+- no diagnosis, remedies, or confidential clinical record content should be posted to Zulip
+- Zulip messages should contain operational coordination only and secure links back to MIS
 
 ---
 
@@ -599,6 +614,10 @@ GET  /api/message-threads/
 GET  /api/access-requests/
 GET  /api/audit-logs/
 GET  /api/support-tickets/
+GET  /api/zulip/messages/
+POST /api/zulip/post-update/
+GET  /api/zulip/outbound-events/
+POST /api/zulip/retry-post/
 POST /api/webhooks/patient-import/
 ```
 
@@ -790,4 +809,3 @@ To deploy Phase 2 and Phase 3 features safely on the production server without c
 - **Zero Package Bloat**: All interactive charts, body mappings, and sliders must be built utilizing native SVG/CSS and lightweight React primitives rather than adding heavy charting packages.
 - **Strict Keycloak Access Scoping**: Clinical workspaces must read Keycloak roles (`clinician`, `receptionist`) before initializing sensitive tabs (Assessments, Diagnosis, Remedies, and Notes), hiding or locking inputs dynamically based on token claims.
 - **RESTful Endpoints & Schema Extensions**: All new structured forms (like system-by-system examinations or subjective scores) will store their structured data under JSONField schemas on the `Visit` or `Case` models, avoiding painful PostgreSQL migrations during rapid UI prototyping.
-

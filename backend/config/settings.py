@@ -13,6 +13,7 @@ https://docs.djangoproject.com/en/5.2/ref/settings/
 import os
 from datetime import timedelta
 from pathlib import Path
+from celery.schedules import crontab
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -191,6 +192,21 @@ KEYCLOAK_ALLOW_LOCAL_FALLBACK = os.getenv("KEYCLOAK_ALLOW_LOCAL_FALLBACK", "true
 KEYCLOAK_ADMIN_USERNAME = os.getenv("KEYCLOAK_ADMIN_USERNAME", "")
 KEYCLOAK_ADMIN_PASSWORD = os.getenv("KEYCLOAK_ADMIN_PASSWORD", "")
 KEYCLOAK_ACTION_EMAIL_LIFESPAN = int(os.getenv("KEYCLOAK_ACTION_EMAIL_LIFESPAN", "432000"))
+
+ZULIP_SITE = os.getenv("ZULIP_SITE", "").rstrip("/")
+ZULIP_BOT_EMAIL = os.getenv("ZULIP_BOT_EMAIL", "")
+ZULIP_BOT_API_KEY = os.getenv("ZULIP_BOT_API_KEY", "")
+ZULIP_BOT_TIMEOUT = int(os.getenv("ZULIP_BOT_TIMEOUT", "10"))
+ZULIP_RETRY_LIMIT = int(os.getenv("ZULIP_RETRY_LIMIT", "5"))
+ZULIP_RETRY_BATCH_SIZE = int(os.getenv("ZULIP_RETRY_BATCH_SIZE", "25"))
+ZULIP_RETRY_WINDOW_MINUTES = int(os.getenv("ZULIP_RETRY_WINDOW_MINUTES", "5"))
+
+CELERY_BEAT_SCHEDULE = {
+    "retry-buffered-zulip-events": {
+        "task": "clinic.tasks.retry_buffered_zulip_events",
+        "schedule": crontab(minute="*/5"),
+    }
+}
 
 ANYMAIL = {
     "BREVO_API_KEY": os.getenv("BREVO_API_KEY", ""),

@@ -53,6 +53,13 @@ services:
       KEYCLOAK_ADMIN_USERNAME: ${KEYCLOAK_ADMIN_USERNAME:-}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-}
       KEYCLOAK_ACTION_EMAIL_LIFESPAN: ${KEYCLOAK_ACTION_EMAIL_LIFESPAN:-432000}
+      ZULIP_SITE: ${ZULIP_SITE:-}
+      ZULIP_BOT_EMAIL: ${ZULIP_BOT_EMAIL:-}
+      ZULIP_BOT_API_KEY: ${ZULIP_BOT_API_KEY:-}
+      ZULIP_BOT_TIMEOUT: ${ZULIP_BOT_TIMEOUT:-10}
+      ZULIP_RETRY_LIMIT: ${ZULIP_RETRY_LIMIT:-5}
+      ZULIP_RETRY_BATCH_SIZE: ${ZULIP_RETRY_BATCH_SIZE:-25}
+      ZULIP_RETRY_WINDOW_MINUTES: ${ZULIP_RETRY_WINDOW_MINUTES:-5}
     command: >
       sh -c "python manage.py migrate --noinput &&
              python manage.py collectstatic --noinput &&
@@ -86,6 +93,13 @@ services:
       POSTGRES_HOST: postgres
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ZULIP_SITE: ${ZULIP_SITE:-}
+      ZULIP_BOT_EMAIL: ${ZULIP_BOT_EMAIL:-}
+      ZULIP_BOT_API_KEY: ${ZULIP_BOT_API_KEY:-}
+      ZULIP_BOT_TIMEOUT: ${ZULIP_BOT_TIMEOUT:-10}
+      ZULIP_RETRY_LIMIT: ${ZULIP_RETRY_LIMIT:-5}
+      ZULIP_RETRY_BATCH_SIZE: ${ZULIP_RETRY_BATCH_SIZE:-25}
+      ZULIP_RETRY_WINDOW_MINUTES: ${ZULIP_RETRY_WINDOW_MINUTES:-5}
     command: celery -A config worker -l info
     depends_on:
       - backend
@@ -107,6 +121,13 @@ services:
       POSTGRES_HOST: postgres
       CELERY_BROKER_URL: redis://redis:6379/0
       CELERY_RESULT_BACKEND: redis://redis:6379/1
+      ZULIP_SITE: ${ZULIP_SITE:-}
+      ZULIP_BOT_EMAIL: ${ZULIP_BOT_EMAIL:-}
+      ZULIP_BOT_API_KEY: ${ZULIP_BOT_API_KEY:-}
+      ZULIP_BOT_TIMEOUT: ${ZULIP_BOT_TIMEOUT:-10}
+      ZULIP_RETRY_LIMIT: ${ZULIP_RETRY_LIMIT:-5}
+      ZULIP_RETRY_BATCH_SIZE: ${ZULIP_RETRY_BATCH_SIZE:-25}
+      ZULIP_RETRY_WINDOW_MINUTES: ${ZULIP_RETRY_WINDOW_MINUTES:-5}
     command: celery -A config beat -l info
     depends_on:
       - backend

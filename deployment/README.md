@@ -67,6 +67,13 @@ KEYCLOAK_ALLOW_LOCAL_FALLBACK=true
 KEYCLOAK_ADMIN_USERNAME=<admin-user>
 KEYCLOAK_ADMIN_PASSWORD=<admin-password>
 KEYCLOAK_ACTION_EMAIL_LIFESPAN=432000
+ZULIP_SITE=https://chat.harmonyhealthsz.com
+ZULIP_BOT_EMAIL=harmony-bot@chat.harmonyhealthsz.com
+ZULIP_BOT_API_KEY=<zulip-bot-api-key>
+ZULIP_BOT_TIMEOUT=10
+ZULIP_RETRY_LIMIT=5
+ZULIP_RETRY_BATCH_SIZE=25
+ZULIP_RETRY_WINDOW_MINUTES=5
 ```
 
 ## Deploy
@@ -88,3 +95,5 @@ cd /opt/harmony-mis
 Do not switch the live stack until a staging stack has successfully pulled and run both Harmony images.
 
 If using the older Portainer stack redeploy flow, make sure the stack env list preserves the full Keycloak block above. The helper script `redeploy-harmony.ps1` now merges missing Keycloak env values from the running `harmony-django-backend` container before it sends the stack update.
+
+For Zulip-backed coordination, keep the same Zulip env block on the backend, Celery worker, and Celery beat containers. If any of those services are recreated without the Zulip values, outbound coordination events can stop posting or stop retrying even while the main MIS API stays healthy.
