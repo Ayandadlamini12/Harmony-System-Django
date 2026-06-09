@@ -496,6 +496,28 @@ export function ZulipCoordinationCard({
       return;
     }
 
+    const TEMPLATE_KEY_MAPPING: Record<string, string> = {
+      fd_ready: "patient_ready",
+      fd_vitals: "generic_update",
+      fd_checkout: "generic_update",
+      ss_escalate: "support_ticket_created",
+      ss_alert: "generic_update",
+      ap_confirm: "generic_update",
+      ap_missed: "generic_update"
+    };
+    const backendTemplateKey = TEMPLATE_KEY_MAPPING[selectedTemplateId] || selectedTemplateId || "generic_update";
+
+    const requestPayload = {
+      channel,
+      topic,
+      linked_entity_type: linkedEntityType,
+      linked_entity_id: String(linkedEntityId),
+      raw_payload: payload,
+      template_key: backendTemplateKey,
+    };
+
+    console.log("ZULIP_POST_REQUEST_PAYLOAD:", requestPayload);
+
     // Real API Call
     try {
       const res = await fetch("/api/zulip/post-update/", {
@@ -503,14 +525,7 @@ export function ZulipCoordinationCard({
         headers: {
           "Content-Type": "application/json",
         },
-        body: JSON.stringify({
-          channel,
-          topic,
-          linked_entity_type: linkedEntityType,
-          linked_entity_id: String(linkedEntityId),
-          raw_payload: payload,
-          template_key: selectedTemplateId || "generic_update",
-        }),
+        body: JSON.stringify(requestPayload),
       });
 
       if (res.ok || res.status === 202) {
@@ -527,8 +542,23 @@ export function ZulipCoordinationCard({
           onPostSuccess(payload);
         }
       } else {
-        const errData = await res.json().catch(() => ({}));
-        toast.error(formatBackendError(errData, "Failed to queue operational update."));
+        let errData: any = null;
+        try {
+          errData = await res.json();
+        } catch (e) {
+          try {
+            const rawText = await res.clone().text();
+            if (rawText.includes("<!DOCTYPE html>") || rawText.includes("<html>")) {
+              errData = { detail: `HTTP ${res.status} ${res.statusText}: Server-side exception or HTML page returned.` };
+            } else {
+              errData = { detail: rawText || `HTTP Error ${res.status}: ${res.statusText}` };
+            }
+          } catch (_) {
+            errData = { detail: `HTTP Error ${res.status}: ${res.statusText}` };
+          }
+        }
+        console.error("ZULIP_POST_ERROR_RAW:", { status: res.status, statusText: res.statusText, errData });
+        toast.error(formatBackendError(errData, `Failed to queue operational update (HTTP ${res.status}).`));
       }
     } catch (err) {
       toast.error("Network Error: Could not connect to API proxy.");

@@ -232,9 +232,22 @@ def transition_active_patient_journey(patient, stage, request=None, note="", vis
     return journey
 
 
+def is_valid_uuid(val: str) -> bool:
+    try:
+        if not val:
+            return False
+        uuid.UUID(str(val))
+        return True
+    except ValueError:
+        return False
+
+
 def resolve_linked_entity_label(linked_entity_type: str, linked_entity_id: str) -> str:
     if linked_entity_type == ZulipOutboundEvent.LinkedType.PATIENT:
-        patient = Patient.objects.filter(Q(public_id=linked_entity_id) | Q(patient_code=linked_entity_id)).first()
+        if is_valid_uuid(linked_entity_id):
+            patient = Patient.objects.filter(Q(public_id=linked_entity_id) | Q(patient_code=linked_entity_id)).first()
+        else:
+            patient = Patient.objects.filter(patient_code=linked_entity_id).first()
         return patient.patient_code if patient else linked_entity_id
     if linked_entity_type == ZulipOutboundEvent.LinkedType.APPOINTMENT:
         appointment = Appointment.objects.filter(pk=linked_entity_id).select_related("patient").first()
@@ -256,7 +269,10 @@ def resolve_secure_link(linked_entity_type: str, linked_entity_id: str) -> str:
     if not public_base:
         return ""
     if linked_entity_type == ZulipOutboundEvent.LinkedType.PATIENT:
-        patient = Patient.objects.filter(Q(public_id=linked_entity_id) | Q(patient_code=linked_entity_id)).first()
+        if is_valid_uuid(linked_entity_id):
+            patient = Patient.objects.filter(Q(public_id=linked_entity_id) | Q(patient_code=linked_entity_id)).first()
+        else:
+            patient = Patient.objects.filter(patient_code=linked_entity_id).first()
         if patient:
             return f"{public_base}/patients/{patient.public_id}"
     if linked_entity_type == ZulipOutboundEvent.LinkedType.APPOINTMENT:
