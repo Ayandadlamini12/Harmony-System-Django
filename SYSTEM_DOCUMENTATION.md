@@ -90,6 +90,22 @@ Recommended safe deployment approach:
 5. Verify `/api/health`, login, and the changed page.
 6. Keep Portainer as visibility and emergency control, not as a place for manual source editing.
 
+Identity-critical production rule:
+
+- Any Harmony backend redeploy must preserve the full Keycloak env block.
+- The live backend currently depends on:
+  - `KEYCLOAK_ENABLED=true`
+  - `KEYCLOAK_SERVER_URL=https://auth.harmonyhealthsz.com`
+  - `KEYCLOAK_REALM=harmony-health`
+  - `KEYCLOAK_CLIENT_ID=harmony-mis`
+  - `KEYCLOAK_CLIENT_SECRET=<live secret>`
+  - `KEYCLOAK_ALLOW_LOCAL_FALLBACK=true`
+  - `KEYCLOAK_ADMIN_USERNAME=<live admin user>`
+  - `KEYCLOAK_ADMIN_PASSWORD=<live admin password>`
+  - `KEYCLOAK_ACTION_EMAIL_LIFESPAN=432000`
+
+If the backend is recreated without those values, MIS login and Keycloak user provisioning can fail even while Keycloak itself remains healthy.
+
 Long-term recommendation:
 
 - GitHub should remain the source of truth.
@@ -774,5 +790,4 @@ To deploy Phase 2 and Phase 3 features safely on the production server without c
 - **Zero Package Bloat**: All interactive charts, body mappings, and sliders must be built utilizing native SVG/CSS and lightweight React primitives rather than adding heavy charting packages.
 - **Strict Keycloak Access Scoping**: Clinical workspaces must read Keycloak roles (`clinician`, `receptionist`) before initializing sensitive tabs (Assessments, Diagnosis, Remedies, and Notes), hiding or locking inputs dynamically based on token claims.
 - **RESTful Endpoints & Schema Extensions**: All new structured forms (like system-by-system examinations or subjective scores) will store their structured data under JSONField schemas on the `Visit` or `Case` models, avoiding painful PostgreSQL migrations during rapid UI prototyping.
-
 

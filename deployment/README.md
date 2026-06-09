@@ -53,6 +53,22 @@ KEYCLOAK_ADMIN_USERNAME=<admin-user>
 KEYCLOAK_ADMIN_PASSWORD=<admin-password>
 ```
 
+These Keycloak values are not optional in production. If any backend redeploy recreates the Django container without them, Harmony MIS login can fail even when Keycloak itself is healthy.
+
+Minimum identity-critical variables:
+
+```sh
+KEYCLOAK_ENABLED=true
+KEYCLOAK_SERVER_URL=https://auth.harmonyhealthsz.com
+KEYCLOAK_REALM=harmony-health
+KEYCLOAK_CLIENT_ID=harmony-mis
+KEYCLOAK_CLIENT_SECRET=<required because harmony-mis is a confidential client>
+KEYCLOAK_ALLOW_LOCAL_FALLBACK=true
+KEYCLOAK_ADMIN_USERNAME=<admin-user>
+KEYCLOAK_ADMIN_PASSWORD=<admin-password>
+KEYCLOAK_ACTION_EMAIL_LIFESPAN=432000
+```
+
 ## Deploy
 
 ```sh
@@ -70,3 +86,5 @@ cd /opt/harmony-mis
 ## Important
 
 Do not switch the live stack until a staging stack has successfully pulled and run both Harmony images.
+
+If using the older Portainer stack redeploy flow, make sure the stack env list preserves the full Keycloak block above. The helper script `redeploy-harmony.ps1` now merges missing Keycloak env values from the running `harmony-django-backend` container before it sends the stack update.
