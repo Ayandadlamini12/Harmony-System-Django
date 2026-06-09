@@ -373,6 +373,21 @@ export function ZulipCoordinationCard({
     }
   }, [showAuditLogs, channel]);
 
+  // Poll message statuses automatically in the background if there are pending messages
+  useEffect(() => {
+    const hasPending = messages.some(m => m.status === "pending");
+    if (!hasPending) return;
+
+    const interval = setInterval(() => {
+      fetchMessages();
+      if (showAuditLogs) {
+        fetchAuditLogs();
+      }
+    }, 4000); // Check every 4 seconds
+
+    return () => clearInterval(interval);
+  }, [messages, channel, topic, showAuditLogs]);
+
   // Available formatted templates for current role
   const templates = useMemo(() => {
     return getTemplatesForChannel(channel, {

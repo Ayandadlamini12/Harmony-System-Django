@@ -342,6 +342,19 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
     setPendingPost(null);
   }, [activeChannelId, activeChannel.topic]);
 
+  // Poll message statuses automatically in the background if there are pending messages
+  useEffect(() => {
+    const hasPending = messages.some(m => m.status === "pending");
+    if (!hasPending) return;
+
+    const interval = setInterval(() => {
+      fetchMessages();
+      fetchAuditLogs();
+    }, 4000); // Check every 4 seconds
+
+    return () => clearInterval(interval);
+  }, [messages, activeChannelId, activeChannel.topic]);
+
   // Real-time policy sanitizer previews
   const { sanitizedText, isScrubbed } = useMemo(() => {
     return applyPolicyFilter(inputText);
