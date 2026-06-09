@@ -234,6 +234,26 @@ function getTemplatesForChannel(channel: string, context: { entityId?: string | 
 // 3. Component Definition
 // ==========================================
 
+export interface ZulipOutboundEvent {
+  id: number;
+  actor: number;
+  actor_name: string;
+  actor_role?: "admin" | "clinician" | "receptionist" | string;
+  channel: string;
+  topic: string;
+  linked_entity_type: "patient" | "ticket" | "appointment" | "consent" | "employee";
+  linked_entity_id: string;
+  raw_payload: string;
+  sanitized_payload: string;
+  template_key: string;
+  status: "pending" | "success" | "failed" | "retry_buffered";
+  response_metadata: Record<string, any>;
+  retry_count: number;
+  open_in_zulip_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export function ZulipCoordinationCard({
   channel,
   topic,
@@ -244,49 +264,82 @@ export function ZulipCoordinationCard({
   userRole = "receptionist",
   onPostSuccess
 }: ZulipCoordinationCardProps) {
-  // Communication Context Service (CCS) States
-  const [messages, setMessages] = useState<ZulipMessage[]>([]);
+  // Real dynamic states loaded from Next.js proxy endpoints
+  const [messages, setMessages] = useState<ZulipOutboundEvent[]>([]);
   const [inputText, setInputText] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
-  
-  // Simulation and Failure States
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isPosting, setIsPosting] = useState(false);
+
+  // Simulation & Failure States
   const [isZulipOffline, setIsZulipOffline] = useState(false);
-  const [isPosting, setIsZposted] = useState(false);
   const [pendingPost, setPendingPost] = useState<string | null>(null);
 
   // Audit Log State
-  const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>([]);
+  const [auditLogs, setAuditLogs] = useState<ZulipOutboundEvent[]>([]);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false);
   const [showAuditLogs, setShowAuditLogs] = useState(false);
 
-  // Initialize Messages from CCS seeds
-  useEffect(() => {
-    if (INITIAL_CHANNEL_SEEDS[channel]) {
-      setMessages(INITIAL_CHANNEL_SEEDS[channel]);
-    } else {
-      setMessages([
-        {
-          id: "gen-1",
-          senderName: "System Daemon",
-          senderRole: "system",
-          body: `ℹ️ Channel #${channel} topic initiated for this operational workspace.`,
-          sentAt: "08:00 AM",
-          isSystem: true
-        }
-      ]);
+  // Fetch real messages from API proxy
+  const fetchMessages = async () => {
+    setIsLoadingMessages(true);
+    try {
+      const res = await fetch(`/api/zulip/messages/?channel=${encodeURIComponent(channel)}&topic=${encodeURIComponent(topic)}&limit=50`);
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.results || []);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.error("Failed to fetch coordination card messages:", errData.detail || res.statusText);
+      }
+    } catch (err) {
+      console.error("Error fetching messages:", err);
+    } finally {
+      setIsLoadingMessages(false);
     }
-  }, [channel]);
+  };
+
+  // Fetch real audit logs from API proxy
+  const fetchAuditLogs = async () => {
+    setIsLoadingAudit(true);
+    try {
+      const res = await fetch(`/api/zulip/outbound-events/?channel=${encodeURIComponent(channel)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const results = Array.isArray(data) ? data : (data.results || []);
+        setAuditLogs(results);
+      } else {
+        console.error("Failed to fetch audit logs:", res.statusText);
+      }
+    } catch (err) {
+      console.error("Error fetching audit logs:", err);
+    } finally {
+      setIsLoadingAudit(false);
+    }
+  };
+
+  // Trigger loads on mount or parameter changes
+  useEffect(() => {
+    fetchMessages();
+    setPendingPost(null);
+  }, [channel, topic]);
+
+  useEffect(() => {
+    if (showAuditLogs) {
+      fetchAuditLogs();
+    }
+  }, [showAuditLogs, channel]);
 
   // Available formatted templates for current role
   const templates = useMemo(() => {
-    const rawTemplates = getTemplatesForChannel(channel, {
+    return getTemplatesForChannel(channel, {
       entityId: linkedEntityId,
       entityName: linkedEntityName,
       patientCode
     });
-    return rawTemplates;
   }, [channel, linkedEntityId, linkedEntityName, patientCode]);
 
-  // Apply Policy Filter to input text in real-time
+  // Apply Policy Filter to input text in real-time (for UX display only, backend enforces)
   const { sanitizedText, isScrubbed } = useMemo(() => {
     return applyPolicyFilter(inputText);
   }, [inputText]);
@@ -302,18 +355,18 @@ export function ZulipCoordinationCard({
   }, [userRole]);
 
   const hasWritePermission = useMemo(() => {
-    // Basic verification gate
     if (channel === "system-support") return userRole === "admin";
     if (channel === "clinical-handover") return userRole === "clinician" || userRole === "admin";
     return userRole === "receptionist" || userRole === "clinician" || userRole === "admin";
   }, [channel, userRole]);
 
-  // Deep Link Navigation Resolver (Strictly Navigation)
+  // Deep Link Navigation Resolver
   const handleOpenInZulip = () => {
-    const safeTopic = encodeURIComponent(topic);
-    const deepLinkUrl = `https://zulip.harmonyhealthsz.com/#narrow/stream/${channel}/topic/${safeTopic}`;
+    // If we have messages, we can use the open_in_zulip_url of the latest message
+    const latestWithUrl = messages.find(m => m.open_in_zulip_url);
+    const deepLinkUrl = latestWithUrl?.open_in_zulip_url || `https://chat.harmonyhealthsz.com/#narrow/stream/${channel}/topic/${encodeURIComponent(topic)}`;
     
-    toast.success(`Opening Zulip in external tab: #[${channel}] > ${topic}`);
+    toast.success(`Opening Zulip stream: #${channel} > ${topic}`);
     window.open(deepLinkUrl, "_blank");
   };
 
@@ -325,109 +378,170 @@ export function ZulipCoordinationCard({
       return;
     }
 
-    const payload = sanitizedText.trim();
+    const payload = inputText.trim();
     if (!payload) return;
 
-    setIsZposted(true);
-    
-    // Simulate API delay
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    setIsPosting(true);
 
-    // Handle Fail State (Failure and Retry pattern)
+    // Handle Mock Fail State (Failure and Retry simulation pattern)
     if (isZulipOffline) {
-      setIsZposted(false);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      setIsPosting(false);
       setPendingPost(payload);
       
-      const failedLog: AuditLogEntry = {
-        id: `aud-${Date.now()}`,
-        actor: userRoleLabel,
-        role: userRole,
-        entityType: linkedEntityType,
-        entityId: linkedEntityId,
+      const mockFailedEvent: ZulipOutboundEvent = {
+        id: -Date.now(), // negative id to denote mock offline local state
+        actor: 0,
+        actor_name: userRole === "admin" ? "Admin Ayanda" : userRole === "clinician" ? "Nurse Gcina" : "Receptionist Thandeka",
+        actor_role: userRole,
         channel,
         topic,
-        sanitizedPayload: payload,
-        timestamp: new Date().toLocaleTimeString(),
-        status: "failed"
+        linked_entity_type: linkedEntityType,
+        linked_entity_id: String(linkedEntityId),
+        raw_payload: payload,
+        sanitized_payload: sanitizedText, // client-side fallback
+        template_key: selectedTemplateId || "generic_update",
+        status: "retry_buffered",
+        response_metadata: { error: "Simulated integration network loss." },
+        retry_count: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
-      setAuditLogs(prev => [failedLog, ...prev]);
+      
+      setMessages(prev => [mockFailedEvent, ...prev]);
       toast.error("Network Error: Zulip Server is unreachable. Payload saved in retry buffer.");
       return;
     }
 
-    // Success State posting to mock server
-    const newMessage: ZulipMessage = {
-      id: `msg-${Date.now()}`,
-      senderName: userRole === "admin" ? "Admin Ayanda" : userRole === "clinician" ? "Nurse Gcina" : "Receptionist Thandeka",
-      senderRole: userRole === "other" ? "receptionist" : userRole,
-      body: payload,
-      sentAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      isSystem: false
-    };
+    // Real API Call
+    try {
+      const res = await fetch("/api/zulip/post-update/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          channel,
+          topic,
+          linked_entity_type: linkedEntityType,
+          linked_entity_id: String(linkedEntityId),
+          raw_payload: payload,
+          template_key: selectedTemplateId || "generic_update",
+        }),
+      });
 
-    const successLog: AuditLogEntry = {
-      id: `aud-${Date.now()}`,
-      actor: newMessage.senderName,
-      role: userRole,
-      entityType: linkedEntityType,
-      entityId: linkedEntityId,
-      channel,
-      topic,
-      sanitizedPayload: payload,
-      timestamp: new Date().toLocaleTimeString(),
-      status: "success"
-    };
-
-    setMessages(prev => [...prev, newMessage]);
-    setAuditLogs(prev => [successLog, ...prev]);
-    setInputText("");
-    setSelectedTemplateId("");
-    setPendingPost(null);
-    setIsZposted(false);
-
-    toast.success("Operational update posted successfully to Zulip topic.");
-    if (onPostSuccess) onPostSuccess(payload);
+      if (res.ok || res.status === 202) {
+        const newEvent = await res.json();
+        setMessages(prev => [newEvent, ...prev]);
+        setInputText("");
+        setSelectedTemplateId("");
+        toast.success("Operational update queued for delivery!");
+        
+        if (showAuditLogs) {
+          fetchAuditLogs();
+        }
+        if (onPostSuccess) {
+          onPostSuccess(payload);
+        }
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.detail || "Failed to queue operational update.");
+      }
+    } catch (err) {
+      toast.error("Network Error: Could not connect to API proxy.");
+      console.error(err);
+    } finally {
+      setIsPosting(false);
+    }
   };
 
-  // Retry Buffer Post
-  const handleRetryPendingPost = async () => {
-    if (!pendingPost) return;
-    setIsZposted(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
+  // Retry Outbound Event
+  const handleRetryPost = async (eventId: number) => {
+    setIsPosting(true);
 
+    // Mock Offline retry failure simulation
     if (isZulipOffline) {
-      setIsZposted(false);
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      setIsPosting(false);
       toast.error("Retry Failed: Zulip Server remains offline. Please try again later.");
       return;
     }
 
-    const newMessage: ZulipMessage = {
-      id: `msg-${Date.now()}`,
-      senderName: userRole === "admin" ? "Admin Ayanda" : userRole === "clinician" ? "Nurse Gcina" : "Receptionist Thandeka",
-      senderRole: userRole === "other" ? "receptionist" : userRole,
-      body: pendingPost,
-      sentAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      isSystem: false
-    };
+    // Handle local mock failed event retrying (from offline simulation)
+    if (eventId < 0) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      // Clear pending state and hit real post update
+      setPendingPost(null);
+      // Try posting the pending text for real
+      const mockEvent = messages.find(m => m.id === eventId);
+      if (mockEvent) {
+        setIsPosting(false);
+        setInputText(mockEvent.raw_payload);
+        setSelectedTemplateId(mockEvent.template_key);
+        // Remove the local mock event from list
+        setMessages(prev => prev.filter(m => m.id !== eventId));
+        toast.info("Mock event loaded back into composer. Click Post to deliver now.");
+        return;
+      }
+    }
 
-    const successLog: AuditLogEntry = {
-      id: `aud-${Date.now()}`,
-      actor: newMessage.senderName,
-      role: userRole,
-      entityType: linkedEntityType,
-      entityId: linkedEntityId,
-      channel,
-      topic,
-      sanitizedPayload: pendingPost,
-      timestamp: new Date().toLocaleTimeString(),
-      status: "success"
-    };
+    // Real API Call to retry-post
+    try {
+      const res = await fetch("/api/zulip/retry-post/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          event_id: eventId,
+        }),
+      });
 
-    setMessages(prev => [...prev, newMessage]);
-    setAuditLogs(prev => [successLog, ...prev]);
-    setPendingPost(null);
-    setIsZposted(false);
-    toast.success("Retry Success: Buffer payload cleared and sent!");
+      if (res.ok || res.status === 202) {
+        const updatedEvent = await res.json();
+        setMessages(prev => prev.map(m => m.id === eventId ? updatedEvent : m));
+        setAuditLogs(prev => prev.map(m => m.id === eventId ? updatedEvent : m));
+        setPendingPost(null);
+        toast.success("Delivery retry triggered successfully!");
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.detail || "Failed to trigger retry.");
+      }
+    } catch (err) {
+      toast.error("Network Error: Could not connect to retry API.");
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
+  const getStatusBadge = (status: ZulipOutboundEvent["status"], retryCount?: number) => {
+    switch (status) {
+      case "success":
+        return (
+          <Badge variant="outline" className="h-4 text-[9px] px-1 bg-emerald-50 text-emerald-700 border-emerald-200 font-bold flex items-center gap-0.5">
+            <CheckCircle2 size={10} /> Delivered
+          </Badge>
+        );
+      case "failed":
+        return (
+          <Badge variant="outline" className="h-4 text-[9px] px-1 bg-red-50 text-red-700 border-red-200 font-bold flex items-center gap-0.5">
+            <ShieldAlert size={10} /> Failed
+          </Badge>
+        );
+      case "retry_buffered":
+        return (
+          <Badge variant="outline" className="h-4 text-[9px] px-1 bg-amber-50 text-amber-700 border-amber-200 font-bold flex items-center gap-0.5" title={`Retry attempt: ${retryCount || 0}/5`}>
+            <Clock size={10} className="animate-pulse" /> Retry Buffered ({retryCount || 0}/5)
+          </Badge>
+        );
+      case "pending":
+      default:
+        return (
+          <Badge variant="outline" className="h-4 text-[9px] px-1 bg-blue-50 text-blue-700 border-blue-200 font-bold flex items-center gap-0.5">
+            <RefreshCw size={10} className="animate-spin" /> Pending
+          </Badge>
+        );
+    }
   };
 
   return (
@@ -451,23 +565,37 @@ export function ZulipCoordinationCard({
           </div>
         </div>
 
-        {/* Diagnostic Simulator Pill */}
-        <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-2 py-1">
-          <button 
+        {/* Diagnostic Simulator and Refresh Action */}
+        <div className="flex items-center gap-2">
+          <Button
             type="button"
-            onClick={() => {
-              setIsZulipOffline(!isZulipOffline);
-              toast.info(isZulipOffline ? "Zulip integration is back ONLINE." : "Zulip network disconnect simulated.");
-            }}
-            className={`flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5 transition ${
-              isZulipOffline 
-                ? "bg-red-50 text-red-600 border border-red-200" 
-                : "bg-emerald-50 text-emerald-700 border border-emerald-100"
-            }`}
+            variant="ghost"
+            size="sm"
+            onClick={fetchMessages}
+            disabled={isLoadingMessages}
+            className="h-7 w-7 p-0 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer"
+            title="Refresh coordination activity"
           >
-            <Activity size={10} className={isZulipOffline ? "" : "animate-pulse"} />
-            {isZulipOffline ? "Offline Sim" : "Online"}
-          </button>
+            <RefreshCw size={12} className={isLoadingMessages ? "animate-spin" : ""} />
+          </Button>
+
+          <div className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-full px-2 py-1">
+            <button 
+              type="button"
+              onClick={() => {
+                setIsZulipOffline(!isZulipOffline);
+                toast.info(isZulipOffline ? "Zulip integration is back ONLINE." : "Zulip network disconnect simulated.");
+              }}
+              className={`flex items-center gap-1 text-[10px] font-bold rounded-full px-2 py-0.5 transition cursor-pointer ${
+                isZulipOffline 
+                  ? "bg-red-50 text-red-600 border border-red-200" 
+                  : "bg-emerald-50 text-emerald-700 border border-emerald-100"
+              }`}
+            >
+              <Activity size={10} className={isZulipOffline ? "" : "animate-pulse"} />
+              {isZulipOffline ? "Offline Sim" : "Online"}
+            </button>
+          </div>
         </div>
       </div>
 
@@ -501,49 +629,79 @@ export function ZulipCoordinationCard({
           <Button
             type="button"
             size="sm"
-            onClick={handleRetryPendingPost}
+            onClick={() => {
+              const mockEvent = messages.find(m => m.id < 0 && m.raw_payload === pendingPost);
+              if (mockEvent) handleRetryPost(mockEvent.id);
+            }}
             disabled={isPosting}
-            className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-bold h-7 py-0 text-[10px]"
+            className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white font-bold h-7 py-0 text-[10px] cursor-pointer"
           >
             <RefreshCw size={11} className={`mr-1 ${isPosting ? "animate-spin" : ""}`} />
-            Retry Sent
+            Load to retry
           </Button>
         </div>
       )}
 
       {/* 4. Timeline Stream of Coordination Events (CCS View) */}
       <div className="space-y-2 max-h-48 overflow-y-auto bg-slate-50/50 p-2.5 rounded-lg border border-slate-100">
-        <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Recent Coordination Activity</div>
+        <div className="flex items-center justify-between text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">
+          <span>Recent Coordination Activity</span>
+          {isLoadingMessages && <span className="text-[9px] animate-pulse normal-case font-normal text-slate-400">updating...</span>}
+        </div>
         {messages.length === 0 ? (
-          <div className="text-center py-6 text-xs text-slate-400">No active coordination events.</div>
+          <div className="text-center py-6 text-xs text-slate-400">
+            {isLoadingMessages ? "Loading activity feed..." : "No active coordination events."}
+          </div>
         ) : (
-          messages.map((msg) => (
-            <div 
-              key={msg.id} 
-              className={`p-2.5 rounded-lg text-xs leading-relaxed transition ${
-                msg.isSystem 
-                  ? "bg-slate-100 border border-slate-200/60 text-slate-600" 
-                  : msg.senderRole === "clinician"
-                    ? "bg-[#fcfaff] border border-[#f0e8fc] text-slate-800"
-                    : msg.senderRole === "admin"
-                      ? "bg-slate-50 border border-slate-200 text-slate-800"
-                      : "bg-[#f4fbf5] border border-[#e3f4e6] text-slate-800"
-              }`}
-            >
-              <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-slate-500 mb-1.5">
-                <span className="flex items-center gap-1">
-                  {msg.isSystem ? (
-                    <Badge variant="outline" className="h-4 text-[9px] px-1 bg-white text-slate-500 border-slate-200">System Bot</Badge>
-                  ) : (
-                    <Badge variant="harmony" className="h-4 text-[9px] px-1 capitalize">{msg.senderRole}</Badge>
-                  )}
-                  <span className="font-semibold text-slate-700">{msg.senderName}</span>
-                </span>
-                <span>{msg.sentAt}</span>
+          messages.map((msg) => {
+            const isSystem = !msg.actor || msg.actor_name?.toLowerCase().includes("bot") || msg.actor_name?.toLowerCase().includes("watchdog") || msg.actor_name?.toLowerCase().includes("daemon") || msg.actor_name?.toLowerCase().includes("system");
+            const role = msg.actor_role || (isSystem ? "system" : "receptionist");
+            
+            return (
+              <div 
+                key={msg.id} 
+                className={`p-2.5 rounded-lg text-xs leading-relaxed transition border ${
+                  isSystem 
+                    ? "bg-slate-100 border-slate-200/60 text-slate-600" 
+                    : role === "clinician"
+                      ? "bg-[#fcfaff] border-[#f0e8fc] text-slate-800"
+                      : role === "admin"
+                        ? "bg-slate-50 border-slate-200 text-slate-800"
+                        : "bg-[#f4fbf5] border-[#e3f4e6] text-slate-800"
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2 text-[10px] font-bold text-slate-500 mb-1.5 border-b border-slate-100/50 pb-1">
+                  <span className="flex items-center gap-1">
+                    {isSystem ? (
+                      <Badge variant="outline" className="h-4 text-[9px] px-1 bg-white text-slate-500 border-slate-200 font-bold">System Bot</Badge>
+                    ) : (
+                      <Badge variant="harmony" className="h-4 text-[9px] px-1 capitalize">{role}</Badge>
+                    )}
+                    <span className="font-semibold text-slate-700">{msg.actor_name}</span>
+                  </span>
+                  
+                  <div className="flex items-center gap-1.5">
+                    {getStatusBadge(msg.status, msg.retry_count)}
+                    {(msg.status === "failed" || msg.status === "retry_buffered") && (
+                      <button
+                        type="button"
+                        onClick={() => handleRetryPost(msg.id)}
+                        disabled={isPosting}
+                        className="text-[9px] font-extrabold text-amber-700 hover:text-amber-800 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded px-1.5 py-0.2 select-none transition cursor-pointer"
+                        title="Force Retry Outbound Posting"
+                      >
+                        Retry
+                      </button>
+                    )}
+                    <span className="font-medium text-slate-400">
+                      {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </span>
+                  </div>
+                </div>
+                <p className="whitespace-pre-wrap font-sans text-slate-700 leading-normal">{msg.sanitized_payload}</p>
               </div>
-              <p className="whitespace-pre-wrap font-sans">{msg.body}</p>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
@@ -556,7 +714,7 @@ export function ZulipCoordinationCard({
               <label htmlFor={`tmpl-${channel}`} className="sr-only">Choose Action Template</label>
               <select
                 id={`tmpl-${channel}`}
-                className="w-full text-xs h-9 rounded-lg border border-slate-200 bg-white px-3 focus:outline-none focus:ring-1 focus:ring-[var(--hh-purple)]"
+                className="w-full text-xs h-9 rounded-lg border border-slate-200 bg-white px-3 focus:outline-none focus:ring-1 focus:ring-[var(--hh-purple)] cursor-pointer"
                 value={selectedTemplateId}
                 onChange={(e) => {
                   const tid = e.target.value;
@@ -601,15 +759,15 @@ export function ZulipCoordinationCard({
           <div className="space-y-1.5">
             <textarea
               className="w-full min-h-[50px] p-2 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--hh-purple)] leading-normal"
-              placeholder="Post a customized update... (Scrubbed against Policy Filter rules)"
+              placeholder="Post a customized update... (Clinical keywords will be scrubbed)"
               value={inputText}
               onChange={(e) => setInputText(e.target.value)}
             />
 
             {/* Privacy Compliance Scrubber Panel */}
             {inputText.trim() && (
-              <div className="bg-[#fafbff] border border-slate-100 p-2.5 rounded-lg text-[11px] leading-relaxed">
-                <div className="flex items-center justify-between text-[10px] font-bold uppercase mb-1">
+              <div className="bg-[#fafbff] border border-slate-100 p-2.5 rounded-lg text-[11px] leading-relaxed animate-in fade-in duration-200">
+                <div className="flex items-center justify-between text-[10px] font-bold uppercase mb-1 border-b border-slate-100 pb-1">
                   <span className="text-slate-400 tracking-wider">Policy Compliance Scrubber Output</span>
                   {isScrubbed ? (
                     <span className="text-amber-600 flex items-center gap-1 bg-amber-50 px-1 rounded font-bold">
@@ -640,23 +798,25 @@ export function ZulipCoordinationCard({
       )}
 
       {/* 6. Irreversible Session Integration Audit Trail */}
-      <div className="pt-2">
+      <div className="pt-2 border-t border-slate-50">
         <button
           type="button"
           onClick={() => setShowAuditLogs(!showAuditLogs)}
-          className="text-[10px] font-bold tracking-wider text-slate-500 hover:text-slate-700 uppercase flex items-center gap-1.5 focus:outline-none"
+          className="text-[10px] font-bold tracking-wider text-slate-500 hover:text-slate-700 uppercase flex items-center gap-1.5 focus:outline-none cursor-pointer"
         >
           <span>{showAuditLogs ? "▼ Hide" : "▶ Show"} Integration Audit Trail</span>
           <Badge variant="outline" className="h-4 text-[9px] px-1 font-mono text-slate-400">{auditLogs.length} Events</Badge>
         </button>
 
         {showAuditLogs && (
-          <div className="mt-2 space-y-2 border border-[#c7d7cd]/60 rounded-lg p-2.5 bg-slate-50/30 max-h-40 overflow-y-auto">
-            {auditLogs.length === 0 ? (
+          <div className="mt-2 space-y-2 border border-[#c7d7cd]/60 rounded-lg p-2.5 bg-slate-50/30 max-h-40 overflow-y-auto animate-in slide-in-from-top-2 duration-200">
+            {isLoadingAudit ? (
+              <div className="text-center py-4 text-[10px] text-slate-400 font-mono">Loading integration logs...</div>
+            ) : auditLogs.length === 0 ? (
               <div className="text-center py-4 text-[10px] text-slate-400 font-medium">No session audit logs recorded.</div>
             ) : (
               auditLogs.map((log) => (
-                <div key={log.id} className="border-b border-slate-100 pb-1.5 last:border-0 text-[10px] leading-relaxed font-mono">
+                <div key={log.id} className="border-b border-slate-100 pb-1.5 last:border-0 last:pb-0 text-[10px] leading-relaxed font-mono">
                   <div className="flex items-center justify-between font-bold text-slate-500">
                     <span className="flex items-center gap-1">
                       {log.status === "success" ? (
@@ -664,16 +824,16 @@ export function ZulipCoordinationCard({
                       ) : (
                         <AlertTriangle size={10} className="text-red-500" />
                       )}
-                      <span>{log.actor} ({log.role.toUpperCase()})</span>
+                      <span>{log.actor_name} ({log.actor_role?.toUpperCase() || "STAFF"})</span>
                     </span>
-                    <span>{log.timestamp}</span>
+                    <span>{new Date(log.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                   </div>
                   <div className="grid grid-cols-2 gap-x-2 text-slate-400 mt-1">
                     <div><strong>Target Topic:</strong> #{log.channel} &gt; {log.topic}</div>
-                    <div><strong>Entity Reference:</strong> {log.entityType.toUpperCase()}:{log.entityId}</div>
+                    <div><strong>Reference:</strong> {log.linked_entity_type.toUpperCase()}:{log.linked_entity_id}</div>
                   </div>
-                  <div className="bg-white/80 p-1.5 rounded border border-slate-200/50 mt-1 text-slate-600 line-clamp-2">
-                    {log.sanitizedPayload}
+                  <div className="bg-white/80 p-1.5 rounded border border-slate-200/50 mt-1 text-slate-600 line-clamp-2 leading-normal">
+                    {log.sanitized_payload}
                   </div>
                 </div>
               ))

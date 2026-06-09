@@ -83,6 +83,26 @@ function applyPolicyFilter(text: string): { sanitizedText: string; isScrubbed: b
   return { sanitizedText: result, isScrubbed };
 }
 
+export interface ZulipOutboundEvent {
+  id: number;
+  actor: number;
+  actor_name: string;
+  actor_role?: "admin" | "clinician" | "receptionist" | string;
+  channel: string;
+  topic: string;
+  linked_entity_type: "patient" | "ticket" | "appointment" | "consent" | "employee";
+  linked_entity_id: string;
+  raw_payload: string;
+  sanitized_payload: string;
+  template_key: string;
+  status: "pending" | "success" | "failed" | "retry_buffered";
+  response_metadata: Record<string, any>;
+  retry_count: number;
+  open_in_zulip_url?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export function MessagingWorkspace({ initialThreads, recipients }: Props) {
   // 1. Role Selection for Simulation
   const [selectedRole, setSelectedRole] = useState<"clinician" | "receptionist" | "admin">("receptionist");
@@ -91,19 +111,22 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
   const [activeFilter, setActiveFilter] = useState<"all" | "operational" | "action" | "unread">("all");
   const [activeChannelId, setActiveChannelId] = useState("front-desk");
 
-  // 3. Simulation & Failure States
+  // 3. Real Dynamic Data States
+  const [messages, setMessages] = useState<ZulipOutboundEvent[]>([]);
+  const [auditLogs, setAuditLogs] = useState<ZulipOutboundEvent[]>([]);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [isLoadingAudit, setIsLoadingAudit] = useState(false);
+
+  // 4. Simulation & Failure States
   const [isZulipOffline, setIsZulipOffline] = useState(false);
   const [isPosting, setIsPosting] = useState(false);
-  const [pendingPost, setPendingPost] = useState<{ channelId: string; body: string } | null>(null);
-
-  // 4. Session Audit Logs
-  const [auditLogs, setAuditLogs] = useState<any[]>([]);
+  const [pendingPost, setPendingPost] = useState<{ channelId: string; body: string; templateKey: string; id: number } | null>(null);
 
   // 5. Input text
   const [inputText, setInputText] = useState("");
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
 
-  // 6. Dynamic Channels Database (State-driven CCS)
+  // 6. Dynamic Channels Database (State-driven CCS for listing only)
   const [channels, setChannels] = useState<ChannelContext[]>([
     {
       id: "front-desk",
@@ -125,24 +148,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
         "Assigned Room": "Consultation Room 2",
         "Visit Type": "New Consultation"
       },
-      messages: [
-        {
-          id: "fd-1",
-          senderName: "Front Desk Tablet",
-          senderRole: "system",
-          body: "⏱️ **QUEUE ASSIGNMENT**: Patient Zahara Dlamini activated. Assigned Queue #14. (Method: Tablet Self Check-In)",
-          sentAt: "10:15 AM",
-          isSystem: true
-        },
-        {
-          id: "fd-2",
-          senderName: "Nurse Gcina",
-          senderRole: "clinician",
-          body: "✅ **VITALS RECORDED** for Queue #14. BP: 120/80 | Temp: 36.6°C. Patient is resting in the lounge. Ready for clinician.",
-          sentAt: "10:22 AM",
-          isSystem: false
-        }
-      ]
+      messages: []
     },
     {
       id: "clinical-handover",
@@ -164,24 +170,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
         "Attending Clinician": "Dr. Dlamini",
         "Next Handover Shift": "Evening Handover (18:00)"
       },
-      messages: [
-        {
-          id: "ch-1",
-          senderName: "Shift Scheduler",
-          senderRole: "system",
-          body: "📝 **SHIFT COMPLETED**: Clinical shift transition. Observe Ward A checks initialized.",
-          sentAt: "08:00 AM",
-          isSystem: true
-        },
-        {
-          id: "ch-2",
-          senderName: "Dr. Dlamini",
-          senderRole: "clinician",
-          body: "🩺 Patient PAT-2026-000412 stabilized. Routine follow-up scheduled for Wednesday. Folder notes updated in MIS.",
-          sentAt: "08:15 AM",
-          isSystem: false
-        }
-      ]
+      messages: []
     },
     {
       id: "appointments",
@@ -203,16 +192,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
         "Status": "Scheduled",
         "Reminder Sent": "SMS & Whatsapp Sent (08:30)"
       },
-      messages: [
-        {
-          id: "ap-1",
-          senderName: "Calendar Daemon",
-          senderRole: "system",
-          body: "📅 **APPOINTMENT CREATED**: Follow-up visit scheduled for PAT-2026-000001 on 2026-06-10.",
-          sentAt: "11:00 AM",
-          isSystem: true
-        }
-      ]
+      messages: []
     },
     {
       id: "consent-forms",
@@ -233,24 +213,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
         "Recipient Cell": "+268 7604 1234",
         "Triggered By": "Receptionist Thandeka"
       },
-      messages: [
-        {
-          id: "cf-1",
-          senderName: "WeasyPrint Service",
-          senderRole: "system",
-          body: "📄 **DOCUMENT GENERATED**: Consent form PDF compiled successfully.",
-          sentAt: "Yesterday",
-          isSystem: true
-        },
-        {
-          id: "cf-2",
-          senderName: "Receptionist Thandeka",
-          senderRole: "receptionist",
-          body: "✉️ Reminded patient Zahara to sign the form electronically. She is looking for her cell number verification code.",
-          sentAt: "Yesterday",
-          isSystem: false
-        }
-      ]
+      messages: []
     },
     {
       id: "system-support",
@@ -271,24 +234,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
         "Status": "Open",
         "Stack ID": "69"
       },
-      messages: [
-        {
-          id: "ss-1",
-          senderName: "Harmony Watchdog",
-          senderRole: "system",
-          body: "🚨 **SYSTEM TICKET CREATED**: Ticket #SUPPORT-0142 submitted. Service: Redis connection speed warning.",
-          sentAt: "09:30 AM",
-          isSystem: true
-        },
-        {
-          id: "ss-2",
-          senderName: "Admin Ayanda",
-          senderRole: "admin",
-          body: "🔧 I am investigating the latency spikes on the cache. I have restarted Redis on port 6379 on the ARM64 server.",
-          sentAt: "09:41 AM",
-          isSystem: false
-        }
-      ]
+      messages: []
     },
     {
       id: "management",
@@ -308,16 +254,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
         "Superuser Checked": "Approved",
         "Status": "Role Matched"
       },
-      messages: [
-        {
-          id: "m-1",
-          senderName: "Security Audit Monitor",
-          senderRole: "system",
-          body: "🔐 **ACCESS LOG**: Terminal credentials matched for Station 2 Ward Desk.",
-          sentAt: "06/07/26",
-          isSystem: true
-        }
-      ]
+      messages: []
     }
   ]);
 
@@ -325,6 +262,51 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
   const activeChannel = useMemo(() => {
     return channels.find(c => c.id === activeChannelId) || channels[0];
   }, [activeChannelId, channels]);
+
+  // Fetch real messages from Next.js API proxy
+  const fetchMessages = async () => {
+    setIsLoadingMessages(true);
+    try {
+      const res = await fetch(`/api/zulip/messages/?channel=${encodeURIComponent(activeChannelId)}&topic=${encodeURIComponent(activeChannel.topic)}&limit=50`);
+      if (res.ok) {
+        const data = await res.json();
+        setMessages(data.results || []);
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.error("Failed to fetch messaging workspace messages:", errData.detail || res.statusText);
+      }
+    } catch (err) {
+      console.error("Error fetching messages:", err);
+    } finally {
+      setIsLoadingMessages(false);
+    }
+  };
+
+  // Fetch real audit logs from API proxy
+  const fetchAuditLogs = async () => {
+    setIsLoadingAudit(true);
+    try {
+      const res = await fetch(`/api/zulip/outbound-events/?channel=${encodeURIComponent(activeChannelId)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const results = Array.isArray(data) ? data : (data.results || []);
+        setAuditLogs(results);
+      } else {
+        console.error("Failed to fetch audit logs:", res.statusText);
+      }
+    } catch (err) {
+      console.error("Error fetching audit logs:", err);
+    } finally {
+      setIsLoadingAudit(false);
+    }
+  };
+
+  // Trigger loads on channel change
+  useEffect(() => {
+    fetchMessages();
+    fetchAuditLogs();
+    setPendingPost(null);
+  }, [activeChannelId, activeChannel.topic]);
 
   // Real-time policy sanitizer previews
   const { sanitizedText, isScrubbed } = useMemo(() => {
@@ -434,13 +416,13 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
 
   // Deep Link Launch point (Strictly Navigation)
   const handleOpenZulipDeepLink = () => {
-    const safeTopic = encodeURIComponent(activeChannel.topic);
-    const zulipUrl = `https://zulip.harmonyhealthsz.com/#narrow/stream/${activeChannel.id}/topic/${safeTopic}`;
-    toast.success(`Resolving deep-link path: #${activeChannel.id} > ${activeChannel.topic}`);
-    window.open(zulipUrl, "_blank");
+    const latestWithUrl = messages.find(m => m.open_in_zulip_url);
+    const deepLinkUrl = latestWithUrl?.open_in_zulip_url || `https://chat.harmonyhealthsz.com/#narrow/stream/${activeChannelId}/topic/${encodeURIComponent(activeChannel.topic)}`;
+    toast.success(`Resolving deep-link path: #${activeChannelId} > ${activeChannel.topic}`);
+    window.open(deepLinkUrl, "_blank");
   };
 
-  // Safe Server-Side Simulated Outbound Posting Service
+  // Safe Outbound Posting Service
   const handlePostUpdate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!hasWritePermission) {
@@ -448,129 +430,176 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
       return;
     }
 
-    const payload = sanitizedText.trim();
+    const payload = inputText.trim();
     if (!payload) return;
 
     setIsPosting(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
 
-    // Offline / Connection loss handler
+    // Mock Offline / Connection loss handler
     if (isZulipOffline) {
+      await new Promise((resolve) => setTimeout(resolve, 800));
       setIsPosting(false);
-      setPendingPost({ channelId: activeChannel.id, body: payload });
+      const mockEventId = -Date.now();
+      setPendingPost({ channelId: activeChannel.id, body: payload, templateKey: selectedTemplateId || "generic_update", id: mockEventId });
       
-      const failedLog = {
-        id: `aud-${Date.now()}`,
-        actor: selectedRole.toUpperCase(),
-        entityType: activeChannel.entityType,
-        entityId: activeChannel.entityId,
-        channel: activeChannel.id,
+      const mockFailedEvent: ZulipOutboundEvent = {
+        id: mockEventId,
+        actor: 0,
+        actor_name: selectedRole === "admin" ? "Admin Ayanda" : selectedRole === "clinician" ? "Nurse Gcina" : "Receptionist Thandeka",
+        actor_role: selectedRole,
+        channel: activeChannelId,
         topic: activeChannel.topic,
-        sanitizedPayload: payload,
-        timestamp: new Date().toLocaleTimeString(),
-        status: "failed"
+        linked_entity_type: activeChannel.entityType,
+        linked_entity_id: String(activeChannel.entityId),
+        raw_payload: payload,
+        sanitized_payload: sanitizedText,
+        template_key: selectedTemplateId || "generic_update",
+        status: "retry_buffered",
+        response_metadata: { error: "Simulated integration network loss." },
+        retry_count: 1,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
       };
-      setAuditLogs(prev => [failedLog, ...prev]);
+      
+      setMessages(prev => [mockFailedEvent, ...prev]);
+      setAuditLogs(prev => [mockFailedEvent, ...prev]);
       toast.error("Downstream Zulip is offline. Payload saved to local buffer.");
       return;
     }
 
-    // Success State
-    const newMessage = {
-      id: `msg-${Date.now()}`,
-      senderName: selectedRole === "admin" ? "Admin Ayanda" : selectedRole === "clinician" ? "Nurse Gcina" : "Receptionist Thandeka",
-      senderRole: selectedRole,
-      body: payload,
-      sentAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      isSystem: false
-    };
+    // Real API Call
+    try {
+      const res = await fetch("/api/zulip/post-update/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          channel: activeChannelId,
+          topic: activeChannel.topic,
+          linked_entity_type: activeChannel.entityType,
+          linked_entity_id: String(activeChannel.entityId),
+          raw_payload: payload,
+          template_key: selectedTemplateId || "generic_update",
+        }),
+      });
 
-    const successLog = {
-      id: `aud-${Date.now()}`,
-      actor: newMessage.senderName,
-      role: selectedRole,
-      entityType: activeChannel.entityType,
-      entityId: activeChannel.entityId,
-      channel: activeChannel.id,
-      topic: activeChannel.topic,
-      sanitizedPayload: payload,
-      timestamp: new Date().toLocaleTimeString(),
-      status: "success"
-    };
-
-    // Update state channels messages array
-    setChannels(prev => prev.map(ch => {
-      if (ch.id === activeChannel.id) {
-        return {
-          ...ch,
-          lastActivityTime: newMessage.sentAt,
-          lastMessagePreview: payload.replace(/\*\*|\*/g, "").substring(0, 42) + "...",
-          messages: [...ch.messages, newMessage]
-        };
+      if (res.ok || res.status === 202) {
+        const newEvent = await res.json();
+        setMessages(prev => [newEvent, ...prev]);
+        setAuditLogs(prev => [newEvent, ...prev]);
+        setInputText("");
+        setSelectedTemplateId("");
+        toast.success("Outbound event synchronized with Zulip Server.");
+        
+        // Update local channels preview
+        setChannels(prev => prev.map(ch => {
+          if (ch.id === activeChannelId) {
+            return {
+              ...ch,
+              lastActivityTime: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+              lastMessagePreview: payload.replace(/\*\*|\*/g, "").substring(0, 42) + "...",
+            };
+          }
+          return ch;
+        }));
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.detail || "Failed to queue operational update.");
       }
-      return ch;
-    }));
-
-    setAuditLogs(prev => [successLog, ...prev]);
-    setInputText("");
-    setSelectedTemplateId("");
-    setPendingPost(null);
-    setIsPosting(false);
-
-    toast.success("Outbound event synchronized with Zulip Server.");
+    } catch (err) {
+      toast.error("Network Error: Could not connect to API proxy.");
+      console.error(err);
+    } finally {
+      setIsPosting(false);
+    }
   };
 
-  // Retry buffer posting
-  const handleRetryPost = async () => {
-    if (!pendingPost) return;
+  // Retry Outbound Event
+  const handleRetryPost = async (eventId: number) => {
     setIsPosting(true);
-    await new Promise((resolve) => setTimeout(resolve, 800));
 
+    // Mock Offline retry failure simulation
     if (isZulipOffline) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
       setIsPosting(false);
-      toast.error("Retry Failed: Zulip Server remains unreachable.");
+      toast.error("Retry Failed: Zulip Server remains offline. Please try again later.");
       return;
     }
 
-    const payload = pendingPost.body;
-    const newMessage = {
-      id: `msg-${Date.now()}`,
-      senderName: selectedRole === "admin" ? "Admin Ayanda" : selectedRole === "clinician" ? "Nurse Gcina" : "Receptionist Thandeka",
-      senderRole: selectedRole,
-      body: payload,
-      sentAt: new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
-      isSystem: false
-    };
-
-    const successLog = {
-      id: `aud-${Date.now()}`,
-      actor: newMessage.senderName,
-      role: selectedRole,
-      entityType: activeChannel.entityType,
-      entityId: activeChannel.entityId,
-      channel: activeChannel.id,
-      topic: activeChannel.topic,
-      sanitizedPayload: payload,
-      timestamp: new Date().toLocaleTimeString(),
-      status: "success"
-    };
-
-    setChannels(prev => prev.map(ch => {
-      if (ch.id === pendingPost.channelId) {
-        return {
-          ...ch,
-          lastActivityTime: newMessage.sentAt,
-          lastMessagePreview: payload.replace(/\*\*|\*/g, "").substring(0, 42) + "...",
-          messages: [...ch.messages, newMessage]
-        };
+    // Handle local mock failed event retrying (from offline simulation)
+    if (eventId < 0) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      setPendingPost(null);
+      const mockEvent = messages.find(m => m.id === eventId);
+      if (mockEvent) {
+        setIsPosting(false);
+        setInputText(mockEvent.raw_payload);
+        setSelectedTemplateId(mockEvent.template_key);
+        setMessages(prev => prev.filter(m => m.id !== eventId));
+        setAuditLogs(prev => prev.filter(m => m.id !== eventId));
+        toast.info("Mock event loaded back into composer. Click Post to deliver now.");
+        return;
       }
-      return ch;
-    }));
+    }
 
-    setAuditLogs(prev => [successLog, ...prev]);
-    setPendingPost(null);
-    setIsPosting(false);
-    toast.success("Retry Buffer successfully dispatched to Zulip!");
+    // Real API Call to retry-post
+    try {
+      const res = await fetch("/api/zulip/retry-post/", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          event_id: eventId,
+        }),
+      });
+
+      if (res.ok || res.status === 202) {
+        const updatedEvent = await res.json();
+        setMessages(prev => prev.map(m => m.id === eventId ? updatedEvent : m));
+        setAuditLogs(prev => prev.map(m => m.id === eventId ? updatedEvent : m));
+        setPendingPost(null);
+        toast.success("Delivery retry triggered successfully!");
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        toast.error(errData.detail || "Failed to trigger retry.");
+      }
+    } catch (err) {
+      toast.error("Network Error: Could not connect to retry API.");
+    } finally {
+      setIsPosting(false);
+    }
+  };
+
+  const getStatusBadge = (status: ZulipOutboundEvent["status"], retryCount?: number) => {
+    switch (status) {
+      case "success":
+        return (
+          <Badge variant="outline" className="h-4 text-[9px] px-1 bg-emerald-50 text-emerald-700 border-emerald-200 font-bold flex items-center gap-0.5">
+            <CheckCircle2 size={10} /> Delivered
+          </Badge>
+        );
+      case "failed":
+        return (
+          <Badge variant="outline" className="h-4 text-[9px] px-1 bg-red-50 text-red-700 border-red-200 font-bold flex items-center gap-0.5">
+            <ShieldAlert size={10} /> Failed
+          </Badge>
+        );
+      case "retry_buffered":
+        return (
+          <Badge variant="outline" className="h-4 text-[9px] px-1 bg-amber-50 text-amber-700 border-amber-200 font-bold flex items-center gap-0.5" title={`Retry attempt: ${retryCount || 0}/5`}>
+            <Clock size={10} className="animate-pulse" /> Retry Buffered ({retryCount || 0}/5)
+          </Badge>
+        );
+      case "pending":
+      default:
+        return (
+          <Badge variant="outline" className="h-4 text-[9px] px-1 bg-blue-50 text-blue-700 border-blue-200 font-bold flex items-center gap-0.5">
+            <RefreshCw size={10} className="animate-spin" /> Pending
+          </Badge>
+        );
+    }
   };
 
   // Reset unread count when clicking a channel
@@ -710,6 +739,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
               Zulip Integration
             </span>
             <button
+              type="button"
               onClick={() => {
                 setIsZulipOffline(!isZulipOffline);
                 toast.info(isZulipOffline ? "Zulip API services ONLINE." : "Zulip API connection drops simulated.");
@@ -753,58 +783,94 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
             </div>
             
             {/* Quick Action Navigation resolver */}
-            <Button
-              onClick={handleOpenZulipDeepLink}
-              variant="secondary"
-              size="sm"
-              className="text-xs font-bold border-[#c7d7cd] hover:bg-[#f6faf7] h-8 px-3 cursor-pointer text-[#225c2c]"
-            >
-              <ExternalLink size={13} className="mr-1" />
-              Open in Zulip
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={fetchMessages}
+                disabled={isLoadingMessages}
+                className="h-8 w-8 p-0 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 cursor-pointer"
+                title="Refresh stream feed"
+              >
+                <RefreshCw size={13} className={isLoadingMessages ? "animate-spin" : ""} />
+              </Button>
+              <Button
+                onClick={handleOpenZulipDeepLink}
+                variant="secondary"
+                size="sm"
+                className="text-xs font-bold border-[#c7d7cd] hover:bg-[#f6faf7] h-8 px-3 cursor-pointer text-[#225c2c]"
+              >
+                <ExternalLink size={13} className="mr-1" />
+                Open in Zulip
+              </Button>
+            </div>
           </div>
         </div>
 
         {/* Stream Messages Container */}
         <div className="flex-1 overflow-y-auto bg-[#f8faf9]/50 p-5 space-y-4 max-h-[calc(100vh-380px)]">
-          {activeChannel.messages.length === 0 ? (
-            <div className="flex h-full items-center justify-center text-sm text-slate-400">No events found in this thread.</div>
+          {messages.length === 0 ? (
+            <div className="flex h-full items-center justify-center text-sm text-slate-400 py-12">
+              {isLoadingMessages ? "Loading stream messages..." : "No events found in this thread."}
+            </div>
           ) : (
-            activeChannel.messages.map((msg) => (
-              <div
-                key={msg.id}
-                className={`border rounded-lg p-4 shadow-sm transition max-w-3xl ${
-                  msg.isSystem
-                    ? "bg-slate-50 border-slate-200/70 text-slate-600 border-l-4 border-l-slate-400"
-                    : msg.senderRole === "clinician"
-                      ? "bg-[#faf7fe] border-[#ebe0fb] text-slate-800 border-l-4 border-l-[var(--hh-purple)]"
-                      : msg.senderRole === "admin"
-                        ? "bg-slate-50 border-slate-200 text-slate-800 border-l-4 border-l-slate-600"
-                        : "bg-[#f4faf6] border-[#dfefe3] text-slate-800 border-l-4 border-l-[#225c2c]"
-                }`}
-              >
-                <div className="flex items-center justify-between gap-3 text-xs mb-1.5 font-bold">
-                  <div className="flex items-center gap-2">
-                    {msg.isSystem ? (
-                      <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded font-mono">SYSTEM BOT</span>
-                    ) : (
-                      <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono uppercase ${
-                        msg.senderRole === "clinician"
-                          ? "bg-[var(--hh-purple-light)] text-[var(--hh-purple)]"
-                          : msg.senderRole === "admin"
-                            ? "bg-slate-200 text-slate-800"
-                            : "bg-[#e2f3e6] text-[#225c2c]"
-                      }`}>
-                        {msg.senderRole}
+            messages.map((msg) => {
+              const isSystem = !msg.actor || msg.actor_name?.toLowerCase().includes("bot") || msg.actor_name?.toLowerCase().includes("watchdog") || msg.actor_name?.toLowerCase().includes("daemon") || msg.actor_name?.toLowerCase().includes("system");
+              const role = msg.actor_role || (isSystem ? "system" : "receptionist");
+              
+              return (
+                <div
+                  key={msg.id}
+                  className={`border rounded-lg p-4 shadow-sm transition max-w-3xl ${
+                    isSystem
+                      ? "bg-slate-50 border-slate-200/70 text-slate-600 border-l-4 border-l-slate-400"
+                      : role === "clinician"
+                        ? "bg-[#faf7fe] border-[#ebe0fb] text-slate-800 border-l-4 border-l-[var(--hh-purple)]"
+                        : role === "admin"
+                          ? "bg-slate-50 border-slate-200 text-slate-800 border-l-4 border-l-slate-600"
+                          : "bg-[#f4faf6] border-[#dfefe3] text-slate-800 border-l-4 border-l-[#225c2c]"
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3 text-xs mb-1.5 font-bold">
+                    <div className="flex items-center gap-2">
+                      {isSystem ? (
+                        <span className="text-[10px] bg-slate-200 text-slate-600 px-1.5 py-0.2 rounded font-mono">SYSTEM BOT</span>
+                      ) : (
+                        <span className={`text-[10px] px-1.5 py-0.2 rounded font-mono uppercase ${
+                          role === "clinician"
+                            ? "bg-[var(--hh-purple-light)] text-[var(--hh-purple)]"
+                            : role === "admin"
+                              ? "bg-slate-200 text-slate-800"
+                              : "bg-[#e2f3e6] text-[#225c2c]"
+                        }`}>
+                          {role}
+                        </span>
+                      )}
+                      <span className="text-slate-800 font-sans text-[11px]">{msg.actor_name}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {getStatusBadge(msg.status, msg.retry_count)}
+                      {(msg.status === "failed" || msg.status === "retry_buffered") && (
+                        <button
+                          type="button"
+                          onClick={() => handleRetryPost(msg.id)}
+                          disabled={isPosting}
+                          className="text-[9px] font-extrabold text-[#c0720c] hover:text-[#9c5707] bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded px-1.5 py-0.5 select-none transition cursor-pointer"
+                          title="Force Retry Outbound Posting"
+                        >
+                          Retry
+                        </button>
+                      )}
+                      <span className="text-[10px] text-slate-400 font-normal font-mono">
+                        {new Date(msg.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
                       </span>
-                    )}
-                    <span className="text-slate-800 font-sans text-[11px]">{msg.senderName}</span>
+                    </div>
                   </div>
-                  <span className="text-[10px] text-slate-400 font-normal font-mono">{msg.sentAt}</span>
+                  <p className="text-xs leading-relaxed font-sans whitespace-pre-wrap">{msg.sanitized_payload}</p>
                 </div>
-                <p className="text-xs leading-relaxed font-sans whitespace-pre-wrap">{msg.body}</p>
-              </div>
-            ))
+              );
+            })
           )}
         </div>
 
@@ -822,8 +888,10 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
 
                 {/* Templates Dropdown selector */}
                 <div className="w-full sm:w-60">
+                  <label htmlFor={`tmpl-select-${activeChannelId}`} className="sr-only">Choose Template Action</label>
                   <select
-                    className="w-full text-[11px] h-8 rounded-lg border border-slate-200 bg-white px-3 focus:outline-none focus:ring-1 focus:ring-[var(--hh-purple)]"
+                    id={`tmpl-select-${activeChannelId}`}
+                    className="w-full text-[11px] h-8 rounded-lg border border-slate-200 bg-white px-3 focus:outline-none focus:ring-1 focus:ring-[var(--hh-purple)] cursor-pointer"
                     value={selectedTemplateId}
                     onChange={(e) => {
                       const tid = e.target.value;
@@ -842,20 +910,20 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
 
               {/* Retry bar if pending post exists */}
               {pendingPost && pendingPost.channelId === activeChannel.id && (
-                <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-2.5 flex items-center justify-between gap-3 text-xs text-amber-800">
+                <div className="rounded-lg border border-amber-200 bg-amber-50/70 p-2.5 flex items-center justify-between gap-3 text-xs text-amber-800 animate-in fade-in duration-200">
                   <div className="flex items-center gap-2">
-                    <AlertTriangle size={14} className="text-amber-600" />
-                    <span>Post pending in buffer queue</span>
+                    <AlertTriangle size={14} className="text-amber-600 shrink-0" />
+                    <span className="line-clamp-1">Outgoing update buffered: <strong>{pendingPost.body}</strong></span>
                   </div>
                   <Button
                     type="button"
                     size="sm"
-                    onClick={handleRetryPost}
+                    onClick={() => handleRetryPost(pendingPost.id)}
                     disabled={isPosting}
-                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold h-6 py-0 text-[10px]"
+                    className="bg-amber-600 hover:bg-amber-700 text-white font-bold h-6 py-0 text-[10px] cursor-pointer"
                   >
                     <RefreshCw size={10} className={`mr-1 ${isPosting ? "animate-spin" : ""}`} />
-                    Retry Now
+                    Load to retry
                   </Button>
                 </div>
               )}
@@ -863,7 +931,9 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
               {/* Message inputs & Scrubber Output */}
               <div className="grid grid-cols-1 md:grid-cols-[1fr_200px] gap-3">
                 <div className="space-y-1">
+                  <label htmlFor={`post-input-${activeChannelId}`} className="sr-only">Operational Update Content</label>
                   <textarea
+                    id={`post-input-${activeChannelId}`}
                     className="w-full min-h-[64px] p-2.5 text-xs border border-slate-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-[var(--hh-purple)] leading-normal font-sans"
                     placeholder="Type an operational update... (Clinical keywords will be scrubbed)"
                     value={inputText}
@@ -889,7 +959,7 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
 
               {/* Real-time policy scrubbing preview */}
               {inputText.trim() && (
-                <div className="bg-[#fafbff] border border-slate-100 p-2.5 rounded-lg text-[11px] leading-relaxed">
+                <div className="bg-[#fafbff] border border-slate-100 p-2.5 rounded-lg text-[11px] leading-relaxed animate-in fade-in duration-200">
                   <div className="flex items-center justify-between text-[10px] font-bold uppercase mb-1">
                     <span className="text-slate-400 tracking-wider">Policy Compliance Scrubber Output</span>
                     {isScrubbed ? (
@@ -967,7 +1037,9 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
           </div>
           
           <div className="space-y-2 max-h-40 overflow-y-auto border border-[#c7d7cd]/60 rounded-lg p-2.5 bg-slate-50/50">
-            {auditLogs.length === 0 ? (
+            {isLoadingAudit ? (
+              <div className="text-center py-5 text-[10px] text-slate-400 font-mono">Loading integration logs...</div>
+            ) : auditLogs.length === 0 ? (
               <div className="text-center py-5 text-[10px] text-slate-400 font-mono">No outbound sync actions triggered.</div>
             ) : (
               auditLogs.map((log) => (
@@ -979,13 +1051,13 @@ export function MessagingWorkspace({ initialThreads, recipients }: Props) {
                       ) : (
                         <AlertTriangle size={9} className="text-red-500" />
                       )}
-                      <span>{log.actor} ({log.role?.toUpperCase() || "OP"})</span>
+                      <span>{log.actor_name} ({log.actor_role?.toUpperCase() || "OP"})</span>
                     </span>
-                    <span>{log.timestamp}</span>
+                    <span>{new Date(log.created_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}</span>
                   </div>
                   <div className="text-slate-400 mt-0.5">Topic: #{log.channel} &gt; {log.topic}</div>
                   <div className="bg-white/80 p-1 rounded border border-slate-200/50 mt-1 text-slate-600 line-clamp-2 leading-normal">
-                    {log.sanitizedPayload}
+                    {log.sanitized_payload}
                   </div>
                 </div>
               ))
