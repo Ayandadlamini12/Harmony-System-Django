@@ -4,7 +4,36 @@ from django.utils import timezone
 from rest_framework import serializers
 
 from .access import has_patient_clinical_access
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, VisitSymptomProblem, Vital, ZulipOutboundEvent
+from .models import (
+    Appointment,
+    AppointmentType,
+    ResourceRoom,
+    PractitionerAvailability,
+    BlockedSlot,
+    ExternalSyncRecord,
+    SchedulingOutboxEvent,
+    AuditLog,
+    Case,
+    ElevatedAccessRequest,
+    FormDraft,
+    Message,
+    MessageDelivery,
+    MessageParticipant,
+    MessageThread,
+    PartnerCompany,
+    Patient,
+    PatientCheckIn,
+    PatientCondition,
+    PatientDocument,
+    PatientJourney,
+    PatientJourneyEvent,
+    PatientProfile,
+    SupportTicket,
+    Visit,
+    VisitSymptomProblem,
+    Vital,
+    ZulipOutboundEvent
+)
 from .zulip import zulip_message_url
 from .workflow import build_patient_workflow_actions
 
@@ -335,14 +364,57 @@ class PatientCheckInSerializer(serializers.ModelSerializer):
         return super().create(validated_data)
 
 
+class AppointmentTypeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = AppointmentType
+        fields = "__all__"
+
+
+class ResourceRoomSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ResourceRoom
+        fields = "__all__"
+
+
+class PractitionerAvailabilitySerializer(serializers.ModelSerializer):
+    practitioner_name = serializers.CharField(source="practitioner.get_full_name", read_only=True)
+
+    class Meta:
+        model = PractitionerAvailability
+        fields = "__all__"
+
+
+class BlockedSlotSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
+
+    class Meta:
+        model = BlockedSlot
+        fields = "__all__"
+
+
 class AppointmentSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
     patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
     patient_phone = serializers.CharField(source="patient.primary_phone", read_only=True)
-    appointment_type_label = serializers.CharField(source="get_appointment_type_display", read_only=True)
+    
+    appointment_type_label = serializers.CharField(source="appointment_type.name", read_only=True)
     source_label = serializers.CharField(source="get_source_display", read_only=True)
     status_label = serializers.CharField(source="get_status_display", read_only=True)
-    assigned_clinician_name = serializers.CharField(source="assigned_clinician.get_full_name", read_only=True)
+    priority_label = serializers.CharField(source="get_priority_display", read_only=True)
+    
+    practitioner_name = serializers.CharField(source="practitioner.get_full_name", read_only=True)
+    room_name = serializers.CharField(source="room.name", read_only=True)
+    created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
+    updated_by_name = serializers.CharField(source="updated_by.get_full_name", read_only=True)
+
+    # Legacy fields mapping (Backwards compatibility)
+    assigned_clinician = serializers.PrimaryKeyRelatedField(
+        source="practitioner",
+        queryset=User.objects.all(),
+        required=False,
+        allow_null=True
+    )
+    assigned_clinician_name = serializers.CharField(source="practitioner.get_full_name", read_only=True)
 
     class Meta:
         model = Appointment
@@ -354,15 +426,30 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "patient_phone",
             "appointment_type",
             "appointment_type_label",
+            "start_at",
+            "end_at",
             "appointment_date",
             "appointment_time",
             "source",
             "source_label",
+            "priority",
+            "priority_label",
+            "practitioner",
+            "practitioner_name",
             "assigned_clinician",
             "assigned_clinician_name",
+            "room",
+            "room_name",
+            "location",
             "notes",
             "status",
             "status_label",
+            "created_by",
+            "created_by_name",
+            "updated_by",
+            "updated_by_name",
+            "cancel_reason",
+            "rescheduled_from",
             "checked_in_at",
             "created_at",
             "updated_at",
@@ -374,13 +461,25 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "patient_phone",
             "appointment_type_label",
             "source_label",
-            "assigned_clinician_name",
-            "status",
             "status_label",
-            "checked_in_at",
+            "priority_label",
+            "practitioner_name",
+            "room_name",
+            "assigned_clinician_name",
+            "created_by_name",
+            "updated_by_name",
+            "appointment_date",
+            "appointment_time",
             "created_at",
             "updated_at",
         )
+
+    def validate(self, attrs):
+        start_at = attrs.get("start_at")
+        end_at = attrs.get("end_at")
+        if start_at and end_at and start_at >= end_at:
+            raise serializers.ValidationError("End time must be strictly after start time.")
+        return attrs
 
 
 class PatientJourneyEventSerializer(serializers.ModelSerializer):

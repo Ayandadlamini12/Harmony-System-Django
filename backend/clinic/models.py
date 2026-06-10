@@ -430,6 +430,128 @@ class PatientCheckIn(TimeStampedModel):
         return f"{self.patient.full_name_display} - {self.get_status_display()}"
 
 
+class AppointmentType(TimeStampedModel):
+    name = models.CharField(max_length=100, unique=True)
+    default_duration_minutes = models.PositiveIntegerField(default=30)
+    requires_practitioner = models.BooleanField(default=True)
+    requires_room = models.BooleanField(default=False)
+    requires_consent = models.BooleanField(default=False)
+    buffer_before_minutes = models.PositiveIntegerField(default=0)
+    buffer_after_minutes = models.PositiveIntegerField(default=0)
+    color_token = models.CharField(max_length=50, blank=True)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class ResourceRoom(TimeStampedModel):
+    name = models.CharField(max_length=100, unique=True)
+    location = models.CharField(max_length=255, null=True, blank=True)
+    resource_type = models.CharField(max_length=100, blank=True)
+    capacity = models.PositiveIntegerField(default=1)
+    is_active = models.BooleanField(default=True)
+
+    def __str__(self) -> str:
+        return self.name
+
+
+class PractitionerAvailability(TimeStampedModel):
+    class Weekday(models.IntegerChoices):
+        MONDAY = 0, "Monday"
+        TUESDAY = 1, "Tuesday"
+        WEDNESDAY = 2, "Wednesday"
+        THURSDAY = 3, "Thursday"
+        FRIDAY = 4, "Friday"
+        SATURDAY = 5, "Saturday"
+        SUNDAY = 6, "Sunday"
+
+    practitioner = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="availabilities",
+    )
+    weekday = models.PositiveSmallIntegerField(choices=Weekday.choices)
+    start_time = models.TimeField()
+    end_time = models.TimeField()
+    effective_from = models.DateField(default=timezone.localdate)
+    effective_to = models.DateField(null=True, blank=True)
+    location = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        ordering = ("weekday", "start_time")
+
+    def __str__(self) -> str:
+        name = self.practitioner.get_full_name() if hasattr(self.practitioner, "get_full_name") else ""
+        return f"{name or self.practitioner.username} - {self.get_weekday_display()} {self.start_time}-{self.end_time}"
+
+
+class BlockedSlot(TimeStampedModel):
+    class ScopeType(models.TextChoices):
+        PRACTITIONER = "practitioner", "Practitioner"
+        ROOM = "room", "Room"
+        CLINIC = "clinic", "Clinic"
+
+    scope_type = models.CharField(max_length=30, choices=ScopeType.choices, default=ScopeType.CLINIC)
+    scope_id = models.CharField(max_length=100, null=True, blank=True)
+    start_at = models.DateTimeField()
+    end_at = models.DateTimeField()
+    reason = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_blocked_slots",
+    )
+
+    class Meta:
+        ordering = ("start_at",)
+
+    def __str__(self) -> str:
+        return f"Blocked {self.scope_type} ({self.scope_id or 'all'}) {self.start_at} to {self.end_at}"
+
+
+class ExternalSyncRecord(TimeStampedModel):
+    entity_type = models.CharField(max_length=50, default="appointment")
+    entity_id = models.CharField(max_length=100)
+    provider = models.CharField(max_length=50, default="google")
+    external_id = models.CharField(max_length=255)
+    sync_status = models.CharField(max_length=50, default="synced")
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    last_error = models.TextField(null=True, blank=True)
+
+    class Meta:
+        unique_together = ("entity_type", "entity_id", "provider")
+
+    def __str__(self) -> str:
+        return f"{self.provider} Sync for {self.entity_type} {self.entity_id}"
+
+
+class SchedulingOutboxEvent(models.Model):
+    class Status(models.TextChoices):
+        PENDING = "pending", "Pending"
+        PROCESSED = "processed", "Processed"
+        FAILED = "failed", "Failed"
+
+    event_type = models.CharField(max_length=100)
+    aggregate_type = models.CharField(max_length=100, default="appointment")
+    aggregate_id = models.CharField(max_length=100)
+    payload_json = models.JSONField()
+    safe_payload_json = models.JSONField(default=dict, blank=True)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.PENDING)
+    retry_count = models.PositiveIntegerField(default=0)
+    last_error = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    processed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ("created_at",)
+
+    def __str__(self) -> str:
+        return f"Outbox Event: {self.event_type} on {self.aggregate_type} {self.aggregate_id} ({self.status})"
+
+
 class Appointment(TimeStampedModel):
     class Source(models.TextChoices):
         INTERNAL = "internal", "Internal"
@@ -438,26 +560,53 @@ class Appointment(TimeStampedModel):
         API = "api", "API"
 
     class Status(models.TextChoices):
-        SCHEDULED = "scheduled", "Scheduled"
+        DRAFT = "draft", "Draft"
+        BOOKED = "booked", "Booked"
+        CONFIRMED = "confirmed", "Confirmed"
         CHECKED_IN = "checked_in", "Checked in"
+        IN_QUEUE = "in_queue", "In Queue"
+        IN_VISIT = "in_visit", "In Visit"
         COMPLETED = "completed", "Completed"
         CANCELLED = "cancelled", "Cancelled"
         NO_SHOW = "no_show", "No show"
 
+    class Priority(models.TextChoices):
+        LOW = "low", "Low"
+        MEDIUM = "medium", "Medium"
+        HIGH = "high", "High"
+
     patient = models.ForeignKey(Patient, on_delete=models.CASCADE, related_name="appointments")
-    appointment_type = models.CharField(max_length=40, choices=Visit.VisitType.choices, default=Visit.VisitType.FOLLOW_UP)
-    appointment_date = models.DateField()
+    appointment_type = models.ForeignKey(AppointmentType, on_delete=models.PROTECT, related_name="appointments", null=True, blank=True)
+    
+    # Precise operational bounds
+    start_at = models.DateTimeField(null=True, blank=True)
+    end_at = models.DateTimeField(null=True, blank=True)
+    
+    # Backwards compatibility database-level fields (auto-synced)
+    appointment_date = models.DateField(null=True, blank=True)
     appointment_time = models.TimeField(null=True, blank=True)
+    
     source = models.CharField(max_length=30, choices=Source.choices, default=Source.INTERNAL)
-    assigned_clinician = models.ForeignKey(
+    priority = models.CharField(max_length=20, choices=Priority.choices, default=Priority.MEDIUM)
+    
+    practitioner = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
         blank=True,
         on_delete=models.SET_NULL,
-        related_name="assigned_appointments",
+        related_name="appointments",
     )
+    room = models.ForeignKey(
+        ResourceRoom,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="appointments",
+    )
+    location = models.CharField(max_length=255, null=True, blank=True)
     notes = models.TextField(blank=True)
-    status = models.CharField(max_length=30, choices=Status.choices, default=Status.SCHEDULED)
+    status = models.CharField(max_length=30, choices=Status.choices, default=Status.BOOKED)
+    
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         null=True,
@@ -465,18 +614,43 @@ class Appointment(TimeStampedModel):
         on_delete=models.SET_NULL,
         related_name="created_appointments",
     )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="updated_appointments",
+    )
+    cancel_reason = models.TextField(null=True, blank=True)
+    rescheduled_from = models.ForeignKey(
+        "self",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="rescheduled_to",
+    )
     checked_in_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
-        ordering = ("appointment_date", "appointment_time", "created_at")
+        ordering = ("start_at", "created_at")
         indexes = [
-            models.Index(fields=["appointment_date", "status"]),
-            models.Index(fields=["patient", "appointment_date"]),
-            models.Index(fields=["assigned_clinician", "appointment_date"]),
+            models.Index(fields=["start_at", "end_at"]),
+            models.Index(fields=["status", "start_at"]),
+            models.Index(fields=["patient", "start_at"]),
+            models.Index(fields=["practitioner", "start_at"]),
+            models.Index(fields=["room", "start_at"]),
         ]
 
+    def save(self, *args, **kwargs):
+        if self.start_at:
+            local_dt = timezone.localtime(self.start_at)
+            self.appointment_date = local_dt.date()
+            self.appointment_time = local_dt.time()
+        super().save(*args, **kwargs)
+
     def __str__(self) -> str:
-        return f"{self.patient.full_name_display} - {self.get_appointment_type_display()} on {self.appointment_date}"
+        appt_type = self.appointment_type.name if self.appointment_type else "No Type"
+        return f"{self.patient.full_name_display} - {appt_type} on {self.start_at or self.appointment_date}"
 
 
 class PatientJourney(TimeStampedModel):

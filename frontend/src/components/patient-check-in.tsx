@@ -10,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import type { Patient } from "@/types/clinic";
-import { ZulipCoordinationCard } from "@/components/zulip-coordination-card";
 
 function normalizeDigits(value?: string | null) {
   return String(value || "").replace(/\D/g, "");
@@ -106,10 +105,6 @@ export function PatientCheckIn({
   patients: Patient[];
   mode?: "staff" | "tablet";
 }) {
-  const [checkInTrigger, setCheckInTrigger] = useState(0);
-  const [lastCheckedInName, setLastCheckedInName] = useState("");
-  const [lastCheckedInCode, setLastCheckedInCode] = useState("");
-  const [lastCheckedInQueue, setLastCheckedInQueue] = useState<number | null>(null);
   const [query, setQuery] = useState("");
   const [identifierType, setIdentifierType] = useState(identifierOptions[0].value);
   const [lookup, setLookup] = useState<LookupResult | null>(null);
@@ -218,10 +213,6 @@ export function PatientCheckIn({
         visitType,
         nextAction: data.next_action
       });
-      setLastCheckedInName(data.patient_name || lookup?.patient_name || "Patient");
-      setLastCheckedInCode(data.patient_code || lookup?.patient_code || "");
-      setLastCheckedInQueue(data.queue_number || null);
-      setCheckInTrigger((prev) => prev + 1);
       setQuery("");
       setLookup(null);
       toast.success(data.appointment_matched ? "Appointment checked in" : "Patient added to waiting list");
@@ -231,8 +222,8 @@ export function PatientCheckIn({
   }
 
   return (
-    <div className={isTablet ? "mx-auto grid w-full max-w-5xl gap-6" : "grid gap-6 lg:grid-cols-[1fr_360px] xl:grid-cols-[1fr_400px]"}>
-      <div className={isTablet ? "" : "space-y-5"}>
+    <div className="mx-auto w-full max-w-5xl space-y-6">
+      <div className="space-y-5">
         <Dialog open={Boolean(checkInError)} onOpenChange={(open) => !open && setCheckInError(null)}>
         <DialogContent className="w-[min(92vw,520px)] overflow-hidden">
           <div className="border-b border-[var(--hh-border-strong)] px-5 py-4">
@@ -462,28 +453,6 @@ export function PatientCheckIn({
         </section>
       )}
       </div>
-
-      {!isTablet && (
-        <div className="space-y-4">
-          <div className="rounded-xl border border-[#c7d7cd] bg-[#f8fbfa] p-4 text-xs">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-[#225c2c] mb-1">Reception Desk Mode</p>
-            <p className="text-[#55635c] font-sans leading-relaxed">
-              This panel links your patient check-in flow with Zulip's coordination services. Activating a visit automatically registers the patient on the Front Desk channel.
-            </p>
-          </div>
-          <ZulipCoordinationCard
-            key={checkInTrigger}
-            channel="front-desk"
-            topic={`PATIENT FLOW | ${lastCheckedInCode || "RECEPTION"} | ${new Date().toISOString().split('T')[0]}`}
-            linkedEntityType="patient"
-            linkedEntityId={lastCheckedInCode || "RECEPTION"}
-            linkedEntityName={lastCheckedInName || "Front Desk Queue"}
-            patientCode={lastCheckedInCode}
-            userRole="receptionist"
-            forceTemplateOnly={true}
-          />
-        </div>
-      )}
     </div>
   );
 }

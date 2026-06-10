@@ -1,6 +1,33 @@
 from django.contrib import admin
 
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, Visit, VisitSymptomProblem, Vital
+from .models import (
+    Appointment,
+    AppointmentType,
+    ResourceRoom,
+    PractitionerAvailability,
+    BlockedSlot,
+    ExternalSyncRecord,
+    SchedulingOutboxEvent,
+    AuditLog,
+    Case,
+    ElevatedAccessRequest,
+    FormDraft,
+    Message,
+    MessageDelivery,
+    MessageParticipant,
+    MessageThread,
+    PartnerCompany,
+    Patient,
+    PatientCheckIn,
+    PatientCondition,
+    PatientDocument,
+    PatientJourney,
+    PatientJourneyEvent,
+    PatientProfile,
+    Visit,
+    VisitSymptomProblem,
+    Vital
+)
 
 
 class PatientProfileInline(admin.StackedInline):
@@ -54,11 +81,49 @@ class PatientCheckInAdmin(admin.ModelAdmin):
     list_filter = ("status", "method", "visit_type", "created_at")
 
 
+@admin.register(AppointmentType)
+class AppointmentTypeAdmin(admin.ModelAdmin):
+    list_display = ("name", "default_duration_minutes", "requires_practitioner", "requires_room", "is_active")
+    search_fields = ("name",)
+    list_filter = ("requires_practitioner", "requires_room", "requires_consent", "is_active")
+
+
+@admin.register(ResourceRoom)
+class ResourceRoomAdmin(admin.ModelAdmin):
+    list_display = ("name", "location", "resource_type", "capacity", "is_active")
+    search_fields = ("name", "location")
+    list_filter = ("is_active",)
+
+
+@admin.register(PractitionerAvailability)
+class PractitionerAvailabilityAdmin(admin.ModelAdmin):
+    list_display = ("practitioner", "weekday", "start_time", "end_time", "effective_from", "effective_to")
+    list_filter = ("weekday", "effective_from")
+
+
+@admin.register(BlockedSlot)
+class BlockedSlotAdmin(admin.ModelAdmin):
+    list_display = ("scope_type", "scope_id", "start_at", "end_at", "reason")
+    list_filter = ("scope_type", "start_at")
+
+
+@admin.register(ExternalSyncRecord)
+class ExternalSyncRecordAdmin(admin.ModelAdmin):
+    list_display = ("entity_type", "entity_id", "provider", "sync_status", "last_synced_at")
+    list_filter = ("provider", "sync_status")
+
+
+@admin.register(SchedulingOutboxEvent)
+class SchedulingOutboxEventAdmin(admin.ModelAdmin):
+    list_display = ("event_type", "aggregate_type", "aggregate_id", "status", "retry_count", "created_at")
+    list_filter = ("status", "event_type", "created_at")
+
+
 @admin.register(Appointment)
 class AppointmentAdmin(admin.ModelAdmin):
-    list_display = ("patient", "appointment_type", "appointment_date", "appointment_time", "source", "assigned_clinician", "status")
+    list_display = ("patient", "appointment_type", "start_at", "end_at", "source", "practitioner", "room", "status")
     search_fields = ("patient__full_name_display", "patient__patient_code", "patient__national_id", "patient__primary_phone", "notes")
-    list_filter = ("appointment_type", "appointment_date", "source", "status", "assigned_clinician")
+    list_filter = ("appointment_type", "start_at", "source", "status", "practitioner", "room")
 
 
 @admin.register(PatientJourney)

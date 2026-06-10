@@ -5,7 +5,13 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import Appointment, AuditLog, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, PatientProfile, Visit, VisitSymptomProblem, Vital, ZulipOutboundEvent
+from .models import (
+    Appointment, AppointmentType, AuditLog, BlockedSlot, ElevatedAccessRequest, 
+    FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, 
+    Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, 
+    PatientProfile, PractitionerAvailability, ResourceRoom, SchedulingOutboxEvent, 
+    Visit, VisitSymptomProblem, Vital, ZulipOutboundEvent
+)
 
 User = get_user_model()
 
@@ -432,12 +438,16 @@ class PatientCheckInApiTests(APITestCase):
 
     def test_check_in_matches_same_day_appointment(self):
         clinician = User.objects.create_user(username="doctor_appt", password="password123", role="clinician")
+        appt_type = AppointmentType.objects.create(name="follow_up", default_duration_minutes=30)
         appointment = Appointment.objects.create(
             patient=self.patient,
-            appointment_type="follow_up",
+            appointment_type=appt_type,
             appointment_date=timezone.localdate(),
-            assigned_clinician=clinician,
+            start_at=timezone.now(),
+            end_at=timezone.now() + timedelta(minutes=30),
+            practitioner=clinician,
             notes="Review remedy response",
+            status=Appointment.Status.BOOKED
         )
 
         response = self.client.post(
@@ -465,11 +475,12 @@ class AppointmentApiTests(APITestCase):
         self.client.force_authenticate(self.admin)
 
     def test_employee_can_book_appointment_with_default_clinician(self):
+        appt_type = AppointmentType.objects.create(name="follow_up", default_duration_minutes=30)
         response = self.client.post(
             "/api/appointments/",
             {
                 "patient": self.patient.id,
-                "appointment_type": "follow_up",
+                "appointment_type": appt_type.id,
                 "appointment_date": "2026-05-28",
                 "appointment_time": "10:30",
                 "source": "internal",
@@ -480,9 +491,9 @@ class AppointmentApiTests(APITestCase):
 
         self.assertEqual(response.status_code, 201)
         appointment = Appointment.objects.get()
-        self.assertEqual(appointment.assigned_clinician, self.clinician)
+        self.assertEqual(appointment.practitioner, self.clinician)
         self.assertEqual(appointment.created_by, self.admin)
-        self.assertEqual(appointment.status, Appointment.Status.SCHEDULED)
+        self.assertEqual(appointment.status, Appointment.Status.BOOKED)
         self.assertTrue(AuditLog.objects.filter(entity_type="appointment", action="create").exists())
 
 
@@ -742,3 +753,146 @@ class ZulipCoordinationApiTests(APITestCase):
         self.assertEqual(response.data["results"][0]["id"], own_event.id)
 
 # Create your tests here.
+
+class AppointmentSchedulingTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="admin_sched", password="password123", role="admin")
+        self.clinician = User.objects.create_user(username="clinician_sched", password="password123", role="clinician")
+        self.receptionist = User.objects.create_user(username="receptionist_sched", password="password123", role="receptionist")
+        self.patient = Patient.objects.create(first_name="Sched", last_name="Patient", gender="male", primary_phone="+26876009999")
+        self.appt_type = AppointmentType.objects.create(name="Consultation", default_duration_minutes=30)
+        self.room = ResourceRoom.objects.create(name="Room 1", is_active=True)
+        self.client.force_authenticate(self.receptionist)
+        
+        # Add availability so conflicts pass
+        import datetime
+        for day in range(7):
+            PractitionerAvailability.objects.create(
+                practitioner=self.clinician,
+                weekday=day,
+                start_time=datetime.time(8, 0),
+                end_time=datetime.time(17, 0),
+                effective_from=timezone.localdate() - timedelta(days=1)
+            )
+    
+    def test_resources_metadata(self):
+        response = self.client.get("/api/scheduling/resources/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("appointment_types", response.data)
+        self.assertIn("rooms", response.data)
+        self.assertIn("practitioners", response.data)
+        self.assertEqual(len(response.data["rooms"]), 1)
+        self.assertEqual(len(response.data["appointment_types"]), 1)
+        self.assertTrue(any(p["id"] == self.clinician.id for p in response.data["practitioners"]))
+
+    def test_capabilities_view(self):
+        response = self.client.get("/api/me/capabilities/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("can_create_appointment", response.data)
+        self.assertIn("can_move_appointment", response.data)
+    
+    def test_board_view(self):
+        # Create an appointment for today
+        today = timezone.localdate()
+        start = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time())) + timedelta(hours=10)
+        appt = Appointment.objects.create(
+            patient=self.patient,
+            appointment_type=self.appt_type,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+            practitioner=self.clinician,
+            room=self.room,
+            status=Appointment.Status.BOOKED
+        )
+        
+        response = self.client.get("/api/scheduling/board/", {"date": today.isoformat()})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("columns", response.data)
+        self.assertIn("appointments", response.data)
+        self.assertEqual(len(response.data["appointments"]), 1)
+        self.assertEqual(response.data["appointments"][0]["id"], appt.id)
+
+    def test_double_booking_conflict(self):
+        # Create one appointment
+        today = timezone.localdate()
+        start = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time())) + timedelta(hours=10)
+        appt = Appointment.objects.create(
+            patient=self.patient,
+            appointment_type=self.appt_type,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+            practitioner=self.clinician,
+            status=Appointment.Status.BOOKED
+        )
+        
+        # Try to create another appointment overlapping
+        response = self.client.post("/api/appointments/", {
+            "patient": self.patient.id,
+            "appointment_type": self.appt_type.id,
+            "start_at": (start + timedelta(minutes=15)).isoformat(),
+            "end_at": (start + timedelta(minutes=45)).isoformat(),
+            "practitioner": self.clinician.id,
+            "source": "internal"
+        }, format="json")
+        
+        self.assertEqual(response.status_code, 409)
+        self.assertIn("conflict", str(response.data).lower())
+
+    def test_move_appointment(self):
+        today = timezone.localdate()
+        start = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time())) + timedelta(hours=10)
+        appt = Appointment.objects.create(
+            patient=self.patient,
+            appointment_type=self.appt_type,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+            practitioner=self.clinician,
+            status=Appointment.Status.BOOKED
+        )
+        
+        new_start = start + timedelta(hours=2)
+        new_end = new_start + timedelta(minutes=30)
+        
+        response = self.client.post(f"/api/appointments/{appt.id}/move/", {
+            "start_at": new_start.isoformat(),
+            "end_at": new_end.isoformat(),
+        }, format="json")
+        
+        self.assertEqual(response.status_code, 200)
+        appt.refresh_from_db()
+        self.assertEqual(appt.start_at, new_start)
+        self.assertEqual(appt.end_at, new_end)
+        
+        # Verify outbox event was created
+        outbox_exists = SchedulingOutboxEvent.objects.filter(
+            event_type="appointment.moved",
+            aggregate_id=str(appt.id)
+        ).exists()
+        self.assertTrue(outbox_exists)
+
+    def test_cancel_appointment(self):
+        today = timezone.localdate()
+        start = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time())) + timedelta(hours=10)
+        appt = Appointment.objects.create(
+            patient=self.patient,
+            appointment_type=self.appt_type,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+            practitioner=self.clinician,
+            status=Appointment.Status.BOOKED
+        )
+        
+        response = self.client.post(f"/api/appointments/{appt.id}/cancel/", {
+            "cancel_reason": "Patient requested cancellation"
+        }, format="json")
+        
+        self.assertEqual(response.status_code, 200)
+        appt.refresh_from_db()
+        self.assertEqual(appt.status, Appointment.Status.CANCELLED)
+        self.assertEqual(appt.cancel_reason, "Patient requested cancellation")
+        
+        outbox_exists = SchedulingOutboxEvent.objects.filter(
+            event_type="appointment.cancelled",
+            aggregate_id=str(appt.id)
+        ).exists()
+        self.assertTrue(outbox_exists)

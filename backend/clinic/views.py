@@ -17,7 +17,14 @@ from rest_framework.response import Response
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
 from .document_generation import consent_document_reference, generate_consent_pdf, render_consent_html, save_consent_pdf, sign_consent_document
-from .models import Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient, PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent, PatientProfile, SupportTicket, Visit, Vital, VisitSymptomProblem, ZulipOutboundEvent
+from .models import (
+    Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message,
+    MessageDelivery, MessageParticipant, MessageThread, PartnerCompany, Patient,
+    PatientCheckIn, PatientDocument, PatientJourney, PatientJourneyEvent,
+    PatientProfile, SupportTicket, Visit, Vital, VisitSymptomProblem,
+    ZulipOutboundEvent, AppointmentType, ResourceRoom, PractitionerAvailability,
+    BlockedSlot, SchedulingOutboxEvent
+)
 from .serializers import (
     AuditLogSerializer,
     AppointmentSerializer,
@@ -39,6 +46,10 @@ from .serializers import (
     ZulipMessagesQuerySerializer,
     ZulipOutboundEventSerializer,
     ZulipPostUpdateSerializer,
+    AppointmentTypeSerializer,
+    ResourceRoomSerializer,
+    PractitionerAvailabilitySerializer,
+    BlockedSlotSerializer,
 )
 from .tasks import post_to_zulip_task
 from .zulip import LINKED_TYPE_CHANNEL_DEFAULTS, build_topic, clean_clinical_payload, format_operational_message, user_can_access_channel
@@ -116,7 +127,7 @@ def start_journey_for_check_in(check_in, request=None):
         Appointment.objects.filter(
             patient=check_in.patient,
             appointment_date=service_date,
-            status=Appointment.Status.SCHEDULED,
+            status__in=[Appointment.Status.BOOKED, Appointment.Status.CONFIRMED],
         )
         .order_by("appointment_time", "created_at")
         .first()
@@ -934,40 +945,364 @@ class PatientCheckInViewSet(viewsets.ModelViewSet):
         )
 
 
+from rest_framework.exceptions import APIException
+
+class SchedulingConflictException(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = "A scheduling conflict was detected."
+    default_code = "resource_conflict"
+
+    def __init__(self, detail=None, conflicts=None):
+        super().__init__(detail)
+        self.detail = {
+            "code": self.default_code,
+            "detail": detail or self.default_detail,
+            "conflicts": conflicts or []
+        }
+
+
+def check_scheduling_conflicts(appointment_id, start_at, end_at, practitioner_id, room_id, appointment_type=None):
+    conflicts = []
+    if not start_at or not end_at:
+        return conflicts
+
+    # 1. Blocked slot check
+    blocked_qs = BlockedSlot.objects.filter(start_at__lt=end_at, end_at__gt=start_at)
+    
+    clinic_blocked = blocked_qs.filter(scope_type=BlockedSlot.ScopeType.CLINIC)
+    for cb in clinic_blocked:
+        conflicts.append({
+            "type": "clinic_blocked",
+            "detail": f"Clinic is blocked: {cb.reason or 'No reason provided'}.",
+            "resource_id": None
+        })
+        
+    if practitioner_id:
+        practitioner_blocked = blocked_qs.filter(
+            scope_type=BlockedSlot.ScopeType.PRACTITIONER,
+            scope_id=str(practitioner_id)
+        )
+        for pb in practitioner_blocked:
+            conflicts.append({
+                "type": "practitioner_blocked",
+                "detail": f"Practitioner is blocked during this time: {pb.reason or 'No reason provided'}.",
+                "resource_id": practitioner_id
+            })
+            
+    if room_id:
+        room_blocked = blocked_qs.filter(
+            scope_type=BlockedSlot.ScopeType.ROOM,
+            scope_id=str(room_id)
+        )
+        for rb in room_blocked:
+            conflicts.append({
+                "type": "room_blocked",
+                "detail": f"Room is blocked during this time: {rb.reason or 'No reason provided'}.",
+                "resource_id": room_id
+            })
+
+    # 2. Practitioner Availability check
+    if practitioner_id:
+        local_start = timezone.localtime(start_at)
+        weekday = local_start.weekday()
+        date = local_start.date()
+        time_start = local_start.time()
+        time_end = timezone.localtime(end_at).time()
+        
+        avail_qs = PractitionerAvailability.objects.filter(
+            practitioner_id=practitioner_id,
+            weekday=weekday,
+            effective_from__lte=date
+        ).filter(
+            Q(effective_to__isnull=True) | Q(effective_to__gte=date)
+        )
+        
+        if avail_qs.exists():
+            fits = False
+            for av in avail_qs:
+                if av.start_time <= time_start and av.end_time >= time_end:
+                    fits = True
+                    break
+            if not fits:
+                conflicts.append({
+                    "type": "practitioner_unavailability",
+                    "detail": f"Appointment time {time_start.strftime('%H:%M')}-{time_end.strftime('%H:%M')} is outside the practitioner's configured availability.",
+                    "resource_id": practitioner_id
+                })
+        else:
+            conflicts.append({
+                "type": "practitioner_unavailability",
+                "detail": "Practitioner has no configured availability on this day.",
+                "resource_id": practitioner_id
+            })
+
+    # 3. Overlap check with other appointments
+    appt_qs = Appointment.objects.exclude(
+        status__in=[Appointment.Status.CANCELLED, Appointment.Status.NO_SHOW, Appointment.Status.DRAFT]
+    )
+    if appointment_id:
+        appt_qs = appt_qs.exclude(id=appointment_id)
+        
+    overlap_qs = appt_qs.filter(start_at__lt=end_at, end_at__gt=start_at)
+    
+    if practitioner_id:
+        prac_overlaps = overlap_qs.filter(practitioner_id=practitioner_id)
+        for po in prac_overlaps:
+            conflicts.append({
+                "type": "practitioner_collision",
+                "detail": f"Practitioner is already booked for patient {po.patient.full_name_display} ({timezone.localtime(po.start_at).strftime('%H:%M')}-{timezone.localtime(po.end_at).strftime('%H:%M')}).",
+                "resource_id": practitioner_id
+            })
+            
+    if room_id:
+        room_overlaps = overlap_qs.filter(room_id=room_id)
+        for ro in room_overlaps:
+            conflicts.append({
+                "type": "room_collision",
+                "detail": f"Room is already booked for patient {ro.patient.full_name_display} ({timezone.localtime(ro.start_at).strftime('%H:%M')}-{timezone.localtime(ro.end_at).strftime('%H:%M')}).",
+                "resource_id": room_id
+            })
+            
+    return conflicts
+
+
+def emit_outbox_event(event_type, appointment, request_user=None):
+    from .serializers import AppointmentSerializer
+    serializer = AppointmentSerializer(appointment)
+    payload = serializer.data
+    
+    safe_payload = payload.copy()
+    if "patient_phone" in safe_payload:
+        safe_payload["patient_phone"] = "CLASSIFIED"
+        
+    SchedulingOutboxEvent.objects.create(
+        event_type=event_type,
+        aggregate_type="appointment",
+        aggregate_id=str(appointment.id),
+        payload_json=payload,
+        safe_payload_json=safe_payload,
+        status=SchedulingOutboxEvent.Status.PENDING,
+    )
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def board_view(request):
+    date_str = request.query_params.get("date")
+    view_by = request.query_params.get("view_by", "practitioners")
+    
+    if date_str:
+        try:
+            date_val = timezone.datetime.strptime(date_str, "%Y-%m-%d").date()
+        except ValueError:
+            return Response({"detail": "Invalid date format. Use YYYY-MM-DD."}, status=status.HTTP_400_BAD_REQUEST)
+    else:
+        date_val = timezone.localdate()
+        
+    columns = []
+    if view_by == "rooms":
+        rooms = ResourceRoom.objects.filter(is_active=True)
+        for room in rooms:
+            columns.append({
+                "id": room.id,
+                "name": room.name,
+                "location": room.location,
+                "capacity": room.capacity,
+                "resource_type": room.resource_type,
+            })
+    else:
+        practitioners = User.objects.filter(role__in=[User.Role.CLINICIAN, User.Role.ADMIN], is_active=True)
+        weekday = date_val.weekday()
+        availabilities = PractitionerAvailability.objects.filter(
+            weekday=weekday,
+            effective_from__lte=date_val
+        ).filter(
+            Q(effective_to__isnull=True) | Q(effective_to__gte=date_val)
+        ).select_related("practitioner")
+        
+        avail_by_prac = {}
+        for av in availabilities:
+            avail_by_prac.setdefault(av.practitioner_id, []).append(
+                PractitionerAvailabilitySerializer(av).data
+            )
+            
+        for prac in practitioners:
+            columns.append({
+                "id": prac.id,
+                "name": prac.get_full_name() or prac.username,
+                "role": prac.role,
+                "availabilities": avail_by_prac.get(prac.id, [])
+            })
+            
+    start_dt = timezone.make_aware(timezone.datetime.combine(date_val, timezone.datetime.min.time()))
+    end_dt = timezone.make_aware(timezone.datetime.combine(date_val, timezone.datetime.max.time()))
+    
+    appts = Appointment.objects.filter(
+        Q(start_at__range=(start_dt, end_dt)) | Q(appointment_date=date_val)
+    ).select_related("patient", "practitioner", "room", "appointment_type").order_by("start_at", "created_at")
+    
+    journeys = {j.patient_id: j for j in PatientJourney.objects.filter(service_date=date_val, is_active=True)}
+    
+    serialized_appts = []
+    for appt in appts:
+        data = AppointmentSerializer(appt).data
+        journey = journeys.get(appt.patient_id)
+        data["flow_state"] = journey.current_stage if journey else None
+        data["consent_status"] = appt.patient.consent_status
+        data["consent_completed"] = appt.patient.consent_status in ["signed", "verified"]
+        serialized_appts.append(data)
+        
+    return Response({
+        "date": date_val.strftime("%Y-%m-%d"),
+        "view_by": view_by,
+        "columns": columns,
+        "appointments": serialized_appts
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def range_appointments_view(request):
+    start_str = request.query_params.get("start_at")
+    end_str = request.query_params.get("end_at")
+    practitioner_id = request.query_params.get("practitioner")
+    room_id = request.query_params.get("room")
+    patient_id = request.query_params.get("patient")
+    
+    qs = Appointment.objects.all().select_related("patient", "practitioner", "room", "appointment_type")
+    
+    if start_str:
+        try:
+            start_dt = timezone.datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+            qs = qs.filter(start_at__gte=start_dt)
+        except ValueError:
+            return Response({"detail": "Invalid start_at ISO format."}, status=status.HTTP_400_BAD_REQUEST)
+            
+    if end_str:
+        try:
+            end_dt = timezone.datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+            qs = qs.filter(end_at__lte=end_dt)
+        except ValueError:
+            return Response({"detail": "Invalid end_at ISO format."}, status=status.HTTP_400_BAD_REQUEST)
+            
+    if practitioner_id:
+        qs = qs.filter(practitioner_id=practitioner_id)
+    if room_id:
+        qs = qs.filter(room_id=room_id)
+    if patient_id:
+        qs = qs.filter(patient_id=patient_id)
+        
+    serializer = AppointmentSerializer(qs, many=True)
+    return Response(serializer.data)
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def resources_metadata_view(request):
+    rooms = ResourceRoomSerializer(ResourceRoom.objects.filter(is_active=True), many=True).data
+    types = AppointmentTypeSerializer(AppointmentType.objects.filter(is_active=True), many=True).data
+    practitioners = []
+    users = User.objects.filter(role__in=[User.Role.CLINICIAN, User.Role.ADMIN], is_active=True)
+    for u in users:
+        practitioners.append({
+            "id": u.id,
+            "name": u.get_full_name() or u.username,
+            "role": u.role,
+        })
+    return Response({
+        "rooms": rooms,
+        "appointment_types": types,
+        "practitioners": practitioners
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def capabilities_view(request):
+    user = request.user
+    is_staff_role = user.role in [User.Role.ADMIN, User.Role.CLINICIAN, User.Role.RECEPTIONIST]
+    capabilities = {
+        "can_create_appointment": is_staff_role,
+        "can_move_appointment": is_staff_role,
+        "can_check_in": is_staff_role,
+        "can_cancel_appointment": is_staff_role,
+        "can_assign_room": is_staff_role,
+        "can_create_follow_up": is_staff_role,
+    }
+    return Response(capabilities)
+
+
 class AppointmentViewSet(viewsets.ModelViewSet):
-    queryset = Appointment.objects.select_related("patient", "assigned_clinician", "created_by").order_by("appointment_date", "appointment_time", "created_at")
+    queryset = Appointment.objects.select_related("patient", "practitioner", "room", "appointment_type", "created_by").order_by("start_at", "created_at")
     serializer_class = AppointmentSerializer
     search_fields = ("patient__full_name_display", "patient__patient_code", "patient__national_id", "patient__primary_phone", "notes")
-    filterset_fields = ("appointment_date", "appointment_type", "source", "status", "assigned_clinician")
-    ordering_fields = ("appointment_date", "appointment_time", "created_at", "updated_at")
+    filterset_fields = ("appointment_date", "appointment_type", "source", "status", "practitioner")
+    ordering_fields = ("start_at", "end_at", "created_at", "updated_at")
 
     def perform_create(self, serializer):
-        clinician = serializer.validated_data.get("assigned_clinician") or default_clinician()
-        appointment = serializer.save(
-            assigned_clinician=clinician,
-            created_by=self.request.user if self.request.user.is_authenticated else None,
-        )
-        write_audit_log(
-            request=self.request,
-            action="create",
-            instance=appointment,
-            entity_type="appointment",
-            after_data=snapshot_instance(appointment),
-            details="Appointment booked.",
-        )
+        start_at = serializer.validated_data.get("start_at")
+        end_at = serializer.validated_data.get("end_at")
+        practitioner = serializer.validated_data.get("practitioner") or default_clinician()
+        room = serializer.validated_data.get("room")
+        
+        with transaction.atomic():
+            if start_at and end_at:
+                list(Appointment.objects.select_for_update().filter(start_at__lt=end_at, end_at__gt=start_at))
+                
+            conflicts = check_scheduling_conflicts(None, start_at, end_at, practitioner.id if practitioner else None, room.id if room else None)
+            if conflicts:
+                raise SchedulingConflictException(conflicts=conflicts)
+                
+            appointment = serializer.save(
+                practitioner=practitioner,
+                created_by=self.request.user if self.request.user.is_authenticated else None,
+            )
+            write_audit_log(
+                request=self.request,
+                action="create",
+                instance=appointment,
+                entity_type="appointment",
+                after_data=snapshot_instance(appointment),
+                details="Appointment booked.",
+            )
+            emit_outbox_event("appointment.created", appointment, self.request.user)
 
     def perform_update(self, serializer):
-        before_data = snapshot_instance(self.get_object())
-        appointment = serializer.save()
-        write_audit_log(
-            request=self.request,
-            action="update",
-            instance=appointment,
-            entity_type="appointment",
-            before_data=before_data,
-            after_data=snapshot_instance(appointment),
-            details="Appointment updated.",
-        )
+        instance = self.get_object()
+        before_data = snapshot_instance(instance)
+        
+        start_at = serializer.validated_data.get("start_at", instance.start_at)
+        end_at = serializer.validated_data.get("end_at", instance.end_at)
+        practitioner = serializer.validated_data.get("practitioner", instance.practitioner)
+        room = serializer.validated_data.get("room", instance.room)
+        
+        with transaction.atomic():
+            if start_at and end_at:
+                list(Appointment.objects.select_for_update().filter(start_at__lt=end_at, end_at__gt=start_at))
+                
+            if (start_at != instance.start_at or end_at != instance.end_at or 
+                practitioner != instance.practitioner or room != instance.room):
+                conflicts = check_scheduling_conflicts(
+                    instance.id, start_at, end_at, 
+                    practitioner.id if practitioner else None, 
+                    room.id if room else None
+                )
+                if conflicts:
+                    raise SchedulingConflictException(conflicts=conflicts)
+                    
+            appointment = serializer.save(
+                updated_by=self.request.user if self.request.user.is_authenticated else None,
+            )
+            write_audit_log(
+                request=self.request,
+                action="update",
+                instance=appointment,
+                entity_type="appointment",
+                before_data=before_data,
+                after_data=snapshot_instance(appointment),
+                details="Appointment updated.",
+            )
+            emit_outbox_event("appointment.updated", appointment, self.request.user)
 
     def perform_destroy(self, instance):
         before_data = snapshot_instance(instance)
@@ -981,6 +1316,232 @@ class AppointmentViewSet(viewsets.ModelViewSet):
             before_data=before_data,
             details="Appointment deleted.",
         )
+
+    @action(detail=True, methods=["post"])
+    def move(self, request, pk=None):
+        appointment = self.get_object()
+        before_data = snapshot_instance(appointment)
+        
+        start_at_str = request.data.get("start_at")
+        end_at_str = request.data.get("end_at")
+        practitioner_id = request.data.get("practitioner", appointment.practitioner_id)
+        room_id = request.data.get("room", appointment.room_id)
+        
+        if not start_at_str or not end_at_str:
+            return Response({"detail": "Both start_at and end_at must be provided."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            start_at = timezone.datetime.fromisoformat(start_at_str.replace("Z", "+00:00"))
+            end_at = timezone.datetime.fromisoformat(end_at_str.replace("Z", "+00:00"))
+        except ValueError:
+            return Response({"detail": "Invalid start_at or end_at format. Use ISO format."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if start_at >= end_at:
+            return Response({"detail": "End time must be strictly after start time."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        with transaction.atomic():
+            list(Appointment.objects.select_for_update().filter(start_at__lt=end_at, end_at__gt=start_at))
+            
+            conflicts = check_scheduling_conflicts(
+                appointment.id, start_at, end_at, practitioner_id, room_id
+            )
+            if conflicts:
+                raise SchedulingConflictException(conflicts=conflicts)
+                
+            appointment.start_at = start_at
+            appointment.end_at = end_at
+            appointment.practitioner_id = practitioner_id
+            appointment.room_id = room_id
+            appointment.updated_by = request.user if request.user.is_authenticated else None
+            appointment.save()
+            
+            write_audit_log(
+                request=request,
+                action="update",
+                instance=appointment,
+                entity_type="appointment",
+                before_data=before_data,
+                after_data=snapshot_instance(appointment),
+                details="Appointment rescheduled/moved.",
+            )
+            emit_outbox_event("appointment.moved", appointment, request.user)
+            
+        return Response(AppointmentSerializer(appointment).data)
+
+    @action(detail=True, methods=["post"], url_path="check-in")
+    def check_in(self, request, pk=None):
+        appointment = self.get_object()
+        if appointment.status == Appointment.Status.CHECKED_IN:
+            return Response({"detail": "Appointment is already checked in."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        before_data = snapshot_instance(appointment)
+        
+        with transaction.atomic():
+            appointment.status = Appointment.Status.CHECKED_IN
+            appointment.checked_in_at = timezone.now()
+            appointment.save(update_fields=["status", "checked_in_at", "updated_at"])
+            
+            check_in = PatientCheckIn.objects.create(
+                patient=appointment.patient,
+                visit_type=PatientCheckIn.VisitType.CLINICAL,
+                method=PatientCheckIn.Method.RECEPTION,
+                status=PatientCheckIn.Status.ARRIVED,
+                checked_in_by=request.user if request.user.is_authenticated else None,
+            )
+            
+            journey, created = PatientJourney.objects.get_or_create(
+                patient=appointment.patient,
+                service_date=timezone.localdate(),
+                is_active=True,
+                defaults={
+                    "current_stage": PatientJourney.Stage.CHECKED_IN,
+                    "flow_type": PatientJourney.FlowType.APPOINTMENT_CHECKIN,
+                    "appointment": appointment,
+                    "check_in": check_in,
+                    "created_by": request.user if request.user.is_authenticated else None,
+                    "updated_by": request.user if request.user.is_authenticated else None,
+                }
+            )
+            if created:
+                create_journey_event(journey, PatientJourney.Stage.CHECKED_IN, request, "Patient checked in via appointment operational action.")
+                
+            write_audit_log(
+                request=request,
+                action="update",
+                instance=appointment,
+                entity_type="appointment",
+                before_data=before_data,
+                after_data=snapshot_instance(appointment),
+                details="Appointment checked in, daily visit flow started.",
+            )
+            emit_outbox_event("appointment.checked_in", appointment, request.user)
+            
+        return Response({
+            "appointment": AppointmentSerializer(appointment).data,
+            "journey": PatientJourneySerializer(journey).data
+        })
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        appointment = self.get_object()
+        cancel_reason = request.data.get("cancel_reason", "")
+        if not cancel_reason:
+            return Response({"detail": "A cancel reason must be provided."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        before_data = snapshot_instance(appointment)
+        
+        appointment.status = Appointment.Status.CANCELLED
+        appointment.cancel_reason = cancel_reason
+        appointment.updated_by = request.user if request.user.is_authenticated else None
+        appointment.save(update_fields=["status", "cancel_reason", "updated_by", "updated_at"])
+        
+        write_audit_log(
+            request=request,
+            action="update",
+            instance=appointment,
+            entity_type="appointment",
+            before_data=before_data,
+            after_data=snapshot_instance(appointment),
+            details=f"Appointment cancelled. Reason: {cancel_reason}",
+        )
+        emit_outbox_event("appointment.cancelled", appointment, request.user)
+        
+        return Response(AppointmentSerializer(appointment).data)
+
+    @action(detail=True, methods=["post"], url_path="assign-room")
+    def assign_room(self, request, pk=None):
+        appointment = self.get_object()
+        room_id = request.data.get("room")
+        
+        before_data = snapshot_instance(appointment)
+        
+        with transaction.atomic():
+            if room_id:
+                if appointment.start_at and appointment.end_at:
+                    list(Appointment.objects.select_for_update().filter(start_at__lt=appointment.end_at, end_at__gt=appointment.start_at))
+                    
+                conflicts = check_scheduling_conflicts(
+                    appointment.id, appointment.start_at, appointment.end_at, 
+                    appointment.practitioner_id, room_id
+                )
+                if conflicts:
+                    raise SchedulingConflictException(conflicts=conflicts)
+                    
+            appointment.room_id = room_id
+            appointment.updated_by = request.user if request.user.is_authenticated else None
+            appointment.save(update_fields=["room", "updated_by", "updated_at"])
+            
+            write_audit_log(
+                request=request,
+                action="update",
+                instance=appointment,
+                entity_type="appointment",
+                before_data=before_data,
+                after_data=snapshot_instance(appointment),
+                details="Resource room assigned to appointment.",
+            )
+            emit_outbox_event("appointment.room_assigned", appointment, request.user)
+            
+        return Response(AppointmentSerializer(appointment).data)
+
+    @action(detail=True, methods=["post"], url_path="create-follow-up")
+    def create_follow_up(self, request, pk=None):
+        parent_appointment = self.get_object()
+        
+        start_at_str = request.data.get("start_at")
+        end_at_str = request.data.get("end_at")
+        appointment_type_id = request.data.get("appointment_type")
+        practitioner_id = request.data.get("practitioner", parent_appointment.practitioner_id)
+        room_id = request.data.get("room")
+        priority = request.data.get("priority", Appointment.Priority.MEDIUM)
+        notes = request.data.get("notes", "")
+        
+        if not start_at_str or not end_at_str or not appointment_type_id:
+            return Response({"detail": "start_at, end_at, and appointment_type must be provided."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        try:
+            start_at = timezone.datetime.fromisoformat(start_at_str.replace("Z", "+00:00"))
+            end_at = timezone.datetime.fromisoformat(end_at_str.replace("Z", "+00:00"))
+        except ValueError:
+            return Response({"detail": "Invalid start_at or end_at format. Use ISO format."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        if start_at >= end_at:
+            return Response({"detail": "End time must be strictly after start time."}, status=status.HTTP_400_BAD_REQUEST)
+            
+        with transaction.atomic():
+            list(Appointment.objects.select_for_update().filter(start_at__lt=end_at, end_at__gt=start_at))
+            
+            conflicts = check_scheduling_conflicts(
+                None, start_at, end_at, practitioner_id, room_id
+            )
+            if conflicts:
+                raise SchedulingConflictException(conflicts=conflicts)
+                
+            follow_up = Appointment.objects.create(
+                patient=parent_appointment.patient,
+                appointment_type_id=appointment_type_id,
+                start_at=start_at,
+                end_at=end_at,
+                practitioner_id=practitioner_id,
+                room_id=room_id,
+                priority=priority,
+                notes=notes,
+                rescheduled_from=parent_appointment,
+                status=Appointment.Status.BOOKED,
+                created_by=request.user if request.user.is_authenticated else None,
+            )
+            
+            write_audit_log(
+                request=request,
+                action="create",
+                instance=follow_up,
+                entity_type="appointment",
+                after_data=snapshot_instance(follow_up),
+                details=f"Follow-up appointment created from parent appointment {parent_appointment.id}.",
+            )
+            emit_outbox_event("appointment.created", follow_up, request.user)
+            
+        return Response(AppointmentSerializer(follow_up).data, status=status.HTTP_201_CREATED)
 
 
 class PatientJourneyViewSet(viewsets.ModelViewSet):

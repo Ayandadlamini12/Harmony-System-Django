@@ -1,4 +1,5 @@
 import type { Appointment, Case, ClinicianProfile, DashboardStats, ElevatedAccessRequest, EmployeeEnrollmentRequest, EmailDeliveryLog, FormDraft, MessageRecipient, MessageThread, Paginated, PartnerCompany, Patient, PatientCheckIn, PatientJourney, RoleModuleMatrix, SupportTicket, SystemEmailSettings, User, Visit, Vital } from "@/types/clinic";
+import type { SchedulingBoardData, SchedulingResources, UserCapabilities } from "@/types/scheduling";
 import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -266,6 +267,35 @@ export function getPartnerCompanies(search = "") {
     next: null,
     previous: null,
     results: []
+  });
+}
+
+export function getSchedulingBoard(date = "", viewBy = "practitioners") {
+  const query = `?date=${encodeURIComponent(date)}&view_by=${encodeURIComponent(viewBy)}`;
+  return apiGet<SchedulingBoardData>(`/scheduling/board/${query}`, {
+    date: date || new Date().toISOString().slice(0, 10),
+    view_by: viewBy as "practitioners" | "rooms",
+    columns: [],
+    appointments: []
+  });
+}
+
+export function getSchedulingResources() {
+  return apiGet<SchedulingResources>("/scheduling/resources/", {
+    rooms: [],
+    appointment_types: [],
+    practitioners: []
+  });
+}
+
+export function getUserCapabilities() {
+  return apiGet<UserCapabilities>("/me/capabilities/", {
+    can_create_appointment: false,
+    can_move_appointment: false,
+    can_check_in: false,
+    can_cancel_appointment: false,
+    can_assign_room: false,
+    can_create_follow_up: false
   });
 }
 

@@ -1,7 +1,14 @@
 from django.urls import path
 from rest_framework.routers import DefaultRouter
 
-from .views import AppointmentViewSet, AuditLogViewSet, CaseViewSet, ElevatedAccessRequestViewSet, FormDraftViewSet, MessageThreadViewSet, PartnerCompanyViewSet, PatientCheckInViewSet, PatientDocumentViewSet, PatientJourneyViewSet, PatientViewSet, SupportTicketViewSet, VisitViewSet, VitalViewSet, ZulipMessagesViewSet, ZulipOutboundEventViewSet, ZulipPostUpdateViewSet, ZulipRetryPostViewSet, dashboard_stats, patient_import_webhook
+from .views import (
+    AppointmentViewSet, AuditLogViewSet, CaseViewSet, ElevatedAccessRequestViewSet,
+    FormDraftViewSet, MessageThreadViewSet, PartnerCompanyViewSet, PatientCheckInViewSet,
+    PatientDocumentViewSet, PatientJourneyViewSet, PatientViewSet, SupportTicketViewSet,
+    VisitViewSet, VitalViewSet, ZulipMessagesViewSet, ZulipOutboundEventViewSet,
+    ZulipPostUpdateViewSet, ZulipRetryPostViewSet, dashboard_stats, patient_import_webhook,
+    board_view, range_appointments_view, resources_metadata_view, capabilities_view
+)
 
 router = DefaultRouter()
 router.register("patients", PatientViewSet, basename="patients")
@@ -26,5 +33,10 @@ urlpatterns = [
     path("zulip/messages/", ZulipMessagesViewSet.as_view({"get": "list"}), name="zulip-messages"),
     path("zulip/post-update/", ZulipPostUpdateViewSet.as_view({"post": "create"}), name="zulip-post-update"),
     path("zulip/retry-post/", ZulipRetryPostViewSet.as_view({"post": "create"}), name="zulip-retry-post"),
+    
+    # Precise clinic operations scheduling engine routes
+    path("scheduling/board/", board_view, name="scheduling-board"),
+    path("scheduling/appointments/", range_appointments_view, name="scheduling-appointments"),
+    path("scheduling/resources/", resources_metadata_view, name="scheduling-resources"),
+    path("me/capabilities/", capabilities_view, name="user-capabilities"),
 ] + router.urls
-
