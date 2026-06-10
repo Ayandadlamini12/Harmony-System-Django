@@ -6,6 +6,46 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def migrate_appointment_types(apps, schema_editor):
+    Appointment = apps.get_model("clinic", "Appointment")
+    AppointmentType = apps.get_model("clinic", "AppointmentType")
+
+    # Create default types
+    type_map = {}
+    defaults = {
+        "new_consultation": "New Consultation",
+        "follow_up": "Follow Up",
+        "review": "Review",
+    }
+    for key, name in defaults.items():
+        obj, _ = AppointmentType.objects.get_or_create(
+            name=name,
+            defaults={
+                "default_duration_minutes": 30,
+                "requires_practitioner": True,
+                "color_token": "indigo" if key == "new_consultation" else "emerald" if key == "follow_up" else "amber",
+            }
+        )
+        type_map[key] = obj
+
+    # Also handle other values or case-insensitivity
+    for appt in Appointment.objects.all():
+        old_type = appt.old_appointment_type
+        if old_type:
+            clean_key = old_type.strip().lower()
+            if clean_key in type_map:
+                appt.appointment_type = type_map[clean_key]
+            else:
+                name_cap = old_type.replace("_", " ").title()
+                obj, _ = AppointmentType.objects.get_or_create(
+                    name=name_cap,
+                    defaults={"default_duration_minutes": 30}
+                )
+                type_map[clean_key] = obj
+                appt.appointment_type = obj
+            appt.save(update_fields=["appointment_type"])
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -312,7 +352,12 @@ class Migration(migrations.Migration):
                 max_length=30,
             ),
         ),
-        migrations.AlterField(
+        migrations.RenameField(
+            model_name="appointment",
+            old_name="appointment_type",
+            new_name="old_appointment_type",
+        ),
+        migrations.AddField(
             model_name="appointment",
             name="appointment_type",
             field=models.ForeignKey(
@@ -322,6 +367,11 @@ class Migration(migrations.Migration):
                 related_name="appointments",
                 to="clinic.appointmenttype",
             ),
+        ),
+        migrations.RunPython(migrate_appointment_types),
+        migrations.RemoveField(
+            model_name="appointment",
+            name="old_appointment_type",
         ),
         migrations.AddField(
             model_name="blockedslot",
