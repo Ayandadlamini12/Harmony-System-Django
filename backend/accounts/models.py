@@ -26,6 +26,41 @@ class User(AbstractUser):
         return self.get_full_name() or self.username or self.email
 
 
+class UserNotificationChannel(models.Model):
+    class Channel(models.TextChoices):
+        EMAIL = "email", "Email"
+        WHATSAPP = "whatsapp", "WhatsApp"
+        TELEGRAM = "telegram", "Telegram"
+
+    class VerificationStatus(models.TextChoices):
+        UNVERIFIED = "unverified", "Unverified"
+        PENDING = "pending", "Pending verification"
+        VERIFIED = "verified", "Verified"
+
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="notification_channels")
+    channel = models.CharField(max_length=30, choices=Channel.choices)
+    value = models.CharField(max_length=180, blank=True)
+    is_preferred = models.BooleanField(default=False)
+    verification_status = models.CharField(
+        max_length=30,
+        choices=VerificationStatus.choices,
+        default=VerificationStatus.UNVERIFIED,
+    )
+    verified_at = models.DateTimeField(null=True, blank=True)
+    metadata = models.JSONField(default=dict, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("channel", "created_at")
+        constraints = [
+            models.UniqueConstraint(fields=["user", "channel"], name="unique_user_notification_channel"),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.user} [{self.channel}]"
+
+
 class RoleModulePermission(models.Model):
     role = models.CharField(max_length=30, choices=User.Role.choices)
     module_key = models.CharField(max_length=80)

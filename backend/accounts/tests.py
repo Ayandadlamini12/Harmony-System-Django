@@ -1,7 +1,7 @@
 from django.contrib.auth import get_user_model
 from rest_framework.test import APITestCase
 
-from .models import ClinicianProfile, EmployeeEnrollmentRequest
+from .models import ClinicianProfile, EmployeeEnrollmentRequest, UserNotificationChannel
 
 User = get_user_model()
 
@@ -98,3 +98,65 @@ class EmployeeEnrollmentRequestApiTests(APITestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.data["count"], 1)
+
+
+class NotificationSettingsApiTests(APITestCase):
+    def test_user_can_save_notification_settings(self):
+        user = User.objects.create_user(
+            username="notify_user",
+            password="password123",
+            role="clinician",
+            email="notify@harmony.test",
+        )
+        self.client.force_authenticate(user)
+
+        response = self.client.patch(
+            "/api/users/me/notification-settings/",
+            {
+                "email": "notify.updated@harmony.test",
+                "channels": [
+                    {
+                        "channel": "whatsapp",
+                        "value": "+26876001111",
+                        "is_preferred": True,
+                        "verification_status": "pending",
+                    },
+                    {
+                        "channel": "telegram",
+                        "value": "@harmonydoctor",
+                        "verification_status": "unverified",
+                    },
+                ],
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        user.refresh_from_db()
+        self.assertEqual(user.email, "notify.updated@harmony.test")
+        self.assertEqual(user.notification_channels.count(), 2)
+        self.assertTrue(user.notification_channels.get(channel="whatsapp").is_preferred)
+        self.assertFalse(user.notification_channels.get(channel="telegram").is_preferred)
+
+    def test_user_can_get_notification_settings(self):
+        user = User.objects.create_user(
+            username="notify_read_user",
+            password="password123",
+            role="receptionist",
+            email="reception@harmony.test",
+        )
+        UserNotificationChannel.objects.create(
+            user=user,
+            channel=UserNotificationChannel.Channel.WHATSAPP,
+            value="+26876002222",
+            is_preferred=True,
+            verification_status=UserNotificationChannel.VerificationStatus.PENDING,
+        )
+        self.client.force_authenticate(user)
+
+        response = self.client.get("/api/users/me/notification-settings/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["email"], "reception@harmony.test")
+        self.assertEqual(len(response.data["channels"]), 1)
+        self.assertEqual(response.data["channels"][0]["channel"], "whatsapp")

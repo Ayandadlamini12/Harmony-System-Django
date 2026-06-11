@@ -21,6 +21,7 @@ from .serializers import (
     ClinicianProfileSerializer,
     EmployeeEnrollmentRequestSerializer,
     EmailDeliveryLogSerializer,
+    NotificationSettingsSerializer,
     RoleModulePermissionSerializer,
     SystemEmailSettingsSerializer,
     build_role_module_matrix,
@@ -142,6 +143,26 @@ class UserViewSet(viewsets.ModelViewSet):
             user.profile_image.delete(save=False)
         user.profile_image.save(uploaded.name, uploaded, save=True)
         return Response(self.get_serializer(user).data)
+
+    @action(
+        detail=False,
+        methods=["get", "patch"],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path="me/notification-settings",
+    )
+    def me_notification_settings(self, request):
+        if request.method == "GET":
+            return Response(NotificationSettingsSerializer(request.user, context={"request": request}).data)
+
+        serializer = NotificationSettingsSerializer(
+            request.user,
+            data=request.data,
+            partial=True,
+            context={"request": request},
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(NotificationSettingsSerializer(request.user, context={"request": request}).data)
 
 
 class RoleModulePermissionViewSet(viewsets.ModelViewSet):

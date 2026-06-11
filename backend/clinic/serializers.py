@@ -798,6 +798,12 @@ class PatientListSerializer(serializers.ModelSerializer):
             "national_id",
             "email",
             "primary_phone",
+            "secondary_phone",
+            "whatsapp_number",
+            "telegram_username",
+            "preferred_notification_channel",
+            "notification_consent",
+            "notification_consent_at",
             "first_name",
             "middle_name",
             "last_name",
@@ -905,10 +911,37 @@ class PatientDetailSerializer(PatientListSerializer):
             data["clinical_access"] = "active"
         return data
 
+    def update(self, instance, validated_data):
+        profile_data = validated_data.pop("profile", None)
+        conditions_data = validated_data.pop("conditions", None)
+
+        if validated_data.get("notification_consent") and not validated_data.get("notification_consent_at"):
+            validated_data["notification_consent_at"] = timezone.now()
+
+        patient = super().update(instance, validated_data)
+
+        if profile_data is not None:
+            profile, _ = PatientProfile.objects.get_or_create(patient=patient)
+            for field, value in profile_data.items():
+                setattr(profile, field, value)
+            request = self.context.get("request")
+            if request and request.user.is_authenticated:
+                profile.updated_by = request.user
+            profile.save()
+
+        if conditions_data is not None:
+            patient.conditions.all().delete()
+            for condition_data in conditions_data:
+                PatientCondition.objects.create(patient=patient, **condition_data)
+
+        return patient
+
     @transaction.atomic
     def create(self, validated_data):
         profile_data = validated_data.pop("profile", {})
         conditions_data = validated_data.pop("conditions", [])
+        if validated_data.get("notification_consent") and not validated_data.get("notification_consent_at"):
+            validated_data["notification_consent_at"] = timezone.now()
         request = self.context.get("request")
         if request and request.user.is_authenticated:
             validated_data["created_by"] = request.user

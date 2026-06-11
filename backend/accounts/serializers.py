@@ -6,7 +6,14 @@ from rest_framework import serializers
 
 from .emailing import send_user_account_created_email
 from .keycloak import KeycloakProvisioningError, keycloak_admin_enabled, upsert_keycloak_user
-from .models import ClinicianProfile, EmailDeliveryLog, EmployeeEnrollmentRequest, RoleModulePermission, SystemEmailSettings
+from .models import (
+    ClinicianProfile,
+    EmailDeliveryLog,
+    EmployeeEnrollmentRequest,
+    RoleModulePermission,
+    SystemEmailSettings,
+    UserNotificationChannel,
+)
 from .role_modules import ROLE_CHOICES, ROLE_MODULES
 
 User = get_user_model()
@@ -377,3 +384,84 @@ class EmployeeEnrollmentRequestSerializer(serializers.ModelSerializer):
         if not attrs.get("phone_number") and not attrs.get("email") and not attrs.get("telegram_chat_id"):
             raise serializers.ValidationError("At least one contact method is required.")
         return attrs
+
+
+class UserNotificationChannelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = UserNotificationChannel
+        fields = (
+            "id",
+            "channel",
+            "value",
+            "is_preferred",
+            "verification_status",
+            "verified_at",
+            "metadata",
+            "created_at",
+            "updated_at",
+        )
+        read_only_fields = ("id", "verified_at", "created_at", "updated_at")
+
+    def validate(self, attrs):
+        channel = attrs.get("channel") or getattr(self.instance, "channel", None)
+        value = (attrs.get("value") or getattr(self.instance, "value", "")).strip()
+
+        if channel == UserNotificationChannel.Channel.EMAIL and not value:
+            raise serializers.ValidationError({"value": "Email value is required."})
+        if channel == UserNotificationChannel.Channel.WHATSAPP and not value:
+            raise serializers.ValidationError({"value": "WhatsApp number is required."})
+        if channel == UserNotificationChannel.Channel.TELEGRAM and not value:
+            raise serializers.ValidationError({"value": "Telegram username or chat ID is required."})
+        return attrs
+
+
+class NotificationSettingsSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=False, allow_blank=True)
+    channels = UserNotificationChannelSerializer(many=True, required=False)
+
+    def to_representation(self, instance):
+        channels = instance.notification_channels.order_by("channel", "created_at")
+        return {
+            "email": instance.email,
+            "channels": UserNotificationChannelSerializer(channels, many=True).data,
+        }
+
+    def update(self, instance, validated_data):
+        email = validated_data.get("email")
+        if email is not None:
+            instance.email = email
+            instance.save(update_fields=["email"])
+
+        channels_data = validated_data.get("channels")
+        if channels_data is None:
+            return instance
+
+        existing = {channel.channel: channel for channel in instance.notification_channels.all()}
+        preferred_channel = None
+
+        for channel_data in channels_data:
+            channel_key = channel_data["channel"]
+            if channel_data.get("is_preferred"):
+                preferred_channel = channel_key
+
+            notification_channel = existing.get(channel_key)
+            if notification_channel:
+                serializer = UserNotificationChannelSerializer(
+                    notification_channel,
+                    data=channel_data,
+                    partial=True,
+                    context=self.context,
+                )
+            else:
+                serializer = UserNotificationChannelSerializer(
+                    data=channel_data,
+                    context=self.context,
+                )
+            serializer.is_valid(raise_exception=True)
+            saved = serializer.save(user=instance)
+            existing[channel_key] = saved
+
+        if preferred_channel:
+            instance.notification_channels.exclude(channel=preferred_channel).update(is_preferred=False)
+
+        return instance

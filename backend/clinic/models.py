@@ -32,6 +32,19 @@ class Patient(TimeStampedModel):
     email = models.EmailField(blank=True)
     primary_phone = models.CharField(max_length=50, blank=True)
     secondary_phone = models.CharField(max_length=50, blank=True)
+    whatsapp_number = models.CharField(max_length=50, blank=True)
+    telegram_username = models.CharField(max_length=120, blank=True)
+    preferred_notification_channel = models.CharField(
+        max_length=30,
+        choices=[
+            ("email", "Email"),
+            ("whatsapp", "WhatsApp"),
+            ("telegram", "Telegram"),
+        ],
+        blank=True,
+    )
+    notification_consent = models.BooleanField(default=False)
+    notification_consent_at = models.DateTimeField(null=True, blank=True)
     next_of_kin_full_name = models.CharField(max_length=255, blank=True)
     next_of_kin_phone = models.CharField(max_length=50, blank=True)
     next_of_kin_email = models.EmailField(blank=True)
@@ -99,6 +112,8 @@ class Patient(TimeStampedModel):
         self.full_name_display = " ".join(
             part for part in [self.first_name, self.middle_name, self.last_name] if part
         )
+        if self.notification_consent and not self.notification_consent_at:
+            self.notification_consent_at = timezone.now()
         if not self.patient_code:
             self.patient_code = self.next_patient_code(self.primary_phone)
         super().save(*args, **kwargs)

@@ -82,6 +82,28 @@ class PatientApiTests(APITestCase):
         self.assertEqual(first.patient_code, f"HHPAT-100{year_suffix}012345")
         self.assertEqual(second.patient_code, f"HHPAT-101{year_suffix}557788")
 
+    def test_updates_patient_notification_preferences(self):
+        patient = Patient.objects.create(first_name="Notify", last_name="Patient", gender="female", primary_phone="+26876001234")
+
+        response = self.client.patch(
+            f"/api/patients/{patient.id}/",
+            {
+                "preferred_notification_channel": "whatsapp",
+                "notification_consent": True,
+                "whatsapp_number": "+26876009999",
+                "telegram_username": "@notifypatient",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        patient.refresh_from_db()
+        self.assertEqual(patient.preferred_notification_channel, "whatsapp")
+        self.assertTrue(patient.notification_consent)
+        self.assertEqual(patient.whatsapp_number, "+26876009999")
+        self.assertEqual(patient.telegram_username, "@notifypatient")
+        self.assertIsNotNone(patient.notification_consent_at)
+
     def test_creates_visit_without_embedded_vitals_for_patient(self):
         patient = Patient.objects.create(first_name="John", last_name="Nkosi", gender="male")
         PatientProfile.objects.create(patient=patient)
