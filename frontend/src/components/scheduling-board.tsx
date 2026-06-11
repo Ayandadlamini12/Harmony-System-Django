@@ -88,7 +88,12 @@ export function SchedulingBoard({
   });
 
   // Receptionist selected employee calendar dropdown (null is "All Clinicians")
-  const [selectedPractitionerId, setSelectedPractitionerId] = useState<number | null>(null);
+  const [selectedPractitionerId, setSelectedPractitionerId] = useState<number | null>(() => {
+    if (session.role === "receptionist") {
+      return resources.practitioners[0]?.id || null;
+    }
+    return null;
+  });
 
   // Patient live search variables inside "Create Appointment" sub-tab
   const [patientQuery, setPatientQuery] = useState("");
@@ -529,7 +534,7 @@ export function SchedulingBoard({
                   variant={actingRole === "receptionist" ? "default" : "ghost"}
                   onClick={() => {
                     setActingRole("receptionist");
-                    setSelectedPractitionerId(null);
+                    setSelectedPractitionerId(resources.practitioners[0]?.id || null);
                   }}
                   className="h-8 text-xs font-semibold px-3"
                 >
@@ -662,7 +667,7 @@ export function SchedulingBoard({
                     value={selectedPractitionerId || ""}
                     onChange={(e) => setSelectedPractitionerId(e.target.value ? Number(e.target.value) : null)}
                   >
-                    <option value="">All Clinicians</option>
+                    {actingRole !== "receptionist" && <option value="">All Clinicians</option>}
                     {resources.practitioners.map((prac) => (
                       <option key={prac.id} value={prac.id}>
                         {prac.name} ({prac.role.toLowerCase().replace("_", " ")})
@@ -1036,6 +1041,8 @@ export function SchedulingBoard({
                 patients={[selectedPatient]}
                 initialPatientId={String(selectedPatient.id)}
                 lockedPatient
+                practitioners={resources.practitioners}
+                appointmentTypes={resources.appointment_types}
                 onBooked={() => {
                   setSelectedPatient(null);
                   setActiveTab("schedule");
@@ -1077,7 +1084,7 @@ export function SchedulingBoard({
                   value={selectedPractitionerId || ""}
                   onChange={(e) => setSelectedPractitionerId(e.target.value ? Number(e.target.value) : null)}
                 >
-                  <option value="">All Clinicians</option>
+                  {actingRole !== "receptionist" && <option value="">All Clinicians</option>}
                   {resources.practitioners.map((prac) => (
                     <option key={prac.id} value={prac.id}>
                       {prac.name}

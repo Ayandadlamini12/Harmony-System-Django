@@ -2,7 +2,7 @@
 
 import { CalendarPlus, Clock, MessageSquare, UserRound } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 
 import { FormSectionHeader } from "@/components/form-section-header";
@@ -13,20 +13,39 @@ import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { showActionError } from "@/lib/action-error";
 import type { Patient } from "@/types/clinic";
+import type { AppointmentType } from "@/types/scheduling";
 
 function today() {
   return new Date().toISOString().slice(0, 10);
 }
 
+const HOURLY_SLOTS = [
+  "08:00",
+  "09:00",
+  "10:00",
+  "11:00",
+  "12:00",
+  "13:00",
+  "14:00",
+  "15:00",
+  "16:00",
+  "17:00",
+  "18:00"
+];
+
 export function AppointmentBooking({
   patients,
   initialPatientId,
   lockedPatient = false,
+  practitioners = [],
+  appointmentTypes = [],
   onBooked
 }: {
   patients: Patient[];
   initialPatientId?: string;
   lockedPatient?: boolean;
+  practitioners?: { id: number; name: string; role: string; }[];
+  appointmentTypes?: AppointmentType[];
   onBooked?: () => void;
 }) {
   const router = useRouter();
@@ -34,24 +53,98 @@ export function AppointmentBooking({
   const [patientId, setPatientId] = useState(initialPatientId || "");
   const selectedPatient = useMemo(() => patients.find((patient) => String(patient.id) === patientId), [patientId, patients]);
 
+  const [localPractitioners, setLocalPractitioners] = useState(practitioners);
+  const [localAppointmentTypes, setLocalAppointmentTypes] = useState(appointmentTypes);
+
+  const [startTime, setStartTime] = useState("08:00");
+  const [endTime, setEndTime] = useState("09:00");
+
+  const startOptions = HOURLY_SLOTS.slice(0, -1); // 08:00 to 17:00
+  const endOptions = HOURLY_SLOTS.slice(1);      // 09:00 to 18:00
+
+  function handleStartTimeChange(time: string) {
+    setStartTime(time);
+    const idx = HOURLY_SLOTS.indexOf(time);
+    if (idx !== -1 && idx + 1 < HOURLY_SLOTS.length) {
+      setEndTime(HOURLY_SLOTS[idx + 1]);
+    }
+  }
+
+  function handleEndTimeChange(time: string) {
+    setEndTime(time);
+    const idx = HOURLY_SLOTS.indexOf(time);
+    if (idx !== -1 && idx - 1 >= 0) {
+      setStartTime(HOURLY_SLOTS[idx - 1]);
+    }
+  }
+
+  useEffect(() => {
+    if (practitioners.length > 0) {
+      setLocalPractitioners(practitioners);
+    }
+  }, [practitioners]);
+
+  useEffect(() => {
+    if (appointmentTypes.length > 0) {
+      setLocalAppointmentTypes(appointmentTypes);
+    }
+  }, [appointmentTypes]);
+
+  useEffect(() => {
+    if (practitioners.length === 0 || appointmentTypes.length === 0) {
+      let active = true;
+      async function loadResources() {
+        try {
+          const response = await fetch("/api/scheduling/resources");
+          if (response.ok && active) {
+            const data = await response.json();
+            if (data.practitioners && practitioners.length === 0) {
+              setLocalPractitioners(data.practitioners);
+            }
+            if (data.appointment_types && appointmentTypes.length === 0) {
+              setLocalAppointmentTypes(data.appointment_types);
+            }
+          }
+        } catch (err) {
+          console.error("Failed to load scheduling resources for booking", err);
+        }
+      }
+      loadResources();
+      return () => {
+        active = false;
+      };
+    }
+  }, [practitioners, appointmentTypes]);
+
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
-    const payload = {
-      patient: Number(form.get("patient")),
-      appointment_type: form.get("appointment_type"),
-      appointment_date: form.get("appointment_date"),
-      appointment_time: form.get("appointment_time") || null,
-      source: form.get("source"),
-      notes: form.get("notes") || ""
-    };
-    if (!payload.patient || !payload.appointment_date) {
+    const appointment_date = form.get("appointment_date");
+    const practitionerVal = form.get("practitioner");
+
+    if (!patientId || !appointment_date || !practitionerVal) {
       showActionError({
         title: "Appointment details missing",
-        message: "Choose a patient and appointment date."
+        message: "Choose a patient, clinician, and appointment date."
       });
       return;
     }
+
+    const startAtStr = `${appointment_date}T${startTime}:00`;
+    const endAtStr = `${appointment_date}T${endTime}:00`;
+
+    const payload = {
+      patient: Number(patientId),
+      appointment_type: Number(form.get("appointment_type")),
+      start_at: startAtStr,
+      end_at: endAtStr,
+      practitioner: Number(practitionerVal),
+      priority: "medium",
+      source: form.get("source"),
+      notes: form.get("notes") || "",
+      status: "booked"
+    };
+
     setSubmitting(true);
     try {
       const response = await fetch("/api/appointments/create", {
@@ -116,10 +209,12 @@ export function AppointmentBooking({
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="grid gap-1.5">
               <span className="hh-label">Type</span>
-              <Select name="appointment_type" defaultValue="follow_up">
-                <option value="new_consultation">New consultation</option>
-                <option value="follow_up">Follow up</option>
-                <option value="review">Review</option>
+              <Select name="appointment_type" required>
+                {localAppointmentTypes.map((type) => (
+                  <option key={type.id} value={type.id}>
+                    {type.name}
+                  </option>
+                ))}
               </Select>
             </label>
             <label className="grid gap-1.5">
@@ -139,10 +234,53 @@ export function AppointmentBooking({
               <Input name="appointment_date" type="date" defaultValue={today()} required />
             </label>
             <label className="grid gap-1.5">
-              <span className="hh-label">Time</span>
+              <span className="hh-label">Clinician (Practitioner)</span>
+              <Select name="practitioner" required>
+                <option value="">Select clinician</option>
+                {localPractitioners.map((prac) => (
+                  <option key={prac.id} value={prac.id}>
+                    {prac.name} ({prac.role.toLowerCase().replace("_", " ")})
+                  </option>
+                ))}
+              </Select>
+            </label>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="grid gap-1.5">
+              <span className="hh-label">Start Time</span>
               <div className="relative">
                 <Clock className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#66736d]" size={17} />
-                <Input className="pl-10" name="appointment_time" type="time" />
+                <Select
+                  className="pl-10"
+                  name="start_time"
+                  value={startTime}
+                  onChange={(e) => handleStartTimeChange(e.target.value)}
+                >
+                  {startOptions.map((time) => (
+                    <option key={time} value={time}>
+                      {time}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </label>
+            <label className="grid gap-1.5">
+              <span className="hh-label">End Time (Strict 1-hour duration)</span>
+              <div className="relative">
+                <Clock className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#66736d]" size={17} />
+                <Select
+                  className="pl-10"
+                  name="end_time"
+                  value={endTime}
+                  onChange={(e) => handleEndTimeChange(e.target.value)}
+                >
+                  {endOptions.map((time) => (
+                    <option key={time} value={time}>
+                      {time}
+                    </option>
+                  ))}
+                </Select>
               </div>
             </label>
           </div>
