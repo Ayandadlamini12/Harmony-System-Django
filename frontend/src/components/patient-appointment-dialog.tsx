@@ -8,7 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogDescription, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import type { Patient } from "@/types/clinic";
 
-export function PatientAppointmentDialog({ patient }: { patient: Patient }) {
+export function PatientAppointmentDialog({
+  patient,
+  userRole,
+  currentPractitionerId
+}: {
+  patient: Patient;
+  userRole?: string;
+  currentPractitionerId?: number | null;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -27,7 +35,14 @@ export function PatientAppointmentDialog({ patient }: { patient: Patient }) {
           </DialogDescription>
         </div>
         <div className="p-5">
-          <AppointmentBooking patients={[patient]} initialPatientId={String(patient.id)} lockedPatient onBooked={() => setOpen(false)} />
+          <AppointmentBooking
+            patients={[patient]}
+            initialPatientId={String(patient.id)}
+            lockedPatient
+            userRole={userRole}
+            currentPractitionerId={currentPractitionerId}
+            onBooked={() => setOpen(false)}
+          />
         </div>
       </DialogContent>
     </Dialog>

@@ -20,18 +20,19 @@ function today() {
 }
 
 const HOURLY_SLOTS = [
-  "08:00",
-  "09:00",
-  "10:00",
-  "11:00",
-  "12:00",
-  "13:00",
-  "14:00",
-  "15:00",
-  "16:00",
-  "17:00",
-  "18:00"
+  "00:00", "01:00", "02:00", "03:00", "04:00", "05:00", "06:00", "07:00", 
+  "08:00", "09:00", "10:00", "11:00", "12:00", "13:00", "14:00", "15:00", 
+  "16:00", "17:00", "18:00", "19:00", "20:00", "21:00", "22:00", "23:00", 
+  "24:00"
 ];
+
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const value = `; ${document.cookie}`;
+  const parts = value.split(`; ${name}=`);
+  if (parts.length === 2) return decodeURIComponent(parts.pop()!.split(';').shift() || "");
+  return null;
+}
 
 export function AppointmentBooking({
   patients,
@@ -39,6 +40,8 @@ export function AppointmentBooking({
   lockedPatient = false,
   practitioners = [],
   appointmentTypes = [],
+  userRole,
+  currentPractitionerId,
   onBooked
 }: {
   patients: Patient[];
@@ -46,6 +49,8 @@ export function AppointmentBooking({
   lockedPatient?: boolean;
   practitioners?: { id: number; name: string; role: string; }[];
   appointmentTypes?: AppointmentType[];
+  userRole?: string;
+  currentPractitionerId?: number | null;
   onBooked?: () => void;
 }) {
   const router = useRouter();
@@ -59,24 +64,61 @@ export function AppointmentBooking({
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("09:00");
 
-  const startOptions = HOURLY_SLOTS.slice(0, -1); // 08:00 to 17:00
-  const endOptions = HOURLY_SLOTS.slice(1);      // 09:00 to 18:00
+  const startOptions = HOURLY_SLOTS.slice(0, -1); // 00:00 to 23:00
+  const endOptions = HOURLY_SLOTS.slice(1);      // 01:00 to 24:00
 
   function handleStartTimeChange(time: string) {
     setStartTime(time);
-    const idx = HOURLY_SLOTS.indexOf(time);
-    if (idx !== -1 && idx + 1 < HOURLY_SLOTS.length) {
-      setEndTime(HOURLY_SLOTS[idx + 1]);
+    const startIdx = HOURLY_SLOTS.indexOf(time);
+    const endIdx = HOURLY_SLOTS.indexOf(endTime);
+    if (startIdx !== -1 && (endIdx === -1 || endIdx <= startIdx)) {
+      setEndTime(HOURLY_SLOTS[startIdx + 1]);
     }
   }
 
   function handleEndTimeChange(time: string) {
     setEndTime(time);
-    const idx = HOURLY_SLOTS.indexOf(time);
-    if (idx !== -1 && idx - 1 >= 0) {
-      setStartTime(HOURLY_SLOTS[idx - 1]);
+    const endIdx = HOURLY_SLOTS.indexOf(time);
+    const startIdx = HOURLY_SLOTS.indexOf(startTime);
+    if (endIdx !== -1 && (startIdx === -1 || startIdx >= endIdx)) {
+      setStartTime(HOURLY_SLOTS[endIdx - 1]);
     }
   }
+
+  const activeRole = useMemo(() => {
+    return (userRole || getCookie("harmony_role") || "receptionist").toLowerCase();
+  }, [userRole]);
+
+  const activePractitionerId = useMemo(() => {
+    if (currentPractitionerId) return currentPractitionerId;
+    const nameCookie = getCookie("harmony_name");
+    const usernameCookie = getCookie("harmony_username");
+    if (!nameCookie && !usernameCookie) return null;
+
+    const match = localPractitioners.find((p) => {
+      const pName = p.name.toLowerCase();
+      return (
+        (nameCookie && pName.includes(nameCookie.toLowerCase())) ||
+        (usernameCookie && pName.includes(usernameCookie.toLowerCase()))
+      );
+    });
+    return match ? match.id : null;
+  }, [currentPractitionerId, localPractitioners]);
+
+  const filteredPractitioners = useMemo(() => {
+    if (activeRole === "receptionist") {
+      // Receptionist: only clinicians
+      return localPractitioners.filter((p) => p.role.toLowerCase() === "clinician");
+    } else if (activeRole === "clinician") {
+      // Clinician: other clinicians and receptionists
+      return localPractitioners.filter((p) => {
+        const isSelf = activePractitionerId && p.id === activePractitionerId;
+        return !isSelf && (p.role.toLowerCase() === "clinician" || p.role.toLowerCase() === "receptionist");
+      });
+    }
+    // Admin and other roles can see all practitioners
+    return localPractitioners;
+  }, [localPractitioners, activeRole, activePractitionerId]);
 
   useEffect(() => {
     if (practitioners.length > 0) {
@@ -131,7 +173,7 @@ export function AppointmentBooking({
     }
 
     const startAtStr = `${appointment_date}T${startTime}:00`;
-    const endAtStr = `${appointment_date}T${endTime}:00`;
+    const endAtStr = `${appointment_date}T${endTime === "24:00" ? "23:59:59" : endTime + ":00"}`;
 
     const payload = {
       patient: Number(patientId),
@@ -237,7 +279,7 @@ export function AppointmentBooking({
               <span className="hh-label">Clinician (Practitioner)</span>
               <Select name="practitioner" required>
                 <option value="">Select clinician</option>
-                {localPractitioners.map((prac) => (
+                {filteredPractitioners.map((prac) => (
                   <option key={prac.id} value={prac.id}>
                     {prac.name} ({prac.role.toLowerCase().replace("_", " ")})
                   </option>
@@ -266,7 +308,7 @@ export function AppointmentBooking({
               </div>
             </label>
             <label className="grid gap-1.5">
-              <span className="hh-label">End Time (Strict 1-hour duration)</span>
+              <span className="hh-label">End Time</span>
               <div className="relative">
                 <Clock className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#66736d]" size={17} />
                 <Select

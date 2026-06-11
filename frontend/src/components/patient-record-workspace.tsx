@@ -396,7 +396,7 @@ export function PatientRecordWorkspace({ patient: initialPatient, canCreateVisit
               <Printer size={15} />
               Print summary
             </Button>
-            <PatientAppointmentDialog patient={patient} />
+            <PatientAppointmentDialog patient={patient} userRole={userRole} />
             <PatientAccessLogDialog patient={patient} userRole={userRole} />
           </div>
 

@@ -1043,6 +1043,8 @@ export function SchedulingBoard({
                 lockedPatient
                 practitioners={resources.practitioners}
                 appointmentTypes={resources.appointment_types}
+                userRole={actingRole}
+                currentPractitionerId={actingRole === "clinician" ? actingClinicianId : null}
                 onBooked={() => {
                   setSelectedPatient(null);
                   setActiveTab("schedule");
