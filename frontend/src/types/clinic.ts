@@ -47,6 +47,11 @@ export type Patient = {
   status: string;
   consent_status?: "pending" | "generated" | "signed" | "verified";
   last_visit_date?: string | null;
+  whatsapp_number?: string | null;
+  telegram_username?: string | null;
+  preferred_notification_channel?: "email" | "whatsapp" | "telegram" | null;
+  notification_consent?: boolean | null;
+  notification_consent_at?: string | null;
   profile?: PatientProfile;
   conditions?: PatientCondition[];
   documents?: PatientDocument[];
@@ -544,5 +549,26 @@ export type PartnerCompany = {
   created_at: string;
   updated_at: string;
 };
+
+export type NotificationChannelType = "email" | "whatsapp" | "telegram";
+export type VerificationStatusType = "unverified" | "pending" | "verified";
+
+export type UserNotificationChannel = {
+  id?: number;
+  channel: NotificationChannelType;
+  value: string;
+  is_preferred: boolean;
+  verification_status: VerificationStatusType;
+  verified_at?: string | null;
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
+};
+
+export type UserNotificationSettings = {
+  email: string;
+  channels: UserNotificationChannel[];
+};
+
 
 

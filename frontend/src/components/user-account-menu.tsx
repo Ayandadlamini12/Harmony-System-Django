@@ -1,7 +1,7 @@
 "use client";
 
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
-import { KeyRound, Laptop, LogOut, UserCog } from "lucide-react";
+import { Bell, KeyRound, Laptop, LogOut, UserCog } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -56,6 +56,11 @@ export function UserAccountMenu({ avatarUrl, name, title }: UserAccountMenuProps
           <DropdownMenu.Item asChild>
             <Link className={itemClass} href="/account/profile">
               <UserCog size={17} /> Profile settings
+            </Link>
+          </DropdownMenu.Item>
+          <DropdownMenu.Item asChild>
+            <Link className={itemClass} href="/account/notifications">
+              <Bell size={17} /> Notification settings
             </Link>
           </DropdownMenu.Item>
           <DropdownMenu.Item asChild>

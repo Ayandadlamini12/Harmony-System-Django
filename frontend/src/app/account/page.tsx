@@ -1,4 +1,4 @@
-import { KeyRound, Laptop, ShieldCheck, UserCog } from "lucide-react";
+import { Bell, KeyRound, Laptop, ShieldCheck, UserCog } from "lucide-react";
 import Link from "next/link";
 import type React from "react";
 
@@ -36,7 +36,7 @@ export default async function AccountPage() {
             </p>
           </div>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             <AccountCard
               description="Update your photo and clinician resume profile."
               href="/account/profile"
@@ -49,7 +49,13 @@ export default async function AccountPage() {
               icon={<KeyRound size={22} />}
               title="Password management"
             />
-            <div className="hh-panel p-5 opacity-75">
+            <AccountCard
+              description="Manage your active contact channels and preferred notification method."
+              href="/account/notifications"
+              icon={<Bell size={22} />}
+              title="Notification settings"
+            />
+            <div className="hh-panel p-5 opacity-75 md:col-span-2 lg:col-span-1">
               <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-[#f1f4f2] text-[#66736d]">
                 <Laptop size={22} />
               </div>

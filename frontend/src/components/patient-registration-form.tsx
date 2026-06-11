@@ -61,6 +61,10 @@ const patientRegistrationSchema = z.object({
   primary_phone: phoneSchema,
   secondary_phone: optionalPhoneSchema,
   email: z.string().trim().email("Use a valid email").or(z.literal("")),
+  whatsapp_number: z.string().trim().optional(),
+  telegram_username: z.string().trim().optional(),
+  preferred_notification_channel: z.enum(["", "email", "whatsapp", "telegram"]).optional(),
+  notification_consent: z.boolean().default(false),
   region: z.string().trim(),
   town_or_locality: z.string().trim(),
   village: z.string().trim(),
@@ -184,6 +188,10 @@ export function PatientRegistrationForm() {
       primary_phone: { country_code: "+268", number: "" },
       secondary_phone: { country_code: "+268", number: "" },
       email: "",
+      whatsapp_number: "",
+      telegram_username: "",
+      preferred_notification_channel: "",
+      notification_consent: false,
       region: "",
       town_or_locality: "",
       village: "",
@@ -209,6 +217,26 @@ export function PatientRegistrationForm() {
   const medicalAidOwnership = form.watch("medical_aid_membership_ownership");
   const selectedCountry = useMemo(() => resolveCountryFromDialCode(primaryDialCode || "+268"), [primaryDialCode]);
   const selectedRegionIsoCode = regions.find((region) => region.name === selectedRegion)?.isoCode || "";
+
+  // Watch fields for dynamic preferred channel constraints
+  const watchWhatsappNumber = form.watch("whatsapp_number");
+  const watchTelegramUsername = form.watch("telegram_username");
+  const watchEmail = form.watch("email");
+  const preferredChannelVal = form.watch("preferred_notification_channel");
+
+  const isEmailSelectable = !!watchEmail?.trim();
+  const isWhatsappSelectable = !!watchWhatsappNumber?.trim();
+  const isTelegramSelectable = !!watchTelegramUsername?.trim();
+
+  useEffect(() => {
+    if (preferredChannelVal === "email" && !isEmailSelectable) {
+      form.setValue("preferred_notification_channel", isWhatsappSelectable ? "whatsapp" : isTelegramSelectable ? "telegram" : "");
+    } else if (preferredChannelVal === "whatsapp" && !isWhatsappSelectable) {
+      form.setValue("preferred_notification_channel", isEmailSelectable ? "email" : isTelegramSelectable ? "telegram" : "");
+    } else if (preferredChannelVal === "telegram" && !isTelegramSelectable) {
+      form.setValue("preferred_notification_channel", isEmailSelectable ? "email" : isWhatsappSelectable ? "whatsapp" : "");
+    }
+  }, [watchEmail, watchWhatsappNumber, watchTelegramUsername, preferredChannelVal, isEmailSelectable, isWhatsappSelectable, isTelegramSelectable, form]);
 
   useEffect(() => {
     async function loadCompanies() {
@@ -263,7 +291,7 @@ export function PatientRegistrationForm() {
       description: "Country code, phones, email, region, locality, and village.",
       icon: Phone,
       tone: "contact" as const,
-      fields: ["primary_phone", "secondary_phone", "email", "region", "town_or_locality", "village"] as const
+      fields: ["primary_phone", "secondary_phone", "email", "whatsapp_number", "telegram_username", "preferred_notification_channel", "notification_consent", "region", "town_or_locality", "village"] as const
     },
     {
       id: "next-of-kin",
@@ -321,6 +349,10 @@ export function PatientRegistrationForm() {
       alcohol_details: text(values.alcohol_details),
       primary_phone: phoneValue(values.primary_phone),
       secondary_phone: phoneValue(values.secondary_phone),
+      whatsapp_number: text(values.whatsapp_number),
+      telegram_username: text(values.telegram_username),
+      preferred_notification_channel: values.preferred_notification_channel || null,
+      notification_consent: values.notification_consent || false,
       next_of_kin_full_name: text(values.next_of_kin_full_name),
       next_of_kin_phone: phoneValue(values.next_of_kin_phone),
       next_of_kin_email: text(values.next_of_kin_email),
@@ -454,7 +486,7 @@ export function PatientRegistrationForm() {
                   <FieldError message={errors.primary_phone?.country_code?.message || errors.primary_phone?.number?.message} />
                 </label>
                 <label className={fieldClass}>
-                  <Label>WhatsApp / Telegram Number</Label>
+                  <Label>Secondary phone (optional)</Label>
                   <div className="grid grid-cols-[92px_minmax(10rem,1fr)] gap-2 max-[420px]:grid-cols-1">
                     <input className="hh-input" list="secondary-phone-codes" {...form.register("secondary_phone.country_code")} />
                     <Input inputMode="tel" placeholder="7600 0000" {...form.register("secondary_phone.number")} />
@@ -462,6 +494,35 @@ export function PatientRegistrationForm() {
                   <FieldError message={errors.secondary_phone?.country_code?.message || errors.secondary_phone?.number?.message} />
                 </label>
                 <label className={fieldClass}><Label>Email</Label><Input type="email" {...form.register("email")} /><FieldError message={errors.email?.message} /></label>
+
+                {/* Patient Notification contact and preferences fields */}
+                <label className={fieldClass}>
+                  <Label>WhatsApp number</Label>
+                  <Input type="tel" placeholder="+26876000000" {...form.register("whatsapp_number")} />
+                  <FieldError message={errors.whatsapp_number?.message} />
+                </label>
+                <label className={fieldClass}>
+                  <Label>Telegram username</Label>
+                  <Input placeholder="@username" {...form.register("telegram_username")} />
+                  <FieldError message={errors.telegram_username?.message} />
+                </label>
+                <label className={fieldClass}>
+                  <Label>Preferred notification channel</Label>
+                  <Select {...form.register("preferred_notification_channel")}>
+                    <option value="">Select preferred channel</option>
+                    <option value="email" disabled={!isEmailSelectable}>
+                      Email {!isEmailSelectable ? "(Requires value)" : ""}
+                    </option>
+                    <option value="whatsapp" disabled={!isWhatsappSelectable}>
+                      WhatsApp {!isWhatsappSelectable ? "(Requires value)" : ""}
+                    </option>
+                    <option value="telegram" disabled={!isTelegramSelectable}>
+                      Telegram {!isTelegramSelectable ? "(Requires value)" : ""}
+                    </option>
+                  </Select>
+                  <FieldError message={errors.preferred_notification_channel?.message} />
+                </label>
+
                 <label className={fieldClass}>
                   <Label>Region / State</Label>
                   {regions.length ? (
@@ -487,6 +548,24 @@ export function PatientRegistrationForm() {
                   <FieldError />
                 </label>
                 <label className={fieldClass}><Label>Village / address area</Label><Input {...form.register("village")} /><FieldError /></label>
+
+                <div className="col-span-full border-t border-[var(--hh-border)] pt-5 mt-4 space-y-4">
+                  <label className="flex items-start gap-3 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-[var(--hh-purple)] focus:ring-[var(--hh-purple)]"
+                      {...form.register("notification_consent")}
+                    />
+                    <div className="grid gap-0.5">
+                      <span className="text-sm font-bold text-slate-800">
+                        Notification Consent
+                      </span>
+                      <span className="text-xs text-[#66736d] leading-normal">
+                        I consent to receiving appointment-related reminders and administrative communication through the contact channels I provide.
+                      </span>
+                    </div>
+                  </label>
+                </div>
               </div>
               <datalist id="primary-phone-codes">{countryCodeOptions.map((option) => <option key={`p-${option.country}-${option.dialCode}`} value={option.dialCode}>{option.label}</option>)}</datalist>
               <datalist id="secondary-phone-codes">{countryCodeOptions.map((option) => <option key={`s-${option.country}-${option.dialCode}`} value={option.dialCode}>{option.label}</option>)}</datalist>

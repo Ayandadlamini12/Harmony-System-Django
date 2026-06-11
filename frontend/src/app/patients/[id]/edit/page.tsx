@@ -78,6 +78,11 @@ export default async function EditPatientPage({
             defaultRegion={patient.region || ""}
             defaultTownOrLocality={patient.town_or_locality || ""}
             defaultVillage={patient.village || ""}
+            defaultWhatsappNumber={patient.whatsapp_number || ""}
+            defaultTelegramUsername={patient.telegram_username || ""}
+            defaultPreferredNotificationChannel={patient.preferred_notification_channel}
+            defaultNotificationConsent={patient.notification_consent || false}
+            defaultNotificationConsentAt={patient.notification_consent_at}
           />
         </section>
 

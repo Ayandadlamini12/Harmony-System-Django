@@ -1,4 +1,4 @@
-import type { Appointment, Case, ClinicianProfile, DashboardStats, ElevatedAccessRequest, EmployeeEnrollmentRequest, EmailDeliveryLog, FormDraft, MessageRecipient, MessageThread, Paginated, PartnerCompany, Patient, PatientCheckIn, PatientJourney, RoleModuleMatrix, SupportTicket, SystemEmailSettings, User, Visit, Vital } from "@/types/clinic";
+import type { Appointment, Case, ClinicianProfile, DashboardStats, ElevatedAccessRequest, EmployeeEnrollmentRequest, EmailDeliveryLog, FormDraft, MessageRecipient, MessageThread, Paginated, PartnerCompany, Patient, PatientCheckIn, PatientJourney, RoleModuleMatrix, SupportTicket, SystemEmailSettings, User, Visit, Vital, UserNotificationSettings } from "@/types/clinic";
 import type { SchedulingBoardData, SchedulingResources, UserCapabilities } from "@/types/scheduling";
 import { cookies } from "next/headers";
 
@@ -297,6 +297,10 @@ export function getUserCapabilities() {
     can_assign_room: false,
     can_create_follow_up: false
   });
+}
+
+export function getUserNotificationSettings() {
+  return apiGet<UserNotificationSettings | null>("/users/me/notification-settings/", null);
 }
 
 export { API_BASE_URL };
