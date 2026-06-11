@@ -22,6 +22,16 @@ $RequiredKeycloakEnv = @(
     "KEYCLOAK_ACTION_EMAIL_LIFESPAN"
 )
 
+$RequiredZulipEnv = @(
+    "ZULIP_SITE",
+    "ZULIP_BOT_EMAIL",
+    "ZULIP_BOT_API_KEY",
+    "ZULIP_BOT_TIMEOUT",
+    "ZULIP_RETRY_LIMIT",
+    "ZULIP_RETRY_BATCH_SIZE",
+    "ZULIP_RETRY_WINDOW_MINUTES"
+)
+
 function Convert-EnvListToMap {
     param([object[]]$EnvList)
     $Map = @{}
@@ -90,6 +100,16 @@ try {
         }
     }
 
+    foreach ($Key in $RequiredZulipEnv) {
+        $StackValue = if ($StackEnvMap.ContainsKey($Key)) { [string]$StackEnvMap[$Key] } else { "" }
+        $BackendValue = if ($BackendEnvMap.ContainsKey($Key)) { [string]$BackendEnvMap[$Key] } else { "" }
+
+        if ([string]::IsNullOrWhiteSpace($StackValue) -and -not [string]::IsNullOrWhiteSpace($BackendValue)) {
+            $StackEnvMap[$Key] = $BackendValue
+            Write-Host "Preserving live backend value for $Key" -ForegroundColor Green
+        }
+    }
+
     $MissingKeycloak = @(
         $RequiredKeycloakEnv | Where-Object {
             -not $StackEnvMap.ContainsKey($_) -or [string]::IsNullOrWhiteSpace([string]$StackEnvMap[$_])
@@ -99,6 +119,17 @@ try {
     if ($MissingKeycloak.Count -gt 0) {
         Write-Host "WARNING: These Keycloak env vars are still missing and may break identity on redeploy:" -ForegroundColor Yellow
         $MissingKeycloak | ForEach-Object { Write-Host " - $_" -ForegroundColor Yellow }
+    }
+
+    $MissingZulip = @(
+        $RequiredZulipEnv | Where-Object {
+            -not $StackEnvMap.ContainsKey($_) -or [string]::IsNullOrWhiteSpace([string]$StackEnvMap[$_])
+        }
+    )
+
+    if ($MissingZulip.Count -gt 0) {
+        Write-Host "WARNING: These Zulip env vars are still missing and may break coordination on redeploy:" -ForegroundColor Yellow
+        $MissingZulip | ForEach-Object { Write-Host " - $_" -ForegroundColor Yellow }
     }
     
     Write-Host "Step 3: Sending update/rebuild request..." -ForegroundColor Yellow
