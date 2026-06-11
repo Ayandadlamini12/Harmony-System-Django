@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   Calendar as CalendarIcon,
@@ -464,6 +464,14 @@ export function SchedulingBoard({
     return "border-l-4 border-l-gray-400 bg-gray-50/75 hover:bg-gray-100/90";
   };
 
+  // Filter practitioners list shown in dropdowns based on role
+  const filterDropdownPractitioners = useMemo(() => {
+    if (actingRole === "receptionist") {
+      return resources.practitioners.filter((p) => p.role.toLowerCase() === "clinician");
+    }
+    return resources.practitioners;
+  }, [resources.practitioners, actingRole]);
+
   // Filter print summary entries
   const currentPrintedClinician = resources.practitioners.find(
     (p) => p.id === (actingRole === "clinician" ? actingClinicianId : selectedPractitionerId)
@@ -668,7 +676,7 @@ export function SchedulingBoard({
                     onChange={(e) => setSelectedPractitionerId(e.target.value ? Number(e.target.value) : null)}
                   >
                     {actingRole !== "receptionist" && <option value="">All Clinicians</option>}
-                    {resources.practitioners.map((prac) => (
+                    {filterDropdownPractitioners.map((prac) => (
                       <option key={prac.id} value={prac.id}>
                         {prac.name} ({prac.role.toLowerCase().replace("_", " ")})
                       </option>
@@ -1087,7 +1095,7 @@ export function SchedulingBoard({
                   onChange={(e) => setSelectedPractitionerId(e.target.value ? Number(e.target.value) : null)}
                 >
                   {actingRole !== "receptionist" && <option value="">All Clinicians</option>}
-                  {resources.practitioners.map((prac) => (
+                  {filterDropdownPractitioners.map((prac) => (
                     <option key={prac.id} value={prac.id}>
                       {prac.name}
                     </option>
