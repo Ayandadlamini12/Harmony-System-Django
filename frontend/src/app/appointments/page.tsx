@@ -2,6 +2,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { getSchedulingBoard, getSchedulingResources, getUserCapabilities } from "@/lib/api";
+import { getSessionUser } from "@/lib/session";
 import { SchedulingBoard } from "@/components/scheduling-board";
 
 export default async function AppointmentsPage({
@@ -14,10 +15,11 @@ export default async function AppointmentsPage({
   const targetViewBy = params.view_by || "practitioners";
 
   // Parallel fetches to minimize network waterfalls and load data extremely fast
-  const [boardData, resources, capabilities] = await Promise.all([
+  const [boardData, resources, capabilities, session] = await Promise.all([
     getSchedulingBoard(targetDate, targetViewBy),
     getSchedulingResources(),
     getUserCapabilities(),
+    getSessionUser(),
   ]);
 
   return (
@@ -38,6 +40,7 @@ export default async function AppointmentsPage({
         initialBoardData={boardData}
         resources={resources}
         capabilities={capabilities}
+        session={session}
       />
     </AppShell>
   );

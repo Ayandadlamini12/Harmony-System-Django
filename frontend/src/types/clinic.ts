@@ -235,6 +235,7 @@ export type Appointment = {
   patient_name?: string;
   patient_code?: string;
   patient_phone?: string;
+  patient_public_id?: string;
   appointment_type: "new_consultation" | "follow_up" | "review";
   appointment_type_label?: string;
   appointment_date: string;

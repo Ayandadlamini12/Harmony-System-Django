@@ -396,6 +396,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
     patient_name = serializers.CharField(source="patient.full_name_display", read_only=True)
     patient_code = serializers.CharField(source="patient.patient_code", read_only=True)
     patient_phone = serializers.CharField(source="patient.primary_phone", read_only=True)
+    patient_public_id = serializers.UUIDField(source="patient.public_id", read_only=True)
     
     appointment_type_label = serializers.CharField(source="appointment_type.name", read_only=True)
     source_label = serializers.CharField(source="get_source_display", read_only=True)
@@ -424,6 +425,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "patient_name",
             "patient_code",
             "patient_phone",
+            "patient_public_id",
             "appointment_type",
             "appointment_type_label",
             "start_at",
@@ -459,6 +461,7 @@ class AppointmentSerializer(serializers.ModelSerializer):
             "patient_name",
             "patient_code",
             "patient_phone",
+            "patient_public_id",
             "appointment_type_label",
             "source_label",
             "status_label",
