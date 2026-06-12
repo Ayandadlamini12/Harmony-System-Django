@@ -335,11 +335,13 @@ export function UserNotificationSettingsForm({ initialSettings }: UserNotificati
                   {whatsappStatus && getStatusBadge(whatsappStatus)}
                   <LoadingButton
                     type="button"
+                    variant="secondary"
+                    size="sm"
                     loading={initiatingChannel === "whatsapp"}
                     loadingText="Starting..."
                     onClick={() => handleInitiateVerification("whatsapp")}
                     disabled={!whatsapp.trim()}
-                    className="rounded-lg border border-[var(--hh-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="min-w-[8.75rem] disabled:cursor-not-allowed"
                   >
                     {whatsappStatus === "pending" ? "Resend code" : "Start verification"}
                   </LoadingButton>
@@ -369,11 +371,13 @@ export function UserNotificationSettingsForm({ initialSettings }: UserNotificati
                   {telegramStatus && getStatusBadge(telegramStatus)}
                   <LoadingButton
                     type="button"
+                    variant="secondary"
+                    size="sm"
                     loading={initiatingChannel === "telegram"}
                     loadingText="Starting..."
                     onClick={() => handleInitiateVerification("telegram")}
                     disabled={!telegram.trim()}
-                    className="rounded-lg border border-[var(--hh-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="min-w-[8.75rem] disabled:cursor-not-allowed"
                   >
                     {telegramStatus === "pending" ? "Regenerate token" : "Start verification"}
                   </LoadingButton>
