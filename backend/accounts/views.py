@@ -121,8 +121,11 @@ class HasHarmonyWebhookSecret(permissions.BasePermission):
 
 class HasN8NCallbackSecret(permissions.BasePermission):
     def has_permission(self, request, view):
-        expected_secret = getattr(settings, "N8N_CALLBACK_SECRET", "")
-        provided_secret = request.headers.get("X-Harmony-N8N-Callback-Secret", "")
+        expected_secret = getattr(settings, "N8N_CALLBACK_SECRET", "") or getattr(settings, "HARMONY_WEBHOOK_SECRET", "")
+        provided_secret = request.headers.get("X-Harmony-N8N-Callback-Secret", "") or request.headers.get(
+            "X-Harmony-Webhook-Secret",
+            "",
+        )
         return bool(expected_secret and provided_secret and provided_secret == expected_secret)
 
 

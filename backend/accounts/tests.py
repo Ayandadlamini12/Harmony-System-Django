@@ -380,6 +380,30 @@ class ChannelVerificationApiTests(APITestCase):
         mock_dispatch.assert_not_called()
 
     @patch("accounts.tasks.dispatch_n8n_webhook_task.delay")
+    def test_inbound_webhook_direct_verifies_with_legacy_harmony_secret(self, mock_dispatch):
+        with self.settings(N8N_CALLBACK_SECRET="", HARMONY_WEBHOOK_SECRET="secret-123"):
+            response = self.client.post(
+                "/api/webhooks/verify-channel/",
+                {
+                    "username": "verify_user",
+                    "channel": "telegram",
+                    "value": "987654321",
+                    "direct_verify": True,
+                },
+                format="json",
+                HTTP_X_HARMONY_WEBHOOK_SECRET="secret-123",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "verified")
+
+        channel = UserNotificationChannel.objects.get(user=self.user, channel="telegram")
+        self.assertEqual(channel.verification_status, UserNotificationChannel.VerificationStatus.VERIFIED)
+        self.assertEqual(channel.value, "987654321")
+        self.assertIsNotNone(channel.verified_at)
+        mock_dispatch.assert_not_called()
+
+    @patch("accounts.tasks.dispatch_n8n_webhook_task.delay")
     def test_inbound_webhook_direct_verifies_with_opaque_token(self, mock_dispatch):
         channel = UserNotificationChannel.objects.create(
             user=self.user,
