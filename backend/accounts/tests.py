@@ -1,4 +1,7 @@
+from unittest.mock import patch
+
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from .models import ClinicianProfile, EmployeeEnrollmentRequest, UserNotificationChannel
@@ -160,3 +163,294 @@ class NotificationSettingsApiTests(APITestCase):
         self.assertEqual(response.data["email"], "reception@harmony.test")
         self.assertEqual(len(response.data["channels"]), 1)
         self.assertEqual(response.data["channels"][0]["channel"], "whatsapp")
+
+
+class ChannelVerificationApiTests(APITestCase):
+    def setUp(self):
+        self.user = User.objects.create_user(
+            username="verify_user",
+            password="password123",
+            role="clinician",
+            email="verify@harmony.test",
+        )
+        self.client.force_authenticate(self.user)
+
+    @patch("accounts.tasks.dispatch_n8n_webhook_task.delay")
+    def test_initiate_verification_generates_code_and_sets_pending(self, mock_dispatch):
+        channel = UserNotificationChannel.objects.create(
+            user=self.user,
+            channel=UserNotificationChannel.Channel.WHATSAPP,
+            value="+26876001234",
+            verification_status=UserNotificationChannel.VerificationStatus.UNVERIFIED,
+        )
+
+        response = self.client.post(
+            "/api/users/me/notification-settings/initiate-verification/",
+            {"channel": "whatsapp"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "pending")
+
+        channel.refresh_from_db()
+        self.assertEqual(channel.verification_status, UserNotificationChannel.VerificationStatus.PENDING)
+        self.assertTrue(channel.metadata.get("verification_code"))
+        self.assertTrue(channel.metadata.get("verification_code_expires_at"))
+        self.assertIsNone(channel.verified_at)
+
+        mock_dispatch.assert_called_once()
+        event_type, payload = mock_dispatch.call_args.args
+        self.assertEqual(event_type, "user_verification_requested")
+        self.assertEqual(payload["username"], self.user.username)
+        self.assertEqual(payload["channel"], "whatsapp")
+        self.assertEqual(payload["value"], "+26876001234")
+        self.assertEqual(payload["code"], channel.metadata["verification_code"])
+        self.assertIn("event_id", payload)
+
+    @patch("accounts.tasks.dispatch_n8n_webhook_task.delay")
+    def test_initiate_verification_generates_telegram_token_and_sets_pending(self, mock_dispatch):
+        channel = UserNotificationChannel.objects.create(
+            user=self.user,
+            channel=UserNotificationChannel.Channel.TELEGRAM,
+            value="@verify_user",
+            verification_status=UserNotificationChannel.VerificationStatus.UNVERIFIED,
+        )
+
+        with self.settings(TELEGRAM_VERIFICATION_BOT_USERNAME="HarmonyVerificationBot"):
+            response = self.client.post(
+                "/api/users/me/notification-settings/initiate-verification/",
+                {"channel": "telegram"},
+                format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "pending")
+        self.assertEqual(response.data["channel"], "telegram")
+
+        channel.refresh_from_db()
+        self.assertEqual(channel.verification_status, UserNotificationChannel.VerificationStatus.PENDING)
+        self.assertTrue(channel.metadata.get("verification_token"))
+        self.assertTrue(channel.metadata.get("verification_token_expires_at"))
+        self.assertNotIn("verification_code", channel.metadata)
+        self.assertEqual(response.data["verification_token"], channel.metadata["verification_token"])
+        self.assertIn("token_expires_at", response.data)
+        self.assertEqual(
+            response.data["telegram_start_link"],
+            f"https://t.me/HarmonyVerificationBot?start={response.data['verification_token']}",
+        )
+
+        mock_dispatch.assert_called_once()
+        event_type, payload = mock_dispatch.call_args.args
+        self.assertEqual(event_type, "user_verification_requested")
+        self.assertEqual(payload["username"], self.user.username)
+        self.assertEqual(payload["channel"], "telegram")
+        self.assertEqual(payload["value"], "@verify_user")
+        self.assertEqual(payload["verification_token"], channel.metadata["verification_token"])
+        self.assertIn("token_expires_at", payload)
+
+    def test_initiate_verification_validates_channel(self):
+        response = self.client.post(
+            "/api/users/me/notification-settings/initiate-verification/",
+            {"channel": "invalid_channel"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+        response = self.client.post(
+            "/api/users/me/notification-settings/initiate-verification/",
+            {"channel": "email"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_initiate_verification_requires_channel_to_exist(self):
+        response = self.client.post(
+            "/api/users/me/notification-settings/initiate-verification/",
+            {"channel": "telegram"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("not configured", response.data["error"])
+
+    def test_initiate_verification_requires_non_empty_value(self):
+        UserNotificationChannel.objects.create(
+            user=self.user,
+            channel=UserNotificationChannel.Channel.TELEGRAM,
+            value="",
+            verification_status=UserNotificationChannel.VerificationStatus.UNVERIFIED,
+        )
+
+        response = self.client.post(
+            "/api/users/me/notification-settings/initiate-verification/",
+            {"channel": "telegram"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("value is empty", response.data["error"])
+
+    @patch("accounts.tasks.dispatch_n8n_webhook_task.delay")
+    def test_confirm_verification_verifies_correct_code(self, mock_dispatch):
+        channel = UserNotificationChannel.objects.create(
+            user=self.user,
+            channel=UserNotificationChannel.Channel.WHATSAPP,
+            value="+26876001234",
+            verification_status=UserNotificationChannel.VerificationStatus.PENDING,
+            metadata={
+                "verification_code": "123456",
+                "verification_code_expires_at": (timezone.now() + timezone.timedelta(minutes=15)).isoformat(),
+            },
+        )
+
+        response = self.client.post(
+            "/api/users/me/notification-settings/confirm-verification/",
+            {"channel": "whatsapp", "code": "123456"},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "verified")
+
+        channel.refresh_from_db()
+        self.assertEqual(channel.verification_status, UserNotificationChannel.VerificationStatus.VERIFIED)
+        self.assertIsNotNone(channel.verified_at)
+        self.assertNotIn("verification_code", channel.metadata)
+        self.assertNotIn("verification_code_expires_at", channel.metadata)
+        mock_dispatch.assert_not_called()
+
+    def test_confirm_verification_rejects_expired_or_incorrect_code(self):
+        UserNotificationChannel.objects.create(
+            user=self.user,
+            channel=UserNotificationChannel.Channel.WHATSAPP,
+            value="+26876001234",
+            verification_status=UserNotificationChannel.VerificationStatus.PENDING,
+            metadata={
+                "verification_code": "123456",
+                "verification_code_expires_at": (timezone.now() - timezone.timedelta(minutes=1)).isoformat(),
+            },
+        )
+
+        response = self.client.post(
+            "/api/users/me/notification-settings/confirm-verification/",
+            {"channel": "whatsapp", "code": "654321"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Invalid verification code", response.data["error"])
+
+        response = self.client.post(
+            "/api/users/me/notification-settings/confirm-verification/",
+            {"channel": "whatsapp", "code": "123456"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("expired", response.data["error"])
+
+    def test_inbound_webhook_rejects_without_callback_secret(self):
+        with self.settings(N8N_CALLBACK_SECRET="secret-123"):
+            response = self.client.post(
+                "/api/webhooks/verify-channel/",
+                {"username": "verify_user", "channel": "whatsapp", "direct_verify": True},
+                format="json",
+            )
+        self.assertEqual(response.status_code, 403)
+
+    @patch("accounts.tasks.dispatch_n8n_webhook_task.delay")
+    def test_inbound_webhook_direct_verifies_with_secret(self, mock_dispatch):
+        with self.settings(N8N_CALLBACK_SECRET="secret-123"):
+            response = self.client.post(
+                "/api/webhooks/verify-channel/",
+                {
+                    "username": "verify_user",
+                    "channel": "telegram",
+                    "value": "987654321",
+                    "direct_verify": True,
+                },
+                format="json",
+                HTTP_X_HARMONY_N8N_CALLBACK_SECRET="secret-123",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "verified")
+
+        channel = UserNotificationChannel.objects.get(user=self.user, channel="telegram")
+        self.assertEqual(channel.verification_status, UserNotificationChannel.VerificationStatus.VERIFIED)
+        self.assertEqual(channel.value, "987654321")
+        self.assertIsNotNone(channel.verified_at)
+        mock_dispatch.assert_not_called()
+
+    @patch("accounts.tasks.dispatch_n8n_webhook_task.delay")
+    def test_inbound_webhook_direct_verifies_with_opaque_token(self, mock_dispatch):
+        channel = UserNotificationChannel.objects.create(
+            user=self.user,
+            channel=UserNotificationChannel.Channel.TELEGRAM,
+            value="@verify_user",
+            verification_status=UserNotificationChannel.VerificationStatus.PENDING,
+            metadata={
+                "verification_token": "opaque-token-123",
+                "verification_token_expires_at": (timezone.now() + timezone.timedelta(minutes=15)).isoformat(),
+            },
+        )
+
+        with self.settings(N8N_CALLBACK_SECRET="secret-123"):
+            response = self.client.post(
+                "/api/webhooks/verify-channel/",
+                {
+                    "username": "opaque-token-123",
+                    "verification_token": "opaque-token-123",
+                    "channel": "telegram",
+                    "value": "987654321",
+                    "direct_verify": True,
+                    "telegram_chat_id": "987654321",
+                    "telegram_username": "verify_user_bot",
+                    "telegram_user_id": "112233",
+                    "token_resolution_mode": "token-deferred-to-harmony",
+                },
+                format="json",
+                HTTP_X_HARMONY_N8N_CALLBACK_SECRET="secret-123",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "verified")
+
+        channel.refresh_from_db()
+        self.assertEqual(channel.verification_status, UserNotificationChannel.VerificationStatus.VERIFIED)
+        self.assertEqual(channel.value, "987654321")
+        self.assertEqual(channel.metadata["telegram_chat_id"], "987654321")
+        self.assertEqual(channel.metadata["telegram_username"], "verify_user_bot")
+        self.assertEqual(channel.metadata["telegram_user_id"], "112233")
+        self.assertNotIn("verification_token", channel.metadata)
+        mock_dispatch.assert_not_called()
+
+    @patch("accounts.tasks.dispatch_n8n_webhook_task.delay")
+    def test_inbound_webhook_verifies_with_code_and_secret(self, mock_dispatch):
+        channel = UserNotificationChannel.objects.create(
+            user=self.user,
+            channel=UserNotificationChannel.Channel.WHATSAPP,
+            value="+26876001234",
+            verification_status=UserNotificationChannel.VerificationStatus.PENDING,
+            metadata={
+                "verification_code": "789012",
+                "verification_code_expires_at": (timezone.now() + timezone.timedelta(minutes=15)).isoformat(),
+            },
+        )
+
+        with self.settings(N8N_CALLBACK_SECRET="secret-123"):
+            response = self.client.post(
+                "/api/webhooks/verify-channel/",
+                {
+                    "username": "verify_user",
+                    "channel": "whatsapp",
+                    "verification_code": "789012",
+                },
+                format="json",
+                HTTP_X_HARMONY_N8N_CALLBACK_SECRET="secret-123",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["status"], "verified")
+
+        channel.refresh_from_db()
+        self.assertEqual(channel.verification_status, UserNotificationChannel.VerificationStatus.VERIFIED)
+        self.assertIsNotNone(channel.verified_at)
+        mock_dispatch.assert_not_called()

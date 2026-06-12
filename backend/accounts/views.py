@@ -1,8 +1,11 @@
 import mimetypes
+import random
+import secrets
 
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.utils import timezone
+from django.utils.dateparse import parse_datetime
 from django.http import FileResponse, Http404
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
@@ -14,7 +17,15 @@ from clinic.audit import write_audit_log
 
 from .emailing import send_enrollment_under_review_email, send_system_email
 from .keycloak import HarmonyTokenSerializer
-from .models import ClinicianProfile, EmailDeliveryLog, EmployeeEnrollmentRequest, RoleModulePermission, SystemEmailSettings
+from .models import (
+    ClinicianProfile,
+    EmailDeliveryLog,
+    EmployeeEnrollmentRequest,
+    RoleModulePermission,
+    SystemEmailSettings,
+    UserNotificationChannel,
+)
+from .tasks import dispatch_n8n_webhook_task
 from .role_modules import ROLE_CHOICES, module_definition_map
 from .serializers import (
     ChangePasswordSerializer,
@@ -32,6 +43,70 @@ from .serializers import (
 User = get_user_model()
 
 
+def _generate_verification_code() -> str:
+    return str(random.randint(100000, 999999))
+
+
+def _verification_expiry() -> timezone.datetime:
+    return timezone.now() + timezone.timedelta(minutes=15)
+
+
+def _generate_verification_token() -> str:
+    return secrets.token_urlsafe(18)
+
+
+def _token_is_expired(expires_at_str: str | None) -> bool:
+    if not expires_at_str:
+        return False
+    expires_at = parse_datetime(expires_at_str)
+    return bool(expires_at and timezone.now() > expires_at)
+
+
+def _mark_channel_verified(
+    channel: UserNotificationChannel,
+    value: str | None = None,
+    extra_metadata: dict | None = None,
+) -> None:
+    if value is not None and value != "":
+        channel.value = value
+    if extra_metadata:
+        channel.metadata.update(extra_metadata)
+    channel.verification_status = UserNotificationChannel.VerificationStatus.VERIFIED
+    channel.verified_at = timezone.now()
+    channel.metadata.pop("verification_code", None)
+    channel.metadata.pop("verification_code_expires_at", None)
+    channel.metadata.pop("verification_token", None)
+    channel.metadata.pop("verification_token_expires_at", None)
+    channel.save(update_fields=["value", "verification_status", "verified_at", "metadata", "updated_at"])
+
+
+def _resolve_channel_for_callback(username: str | None, channel_name: str, verification_token: str | None):
+    if username:
+        try:
+            user = User.objects.get(username=username)
+            channel, _ = UserNotificationChannel.objects.get_or_create(user=user, channel=channel_name)
+            return channel
+        except User.DoesNotExist:
+            pass
+
+    if verification_token:
+        channel = (
+            UserNotificationChannel.objects.select_related("user")
+            .filter(
+                channel=channel_name,
+                verification_status=UserNotificationChannel.VerificationStatus.PENDING,
+            )
+            .filter(metadata__verification_token=verification_token)
+            .first()
+        )
+        if channel:
+            if _token_is_expired(channel.metadata.get("verification_token_expires_at")):
+                return "expired"
+            return channel
+
+    return None
+
+
 class IsAdminUserRole(permissions.BasePermission):
     def has_permission(self, request, view):
         return bool(request.user and request.user.is_authenticated and request.user.role == "admin")
@@ -41,6 +116,13 @@ class HasHarmonyWebhookSecret(permissions.BasePermission):
     def has_permission(self, request, view):
         expected_secret = getattr(settings, "HARMONY_WEBHOOK_SECRET", "")
         provided_secret = request.headers.get("X-Harmony-Webhook-Secret", "")
+        return bool(expected_secret and provided_secret and provided_secret == expected_secret)
+
+
+class HasN8NCallbackSecret(permissions.BasePermission):
+    def has_permission(self, request, view):
+        expected_secret = getattr(settings, "N8N_CALLBACK_SECRET", "")
+        provided_secret = request.headers.get("X-Harmony-N8N-Callback-Secret", "")
         return bool(expected_secret and provided_secret and provided_secret == expected_secret)
 
 
@@ -163,6 +245,103 @@ class UserViewSet(viewsets.ModelViewSet):
         serializer.is_valid(raise_exception=True)
         serializer.save()
         return Response(NotificationSettingsSerializer(request.user, context={"request": request}).data)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path="me/notification-settings/initiate-verification",
+    )
+    def me_initiate_verification(self, request):
+        channel_name = request.data.get("channel")
+        if channel_name not in {UserNotificationChannel.Channel.WHATSAPP, UserNotificationChannel.Channel.TELEGRAM}:
+            return Response(
+                {"error": "Invalid channel. Must be 'whatsapp' or 'telegram'."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            channel = UserNotificationChannel.objects.get(user=request.user, channel=channel_name)
+        except UserNotificationChannel.DoesNotExist:
+            return Response({"error": "Notification channel not configured."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if not channel.value or not channel.value.strip():
+            return Response(
+                {"error": f"{channel_name.capitalize()} contact value is empty."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        expiration = _verification_expiry()
+        payload = {
+            "username": request.user.username,
+            "channel": channel.channel,
+            "value": channel.value,
+            "event_id": f"user-channel-{channel.pk}-{int(expiration.timestamp())}",
+        }
+
+        if channel.channel == UserNotificationChannel.Channel.TELEGRAM:
+            verification_token = _generate_verification_token()
+            channel.metadata["verification_token"] = verification_token
+            channel.metadata["verification_token_expires_at"] = expiration.isoformat()
+            payload["verification_token"] = verification_token
+            payload["token_expires_at"] = expiration.isoformat()
+        else:
+            code = _generate_verification_code()
+            channel.metadata["verification_code"] = code
+            channel.metadata["verification_code_expires_at"] = expiration.isoformat()
+            payload["code"] = code
+
+        channel.verification_status = UserNotificationChannel.VerificationStatus.PENDING
+        channel.verified_at = None
+        channel.save(update_fields=["metadata", "verification_status", "verified_at", "updated_at"])
+        dispatch_n8n_webhook_task.delay("user_verification_requested", payload)
+        response_payload = {
+            "status": "pending",
+            "channel": channel.channel,
+            "message": "Verification initiated successfully.",
+        }
+        if channel.channel == UserNotificationChannel.Channel.TELEGRAM:
+            response_payload["verification_token"] = verification_token
+            response_payload["token_expires_at"] = expiration.isoformat()
+            if settings.TELEGRAM_VERIFICATION_BOT_USERNAME:
+                response_payload["telegram_start_link"] = (
+                    f"https://t.me/{settings.TELEGRAM_VERIFICATION_BOT_USERNAME}?start={verification_token}"
+                )
+
+        return Response(response_payload)
+
+    @action(
+        detail=False,
+        methods=["post"],
+        permission_classes=[permissions.IsAuthenticated],
+        url_path="me/notification-settings/confirm-verification",
+    )
+    def me_confirm_verification(self, request):
+        channel_name = request.data.get("channel")
+        code = request.data.get("code")
+        if not channel_name or not code:
+            return Response(
+                {"error": "Both 'channel' and 'code' are required."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            channel = UserNotificationChannel.objects.get(user=request.user, channel=channel_name)
+        except UserNotificationChannel.DoesNotExist:
+            return Response({"error": "Notification channel not configured."}, status=status.HTTP_400_BAD_REQUEST)
+
+        stored_code = channel.metadata.get("verification_code")
+        expires_at_str = channel.metadata.get("verification_code_expires_at")
+        if not stored_code or str(stored_code) != str(code):
+            return Response({"error": "Invalid verification code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if expires_at_str:
+            expires_at = parse_datetime(expires_at_str)
+            if expires_at and timezone.now() > expires_at:
+                return Response({"error": "Verification code has expired."}, status=status.HTTP_400_BAD_REQUEST)
+
+        _mark_channel_verified(channel)
+        return Response({"status": "verified", "message": "Channel verified successfully."})
 
 
 class RoleModulePermissionViewSet(viewsets.ModelViewSet):
@@ -346,3 +525,63 @@ class EmployeeEnrollmentRequestViewSet(viewsets.ModelViewSet):
             after_data=after,
         )
         return Response(after)
+
+
+class ChannelVerificationWebhookView(APIView):
+    permission_classes = [HasN8NCallbackSecret]
+
+    def post(self, request):
+        username = request.data.get("username")
+        channel_name = request.data.get("channel")
+        value = request.data.get("value")
+        verification_code = request.data.get("verification_code")
+        verification_token = request.data.get("verification_token")
+        direct_verify = bool(request.data.get("direct_verify", False))
+        telegram_metadata = {
+            key: request.data.get(key)
+            for key in ("telegram_chat_id", "telegram_username", "telegram_user_id", "token_resolution_mode")
+            if request.data.get(key) not in (None, "")
+        }
+
+        if not channel_name:
+            return Response(
+                {"error": "'channel' is a required field."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if channel_name not in UserNotificationChannel.Channel.values:
+            return Response(
+                {"error": f"Invalid channel. Must be one of {UserNotificationChannel.Channel.values}."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        channel = _resolve_channel_for_callback(username, channel_name, verification_token)
+        if channel == "expired":
+            return Response({"error": "Verification token has expired."}, status=status.HTTP_400_BAD_REQUEST)
+        if channel is None:
+            return Response(
+                {"error": "Unable to resolve notification channel from username or verification token."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if direct_verify:
+            _mark_channel_verified(channel, value=value, extra_metadata=telegram_metadata)
+            return Response({"status": "verified", "message": "Channel verified directly."})
+
+        if not verification_code:
+            return Response(
+                {"error": "Either 'direct_verify=True' or 'verification_code' must be provided."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        stored_code = channel.metadata.get("verification_code")
+        expires_at_str = channel.metadata.get("verification_code_expires_at")
+        if not stored_code or str(stored_code) != str(verification_code):
+            return Response({"error": "Invalid verification code."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if expires_at_str:
+            expires_at = parse_datetime(expires_at_str)
+            if expires_at and timezone.now() > expires_at:
+                return Response({"error": "Verification code has expired."}, status=status.HTTP_400_BAD_REQUEST)
+
+        _mark_channel_verified(channel, value=value, extra_metadata=telegram_metadata)
+        return Response({"status": "verified", "message": "Channel verified via code."})

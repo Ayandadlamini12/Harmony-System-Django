@@ -2,14 +2,20 @@
 
 import { FormEvent, useEffect, useState } from "react";
 import { toast } from "sonner";
-import { Bell, Mail, Phone, Send, ArrowLeft, ShieldCheck, CheckCircle2, AlertCircle, RefreshCw } from "lucide-react";
+import { Bell, Mail, Phone, Send, ArrowLeft, ShieldCheck, AlertCircle, RefreshCw, Copy, ExternalLink } from "lucide-react";
 import Link from "next/link";
 
 import { LoadingButton } from "@/components/harmony-loading";
 import { Badge } from "@/components/ui/badge";
 import { Select } from "@/components/ui/select";
 import { showActionError } from "@/lib/action-error";
-import type { UserNotificationSettings, UserNotificationChannel, NotificationChannelType, VerificationStatusType } from "@/types/clinic";
+import type {
+  UserNotificationSettings,
+  UserNotificationChannel,
+  NotificationChannelType,
+  VerificationStatusType,
+  VerificationInitiationResponse,
+} from "@/types/clinic";
 
 interface UserNotificationSettingsFormProps {
   initialSettings?: UserNotificationSettings | null;
@@ -25,6 +31,10 @@ export function UserNotificationSettingsForm({ initialSettings }: UserNotificati
   const [whatsapp, setWhatsapp] = useState("");
   const [telegram, setTelegram] = useState("");
   const [preferredChannel, setPreferredChannel] = useState<NotificationChannelType>("email");
+  const [initiatingChannel, setInitiatingChannel] = useState<"whatsapp" | "telegram" | null>(null);
+  const [telegramVerificationToken, setTelegramVerificationToken] = useState("");
+  const [telegramStartLink, setTelegramStartLink] = useState("");
+  const [telegramTokenExpiresAt, setTelegramTokenExpiresAt] = useState("");
 
   // Verification status states (display-only, reflect backend state only)
   const [whatsappStatus, setWhatsappStatus] = useState<VerificationStatusType | null>(null);
@@ -95,6 +105,9 @@ export function UserNotificationSettingsForm({ initialSettings }: UserNotificati
 
   const handleTelegramChange = (val: string) => {
     setTelegram(val);
+    setTelegramVerificationToken("");
+    setTelegramStartLink("");
+    setTelegramTokenExpiresAt("");
     if (!val && preferredChannel === "telegram") {
       setPreferredChannel("email");
     }
@@ -188,6 +201,57 @@ export function UserNotificationSettingsForm({ initialSettings }: UserNotificati
     }
   }
 
+  async function handleInitiateVerification(channel: "whatsapp" | "telegram") {
+    setInitiatingChannel(channel);
+
+    try {
+      const res = await fetch("/api/users/me/notification-settings/initiate-verification/", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ channel }),
+      });
+
+      const data = (await res.json().catch(() => ({}))) as Partial<VerificationInitiationResponse> & { error?: string; detail?: string };
+      if (!res.ok) {
+        showActionError({
+          title: "Verification start failed",
+          message: data.error || data.detail || "Could not start verification for this channel.",
+        });
+        return;
+      }
+
+      await fetchSettings();
+
+      if (channel === "telegram") {
+        setTelegramVerificationToken(data.verification_token || "");
+        setTelegramStartLink(data.telegram_start_link || "");
+        setTelegramTokenExpiresAt(data.token_expires_at || "");
+        toast.success("Telegram verification token generated");
+        return;
+      }
+
+      toast.success(data.message || "Verification started");
+    } catch (err) {
+      console.error(err);
+      toast.error("Network error starting verification");
+    } finally {
+      setInitiatingChannel(null);
+    }
+  }
+
+  async function handleCopyTelegramToken() {
+    if (!telegramVerificationToken) {
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(telegramVerificationToken);
+      toast.success("Telegram token copied");
+    } catch (err) {
+      console.error(err);
+      toast.error("Could not copy Telegram token");
+    }
+  }
+
   const getStatusBadge = (status: VerificationStatusType) => {
     switch (status) {
       case "verified":
@@ -213,6 +277,9 @@ export function UserNotificationSettingsForm({ initialSettings }: UserNotificati
   const isEmailSelectable = !!email.trim();
   const isWhatsappSelectable = !!whatsapp.trim();
   const isTelegramSelectable = !!telegram.trim();
+  const formattedTelegramExpiry = telegramTokenExpiresAt
+    ? new Date(telegramTokenExpiresAt).toLocaleString()
+    : "";
 
   return (
     <div className="space-y-6">
@@ -264,7 +331,19 @@ export function UserNotificationSettingsForm({ initialSettings }: UserNotificati
                 <label htmlFor="whatsapp" className="hh-label flex items-center gap-2">
                   <Phone size={16} className="text-[#66736d]" /> WhatsApp number
                 </label>
-                {whatsappStatus && getStatusBadge(whatsappStatus)}
+                <div className="flex items-center gap-2">
+                  {whatsappStatus && getStatusBadge(whatsappStatus)}
+                  <LoadingButton
+                    type="button"
+                    loading={initiatingChannel === "whatsapp"}
+                    loadingText="Starting..."
+                    onClick={() => handleInitiateVerification("whatsapp")}
+                    disabled={!whatsapp.trim()}
+                    className="rounded-lg border border-[var(--hh-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {whatsappStatus === "pending" ? "Resend code" : "Start verification"}
+                  </LoadingButton>
+                </div>
               </div>
               <input
                 id="whatsapp"
@@ -275,25 +354,80 @@ export function UserNotificationSettingsForm({ initialSettings }: UserNotificati
                 onChange={(e) => handleWhatsappChange(e.target.value)}
               />
               <p className="text-xs text-[#66736d]">Include country code (e.g., +268 for Eswatini).</p>
+              <p className="text-xs text-[#66736d]">
+                Starting verification sends a pending verification request through the configured automation workflow for this number.
+              </p>
             </div>
 
-            {/* Telegram Username */}
+            {/* Telegram Account */}
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <label htmlFor="telegram" className="hh-label flex items-center gap-2">
-                  <Send size={16} className="text-[#66736d]" /> Telegram username or linked account
+                  <Send size={16} className="text-[#66736d]" /> Telegram account label
                 </label>
-                {telegramStatus && getStatusBadge(telegramStatus)}
+                <div className="flex items-center gap-2">
+                  {telegramStatus && getStatusBadge(telegramStatus)}
+                  <LoadingButton
+                    type="button"
+                    loading={initiatingChannel === "telegram"}
+                    loadingText="Starting..."
+                    onClick={() => handleInitiateVerification("telegram")}
+                    disabled={!telegram.trim()}
+                    className="rounded-lg border border-[var(--hh-border)] bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {telegramStatus === "pending" ? "Regenerate token" : "Start verification"}
+                  </LoadingButton>
+                </div>
               </div>
               <input
                 id="telegram"
                 type="text"
                 className="hh-input"
-                placeholder="@username"
+                placeholder="Reception mobile Telegram account"
                 value={telegram}
                 onChange={(e) => handleTelegramChange(e.target.value)}
               />
-              <p className="text-xs text-[#66736d]">Your public Telegram username (starting with @).</p>
+              <p className="text-xs text-[#66736d]">
+                This is only a reference label. The real Telegram account is linked through the verification bot and stored from the bot session.
+              </p>
+              {telegramVerificationToken ? (
+                <div className="rounded-lg border border-[#ecdff9] bg-[#fbf9fe] p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-semibold text-[var(--hh-purple-dark)]">Telegram verification token ready</p>
+                      <p className="mt-1 text-xs leading-5 text-[#66736d]">
+                        Send this token to the Harmony verification bot using <span className="font-mono">/start &lt;token&gt;</span>.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopyTelegramToken}
+                      className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--hh-border)] bg-white text-slate-700 hover:bg-slate-50"
+                      aria-label="Copy Telegram token"
+                    >
+                      <Copy size={16} />
+                    </button>
+                  </div>
+                  <div className="mt-3 rounded-lg border border-[#e4d8f3] bg-white px-3 py-2 font-mono text-sm text-slate-800 break-all">
+                    {telegramVerificationToken}
+                  </div>
+                  <div className="mt-3 flex flex-wrap items-center gap-3">
+                    {telegramStartLink ? (
+                      <a
+                        href={telegramStartLink}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-2 rounded-lg bg-[var(--hh-purple)] px-3 py-2 text-xs font-semibold text-white hover:opacity-95"
+                      >
+                        <ExternalLink size={14} /> Open Telegram bot
+                      </a>
+                    ) : null}
+                    {formattedTelegramExpiry ? (
+                      <span className="text-xs text-[#66736d]">Expires: {formattedTelegramExpiry}</span>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
             </div>
 
             <div className="border-t border-[var(--hh-border)] pt-6">
@@ -343,16 +477,16 @@ export function UserNotificationSettingsForm({ initialSettings }: UserNotificati
               <h3 className="font-bold">Verification statuses</h3>
             </div>
             <p className="mt-3 text-sm leading-6 text-[#66736d]">
-              Communication channels are assigned statuses to track delivery reliability and active user configuration.
+              Communication channels are assigned statuses to track delivery readiness and verification state.
             </p>
             <div className="mt-4 space-y-3">
               <div className="flex items-start gap-2.5 text-xs text-[#66736d]">
                 <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-[var(--hh-purple)] shrink-0" />
-                <span><strong>Verification Tracking:</strong> Statuses (Unverified, Pending, Verified) are managed administratively or via connected system integrations.</span>
+                <span><strong>Telegram Flow:</strong> Start verification here, then send the issued token to the Harmony verification bot to link your real Telegram account.</span>
               </div>
               <div className="flex items-start gap-2.5 text-xs text-[#66736d]">
                 <div className="mt-0.5 h-1.5 w-1.5 rounded-full bg-[var(--hh-purple)] shrink-0" />
-                <span><strong>Display-Only Badges:</strong> The status indicators shown on this form are display-only metrics retrieved directly from the backend.</span>
+                <span><strong>Status Source:</strong> The badges on this form still reflect backend truth only. The frontend starts the workflow, but it does not mark anything verified by itself.</span>
               </div>
             </div>
           </div>
@@ -363,7 +497,7 @@ export function UserNotificationSettingsForm({ initialSettings }: UserNotificati
               <div>
                 <h4 className="font-bold text-sm">Need status assistance?</h4>
                 <p className="mt-1 text-xs leading-5 text-[#66736d]">
-                  Speak with your system administrator or clinic coordinator if you need to update a channel's verification status, or if you have changed your active contact numbers.
+                  If a Telegram token expires or the wrong account was linked, regenerate the token here before asking an administrator to clear or review the linked channel.
                 </p>
               </div>
             </div>

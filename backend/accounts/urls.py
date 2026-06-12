@@ -3,6 +3,7 @@ from rest_framework.routers import DefaultRouter
 
 from .views import (
     ChangePasswordView,
+    ChannelVerificationWebhookView,
     EmailDeliveryLogViewSet,
     EmployeeEnrollmentRequestViewSet,
     RegisterView,
@@ -21,4 +22,5 @@ urlpatterns = [
     path("auth/register/", RegisterView.as_view(), name="register"),
     path("auth/change-password/", ChangePasswordView.as_view(), name="change_password"),
     path("system/email-settings/", SystemEmailSettingsView.as_view(), name="system_email_settings"),
+    path("webhooks/verify-channel/", ChannelVerificationWebhookView.as_view(), name="channel_verification_webhook"),
 ] + router.urls

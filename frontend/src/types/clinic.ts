@@ -570,5 +570,14 @@ export type UserNotificationSettings = {
   channels: UserNotificationChannel[];
 };
 
+export type VerificationInitiationResponse = {
+  status: "pending";
+  channel: "whatsapp" | "telegram";
+  message: string;
+  verification_token?: string;
+  token_expires_at?: string;
+  telegram_start_link?: string;
+};
+
 
 
