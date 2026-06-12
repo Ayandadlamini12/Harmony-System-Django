@@ -7,6 +7,8 @@ export async function POST(request: Request) {
   const callbackSecret =
     request.headers.get("x-harmony-n8n-callback-secret") ||
     request.headers.get("x-harmony-webhook-secret") ||
+    process.env.N8N_CALLBACK_SECRET ||
+    process.env.HARMONY_WEBHOOK_SECRET ||
     "";
 
   const response = await fetch(`${API_BASE_URL}/webhooks/verify-channel/`, {

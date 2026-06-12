@@ -163,6 +163,8 @@ services:
       NEXT_PUBLIC_API_BASE_URL: ${APP_URL}/api
       APP_BASE_URL: ${APP_URL}
       COOKIE_SECURE: "true"
+      HARMONY_WEBHOOK_SECRET: ${HARMONY_WEBHOOK_SECRET}
+      N8N_CALLBACK_SECRET: ${N8N_CALLBACK_SECRET}
     ports:
       - "30001:3000"
     depends_on:
