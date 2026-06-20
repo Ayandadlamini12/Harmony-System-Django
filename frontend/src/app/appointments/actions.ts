@@ -166,3 +166,35 @@ export async function cancelAppointment(appointmentId: number, cancelReason: str
     };
   }
 }
+
+export async function getPractitionerAvailabilitiesForDate(date: string) {
+  try {
+    const auth = await getAuthHeader();
+    const response = await fetch(`${API_BASE_URL}/scheduling/board/?date=${encodeURIComponent(date)}&view_by=practitioners`, {
+      method: "GET",
+      headers: {
+        Authorization: auth,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        success: false,
+        columns: [],
+        error: data.detail || "Failed to fetch availabilities.",
+      };
+    }
+
+    return { success: true, columns: data.columns || [] };
+  } catch (err: any) {
+    return {
+      success: false,
+      columns: [],
+      error: "Network connection error.",
+    };
+  }
+}
+

@@ -33,10 +33,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { QuickBookingDrawer } from "./quick-booking-drawer";
 import { AppointmentDetailDialog } from "./appointment-detail-dialog";
-import { AppointmentBooking } from "./appointment-booking";
 import { moveAppointment } from "@/app/appointments/actions";
 import type { SessionUser } from "@/lib/session";
-import type { Patient } from "@/types/clinic";
+import type { Patient, BookingPatient } from "@/types/clinic";
 import type {
   SchedulingBoardData,
   SchedulingResources,
@@ -73,7 +72,7 @@ export function SchedulingBoard({
   const [nowLineTop, setNowLineTop] = useState<number | null>(null);
 
   // Tabs layout navigation
-  const [activeTab, setActiveTab] = useState<"schedule" | "create" | "print">("schedule");
+  const [activeTab, setActiveTab] = useState<"schedule" | "print">("schedule");
 
   // Administrator testing sandbox roles
   const [actingRole, setActingRole] = useState<string>(session.role);
@@ -95,12 +94,6 @@ export function SchedulingBoard({
     return null;
   });
 
-  // Patient live search variables inside "Create Appointment" sub-tab
-  const [patientQuery, setPatientQuery] = useState("");
-  const [searchedPatients, setSearchedPatients] = useState<Patient[]>([]);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
-  const [searchingPatients, setSearchingPatients] = useState(false);
-
   // Synchronize board data with server updates
   useEffect(() => {
     setBoardData(initialBoardData);
@@ -111,6 +104,7 @@ export function SchedulingBoard({
   const [bookingTime, setBookingTime] = useState("08:00");
   const [bookingPractitionerId, setBookingPractitionerId] = useState<number | null>(null);
   const [bookingRoomId, setBookingRoomId] = useState<number | null>(null);
+  const [bookingPatient, setBookingPatient] = useState<BookingPatient | null>(null);
 
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedAppointment, setSelectedAppointment] = useState<BoardAppointment | null>(null);
@@ -137,28 +131,7 @@ export function SchedulingBoard({
     }
   }, [session, resources.practitioners]);
 
-  // Query matching patients on debounce
-  useEffect(() => {
-    if (!patientQuery.trim()) {
-      setSearchedPatients([]);
-      return;
-    }
-    const delayDebounce = setTimeout(async () => {
-      setSearchingPatients(true);
-      try {
-        const response = await fetch(`/api/patients/search?query=${encodeURIComponent(patientQuery)}`);
-        if (response.ok) {
-          const data = await response.json();
-          setSearchedPatients(data.results || []);
-        }
-      } catch (err) {
-        console.error("Patient query failure:", err);
-      } finally {
-        setSearchingPatients(false);
-      }
-    }, 400);
-    return () => clearTimeout(delayDebounce);
-  }, [patientQuery]);
+
 
   const navigateDate = (newDateStr: string) => {
     router.push(`/appointments?date=${newDateStr}&view_by=${viewBy}`);
@@ -418,6 +391,7 @@ export function SchedulingBoard({
     const m = dropMinsFromMidnight % 60;
     const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
 
+    setBookingPatient(null);
     setBookingTime(timeStr);
     if (viewBy === "practitioners") {
       setBookingPractitionerId(colId);
@@ -427,9 +401,9 @@ export function SchedulingBoard({
       setBookingPractitionerId(null);
     }
 
-    // Switch to booking form pre-selected
+    // Open booking drawer immediately
+    setIsBookingOpen(true);
     toast.success(`Selected slot at ${timeStr}. Prefilling creation form.`);
-    setActiveTab("create");
   };
 
   const handleOpenDetails = (appt: BoardAppointment) => {
@@ -441,7 +415,17 @@ export function SchedulingBoard({
     setBookingTime("08:30");
     setBookingPractitionerId(practitionerId);
     setBookingRoomId(null);
-    setActiveTab("create");
+    if (selectedAppointment) {
+      setBookingPatient({
+        id: selectedAppointment.patient,
+        full_name_display: selectedAppointment.patient_name || "Unknown Patient",
+        patient_code: selectedAppointment.patient_code || "",
+        primary_phone: selectedAppointment.patient_phone || "",
+      });
+    } else {
+      setBookingPatient(null);
+    }
+    setIsBookingOpen(true);
     toast.info("Prefilled follow-up appointment slots.");
   };
 
@@ -490,6 +474,7 @@ export function SchedulingBoard({
         resources={resources}
         capabilities={capabilities}
         onSuccess={handleSuccessCallback}
+        initialPatient={bookingPatient}
       />
 
       <AppointmentDetailDialog
@@ -591,8 +576,14 @@ export function SchedulingBoard({
           Check Schedule
         </Button>
         <Button
-          variant={activeTab === "create" ? "default" : "ghost"}
-          onClick={() => setActiveTab("create")}
+          variant="ghost"
+          onClick={() => {
+            setBookingPatient(null);
+            setBookingTime("08:00");
+            setBookingPractitionerId(null);
+            setBookingRoomId(null);
+            setIsBookingOpen(true);
+          }}
           className="flex-1 md:flex-none justify-center gap-2 font-bold text-sm h-10 px-6 rounded-lg transition-all"
         >
           <Plus size={16} />
@@ -949,128 +940,7 @@ export function SchedulingBoard({
         </div>
       )}
 
-      {/* TAB 2: CREATE APPOINTMENT VIEW */}
-      {activeTab === "create" && (
-        <div className="grid gap-6 md:grid-cols-[1.1fr_0.9fr] max-w-6xl mx-auto no-print">
-          {/* Patient Lookup and Selection Panel */}
-          <div className="space-y-4">
-            <div className="hh-panel p-5 bg-white border border-[var(--hh-border)] rounded-xl shadow-sm">
-              <h3 className="text-base font-bold text-[#3f1d58] flex items-center gap-2 mb-2">
-                <UserRound size={18} />
-                1. Select Patient
-              </h3>
-              <p className="text-xs text-gray-500 mb-4">
-                Search patients dynamically by name, national ID, or clinic identifier code.
-              </p>
 
-              {!selectedPatient ? (
-                <div className="space-y-3">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" size={17} />
-                    <Input
-                      placeholder="Type patient name or code to search..."
-                      value={patientQuery}
-                      onChange={(e) => setPatientQuery(e.target.value)}
-                      className="pl-10 h-10 text-sm bg-white"
-                      autoFocus
-                    />
-                  </div>
-
-                  {searchingPatients && (
-                    <div className="text-xs text-[#66736d] flex items-center gap-1.5 pl-1 py-1">
-                      <RefreshCw size={12} className="animate-spin" />
-                      Searching...
-                    </div>
-                  )}
-
-                  <div className="divide-y divide-[var(--hh-border)] max-h-60 overflow-y-auto border border-gray-150 rounded-lg">
-                    {searchedPatients.map((pat) => (
-                      <div
-                        key={pat.id}
-                        onClick={() => setSelectedPatient(pat)}
-                        className="p-3 text-sm hover:bg-gray-50 cursor-pointer flex items-center justify-between transition-colors"
-                      >
-                        <div>
-                          <div className="font-bold text-[#3f1d58]">{pat.full_name_display}</div>
-                          <div className="text-xs text-gray-500 mt-0.5">
-                            {pat.primary_phone || "No phone"} · {pat.national_id || "No National ID"}
-                          </div>
-                        </div>
-                        <Badge variant="outline" className="font-mono text-xs bg-white text-[var(--hh-purple)]">
-                          {pat.patient_code}
-                        </Badge>
-                      </div>
-                    ))}
-                    {patientQuery.trim() && searchedPatients.length === 0 && !searchingPatients && (
-                      <div className="p-4 text-center text-xs text-gray-500">
-                        No patients found matching "{patientQuery}".
-                      </div>
-                    )}
-                    {!patientQuery.trim() && (
-                      <div className="p-4 text-center text-xs text-gray-400">
-                        Start typing to search the patient registry.
-                      </div>
-                    )}
-                  </div>
-                </div>
-              ) : (
-                <div className="rounded-lg border border-[var(--hh-green)] bg-[#f7faf8] p-4 flex items-center justify-between shadow-sm">
-                  <div className="flex items-start gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[var(--hh-green-light)] text-[var(--hh-green-dark)] font-bold">
-                      {selectedPatient.full_name_display.slice(0, 2).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="font-bold text-gray-900">{selectedPatient.full_name_display}</div>
-                      <div className="text-xs text-[#66736d] mt-0.5">
-                        Code: {selectedPatient.patient_code} · Phone: {selectedPatient.primary_phone || "N/A"}
-                      </div>
-                    </div>
-                  </div>
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => {
-                      setSelectedPatient(null);
-                      setPatientQuery("");
-                    }}
-                    className="text-red-600 hover:bg-red-50 hover:text-red-700 h-8"
-                  >
-                    Change Patient
-                  </Button>
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Booking Form Panel */}
-          <div>
-            {selectedPatient ? (
-              <AppointmentBooking
-                patients={[selectedPatient]}
-                initialPatientId={String(selectedPatient.id)}
-                lockedPatient
-                practitioners={resources.practitioners}
-                appointmentTypes={resources.appointment_types}
-                userRole={actingRole}
-                currentPractitionerId={actingRole === "clinician" ? actingClinicianId : null}
-                onBooked={() => {
-                  setSelectedPatient(null);
-                  setActiveTab("schedule");
-                  router.refresh();
-                }}
-              />
-            ) : (
-              <div className="hh-panel p-8 text-center bg-gray-50/50 border border-dashed border-[var(--hh-border)] rounded-xl flex flex-col items-center justify-center h-full min-h-[300px]">
-                <UserRound size={32} className="text-gray-300 mb-2" />
-                <h4 className="font-bold text-[#3f1d58] text-sm">Patient selection required</h4>
-                <p className="text-xs text-gray-500 mt-1 max-w-xs">
-                  Please search and select a patient in the left panel to configure their appointment details.
-                </p>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
 
       {/* TAB 3: PRINT VIEW */}
       {activeTab === "print" && (

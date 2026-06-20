@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useState, useTransition, useRef } from "react";
 import { Calendar, Clock, Search, User, UserPlus, X, HelpCircle, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
@@ -10,9 +10,9 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
-import { createAppointment } from "@/app/appointments/actions";
+import { createAppointment, getPractitionerAvailabilitiesForDate } from "@/app/appointments/actions";
 import type { AppointmentType, ResourceRoom, SchedulingResources, UserCapabilities } from "@/types/scheduling";
-import type { Patient } from "@/types/clinic";
+import type { Patient, BookingPatient } from "@/types/clinic";
 
 interface QuickBookingDrawerProps {
   isOpen: boolean;
@@ -24,6 +24,15 @@ interface QuickBookingDrawerProps {
   resources: SchedulingResources;
   capabilities: UserCapabilities;
   onSuccess: () => void;
+  initialPatient?: BookingPatient | null;
+}
+
+function timeToMinutes(t: string): number {
+  if (!t) return 0;
+  const parts = t.split(":").map(Number);
+  const hours = parts[0] || 0;
+  const minutes = parts[1] || 0;
+  return hours * 60 + minutes;
 }
 
 export function QuickBookingDrawer({
@@ -36,11 +45,12 @@ export function QuickBookingDrawer({
   resources,
   capabilities,
   onSuccess,
+  initialPatient = null,
 }: QuickBookingDrawerProps) {
   const [patientSearch, setPatientSearch] = useState("");
   const [searchResults, setSearchResults] = useState<Patient[]>([]);
   const [searching, setSearching] = useState(false);
-  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [selectedPatient, setSelectedPatient] = useState<BookingPatient | null>(null);
 
   // Form states
   const [apptTypeId, setApptTypeId] = useState<string>("");
@@ -57,6 +67,23 @@ export function QuickBookingDrawer({
   const [serverError, setServerError] = useState<string | null>(null);
   const [conflicts, setConflicts] = useState<any[] | null>(null);
 
+  // Additional states for availability checks
+  const [practitionerColumns, setPractitionerColumns] = useState<any[]>([]);
+  const [isCheckingAvailability, setIsCheckingAvailability] = useState(false);
+  const [availabilityWarning, setAvailabilityWarning] = useState<string | null>(null);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Focus patient search input on open
+  useEffect(() => {
+    if (isOpen && !selectedPatient) {
+      const timer = setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, selectedPatient]);
+
   // Synchronize form states on coordinates change
   useEffect(() => {
     if (isOpen) {
@@ -66,7 +93,7 @@ export function QuickBookingDrawer({
       setRoomId(selectedRoomId ? String(selectedRoomId) : "");
       setServerError(null);
       setConflicts(null);
-      setSelectedPatient(null);
+      setSelectedPatient(initialPatient);
       setPatientSearch("");
       setSearchResults([]);
       setNotes("");
@@ -80,7 +107,75 @@ export function QuickBookingDrawer({
         setApptTypeId("");
       }
     }
-  }, [isOpen, selectedDate, selectedTime, selectedPractitionerId, selectedRoomId, resources]);
+  }, [isOpen, selectedDate, selectedTime, selectedPractitionerId, selectedRoomId, resources, initialPatient]);
+
+  // Load practitioner availabilities on date change
+  useEffect(() => {
+    if (!isOpen || !date) return;
+
+    let active = true;
+    setIsCheckingAvailability(true);
+    setAvailabilityWarning(null);
+
+    getPractitionerAvailabilitiesForDate(date).then((res) => {
+      if (!active) return;
+      setIsCheckingAvailability(false);
+      if (res.success && res.columns) {
+        setPractitionerColumns(res.columns);
+      } else {
+        setPractitionerColumns([]);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [isOpen, date]);
+
+  // Perform availability checks
+  useEffect(() => {
+    if (!practitionerId || practitionerColumns.length === 0) {
+      setAvailabilityWarning(null);
+      return;
+    }
+
+    const [year, month, day] = date.split("-").map(Number);
+    const jsDate = new Date(year, month - 1, day);
+    const djangoWeekday = (jsDate.getDay() + 6) % 7; // Monday = 0, Sunday = 6
+
+    const col = practitionerColumns.find((c: any) => c.id === Number(practitionerId));
+    if (!col) {
+      setAvailabilityWarning(null);
+      return;
+    }
+
+    const availabilities = col.availabilities || [];
+    const matchingAvailabilities = availabilities.filter((a: any) => a.weekday === djangoWeekday);
+
+    if (matchingAvailabilities.length === 0) {
+      setAvailabilityWarning("No configured availability for this clinician on this day");
+      return;
+    }
+
+    const selectedStart = timeToMinutes(startTime);
+    const selectedEnd = timeToMinutes(endTime);
+
+    const fullyContained = matchingAvailabilities.some((avail: any) => {
+      const availStart = timeToMinutes(avail.start_time);
+      const availEnd = timeToMinutes(avail.end_time);
+      return selectedStart >= availStart && selectedEnd <= availEnd;
+    });
+
+    if (!fullyContained) {
+      const formatTimeStr = (t: string) => t.substring(0, 5); // "08:00:00" -> "08:00"
+      const rangesStr = matchingAvailabilities
+        .map((avail: any) => `${formatTimeStr(avail.start_time)}-${formatTimeStr(avail.end_time)}`)
+        .join(", ");
+      setAvailabilityWarning(`Selected time is outside configured availability: ${rangesStr}`);
+    } else {
+      setAvailabilityWarning(null);
+    }
+  }, [date, startTime, endTime, practitionerId, practitionerColumns]);
 
   // Handle auto-calculating end time based on selected appointment type duration
   useEffect(() => {
@@ -179,6 +274,17 @@ export function QuickBookingDrawer({
     });
   };
 
+  const getFormattedDate = () => {
+    if (!date) return "";
+    try {
+      const [year, month, day] = date.split("-").map(Number);
+      const d = new Date(year, month - 1, day);
+      return d.toLocaleDateString("en-US", { weekday: "short", year: "numeric", month: "short", day: "numeric" });
+    } catch (e) {
+      return date;
+    }
+  };
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <SheetContent className="w-[min(100vw,540px)] sm:max-w-[540px] overflow-y-auto bg-white/95 backdrop-blur-md border-l border-[var(--hh-border)]">
@@ -193,6 +299,58 @@ export function QuickBookingDrawer({
         </div>
 
         <div className="py-6">
+          {/* Coordinates Banner */}
+          <div className="mb-5 p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-sm space-y-1.5 text-[#3f1d58] shadow-sm animate-in fade-in duration-200">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+              <span className="font-semibold flex items-center gap-1.5">
+                <Calendar size={15} className="text-[var(--hh-purple)]" />
+                {getFormattedDate()}
+              </span>
+              <span className="font-semibold flex items-center gap-1.5">
+                <Clock size={15} className="text-[var(--hh-purple)]" />
+                {startTime} - {endTime}
+              </span>
+            </div>
+            <div className="text-xs text-[#66736d] flex flex-wrap gap-x-4 gap-y-1">
+              <span>
+                Clinician: <strong className="text-[#3f1d58]">{resources.practitioners.find(p => String(p.id) === practitionerId)?.name || "Unassigned / Walk-in pool"}</strong>
+              </span>
+              <span>
+                Room: <strong className="text-[#3f1d58]">{resources.rooms.find(r => String(r.id) === roomId)?.name || "None allocated"}</strong>
+              </span>
+            </div>
+          </div>
+
+          {/* Missing Resources Warning */}
+          {(resources.appointment_types.length === 0 || resources.practitioners.length === 0) && (
+            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 text-sm animate-in fade-in duration-200">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
+                <div className="grid gap-1">
+                  <div className="font-bold">Missing Scheduling Resources</div>
+                  <p className="text-xs text-amber-800">
+                    {resources.appointment_types.length === 0 && "• No appointment types are configured. "}
+                    {resources.practitioners.length === 0 && "• No practitioners are registered. "}
+                    Please configure resources in administrative settings before booking.
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Practitioner Availability Warning */}
+          {practitionerId && availabilityWarning && (
+            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50/70 p-4 text-amber-900 text-sm animate-in fade-in duration-200">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
+                <div className="grid gap-1">
+                  <div className="font-bold">Clinician Availability Warning</div>
+                  <p className="text-xs text-amber-800">{availabilityWarning}</p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Conflict Warning Block */}
           {serverError && (
             <div className="mb-5 rounded-lg border border-red-200 bg-red-50 p-4 text-red-900 text-sm">
@@ -222,11 +380,11 @@ export function QuickBookingDrawer({
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-[#66736d]" size={17} />
                   <Input
+                    ref={searchInputRef}
                     className="pl-10 text-sm"
                     value={patientSearch}
                     onChange={(e) => setPatientSearch(e.target.value)}
                     placeholder="Enter phone, patient ID (e.g. HHPAT001), or full name"
-                    autoFocus
                   />
                 </div>
               </label>

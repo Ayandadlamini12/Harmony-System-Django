@@ -64,6 +64,8 @@ export type Patient = {
   deleted_at?: string | null;
 };
 
+export type BookingPatient = Pick<Patient, "id" | "full_name_display" | "patient_code" | "primary_phone">;
+
 export type PatientWorkflowAction = {
   key: "consent_forms" | "check_in" | "medical_history" | "confidential_records" | "vitals" | "visits";
   label: string;
