@@ -7,7 +7,8 @@ from .views import (
     PatientDocumentViewSet, PatientJourneyViewSet, PatientViewSet, SupportTicketViewSet,
     VisitViewSet, VitalViewSet, ZulipMessagesViewSet, ZulipOutboundEventViewSet,
     ZulipPostUpdateViewSet, ZulipRetryPostViewSet, dashboard_stats, patient_import_webhook,
-    board_view, range_appointments_view, resources_metadata_view, capabilities_view
+    board_view, range_appointments_view, resources_metadata_view, capabilities_view,
+    PractitionerAvailabilityViewSet
 )
 
 router = DefaultRouter()
@@ -18,6 +19,7 @@ router.register("cases", CaseViewSet, basename="cases")
 router.register("vitals", VitalViewSet, basename="vitals")
 router.register("check-ins", PatientCheckInViewSet, basename="check-ins")
 router.register("appointments", AppointmentViewSet, basename="appointments")
+router.register("practitioner-availabilities", PractitionerAvailabilityViewSet, basename="practitioner-availabilities")
 router.register("patient-journeys", PatientJourneyViewSet, basename="patient-journeys")
 router.register("form-drafts", FormDraftViewSet, basename="form-drafts")
 router.register("message-threads", MessageThreadViewSet, basename="message-threads")

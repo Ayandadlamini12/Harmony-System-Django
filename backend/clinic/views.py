@@ -1232,6 +1232,78 @@ def capabilities_view(request):
     return Response(capabilities)
 
 
+class PractitionerAvailabilityPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if request.method in permissions.SAFE_METHODS:
+            return request.user.role in [User.Role.ADMIN, User.Role.CLINICIAN]
+        return request.user.role == User.Role.ADMIN
+
+
+class PractitionerAvailabilityViewSet(viewsets.ModelViewSet):
+    serializer_class = PractitionerAvailabilitySerializer
+    permission_classes = [PractitionerAvailabilityPermission]
+    ordering_fields = ("weekday", "start_time", "effective_from", "effective_to", "practitioner")
+    filterset_fields = ("practitioner", "weekday")
+
+    def get_queryset(self):
+        queryset = PractitionerAvailability.objects.select_related("practitioner").order_by(
+            "practitioner__first_name",
+            "practitioner__last_name",
+            "weekday",
+            "start_time",
+        )
+        user = self.request.user
+        if user.role == User.Role.CLINICIAN:
+            return queryset.filter(practitioner=user)
+
+        practitioner_id = self.request.query_params.get("practitioner")
+        weekday = self.request.query_params.get("weekday")
+        if practitioner_id:
+            queryset = queryset.filter(practitioner_id=practitioner_id)
+        if weekday not in (None, ""):
+            queryset = queryset.filter(weekday=weekday)
+        return queryset
+
+    def perform_create(self, serializer):
+        availability = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="create",
+            instance=availability,
+            entity_type="practitioner_availability",
+            after_data=snapshot_instance(availability),
+            details="Practitioner availability range created.",
+        )
+
+    def perform_update(self, serializer):
+        instance = self.get_object()
+        before_data = snapshot_instance(instance)
+        availability = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="update",
+            instance=availability,
+            entity_type="practitioner_availability",
+            before_data=before_data,
+            after_data=snapshot_instance(availability),
+            details="Practitioner availability range updated.",
+        )
+
+    def perform_destroy(self, instance):
+        before_data = snapshot_instance(instance)
+        write_audit_log(
+            request=self.request,
+            action="delete",
+            instance=instance,
+            entity_type="practitioner_availability",
+            before_data=before_data,
+            details="Practitioner availability range deleted.",
+        )
+        instance.delete()
+
+
 class AppointmentViewSet(viewsets.ModelViewSet):
     queryset = Appointment.objects.select_related("patient", "practitioner", "room", "appointment_type", "created_by").order_by("start_at", "created_at")
     serializer_class = AppointmentSerializer

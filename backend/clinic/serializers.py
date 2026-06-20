@@ -383,6 +383,18 @@ class PractitionerAvailabilitySerializer(serializers.ModelSerializer):
         model = PractitionerAvailability
         fields = "__all__"
 
+    def validate(self, attrs):
+        start_time = attrs.get("start_time", getattr(self.instance, "start_time", None))
+        end_time = attrs.get("end_time", getattr(self.instance, "end_time", None))
+        effective_from = attrs.get("effective_from", getattr(self.instance, "effective_from", None))
+        effective_to = attrs.get("effective_to", getattr(self.instance, "effective_to", None))
+
+        if start_time and end_time and start_time >= end_time:
+            raise serializers.ValidationError({"end_time": "End time must be after start time."})
+        if effective_from and effective_to and effective_from > effective_to:
+            raise serializers.ValidationError({"effective_to": "Effective end date must be after the start date."})
+        return attrs
+
 
 class BlockedSlotSerializer(serializers.ModelSerializer):
     created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)

@@ -66,7 +66,16 @@ export const navItems: NavItem[] = [
     ]
   },
   { href: "/consent-forms", label: "Consent Forms", icon: FileText, roles: ["admin", "clinician", "receptionist"] },
-  { href: "/appointments", label: "Appointments", icon: CalendarCheck, roles: ["admin", "clinician", "receptionist"] },
+  {
+    href: "/appointments",
+    label: "Appointments",
+    icon: CalendarCheck,
+    roles: ["admin", "clinician", "receptionist"],
+    children: [
+      { href: "/appointments", label: "Calendar", icon: CalendarCheck, roles: ["admin", "clinician", "receptionist"] },
+      { href: "/appointments/availability", label: "Availability Settings", icon: CalendarCheck, roles: ["admin", "clinician"] }
+    ]
+  },
   { href: "/approvals", label: "Approvals", icon: ShieldCheck, roles: ["admin", "clinician"] },
   { href: "/messages", label: "Messages", icon: MessageSquare, roles: ["admin", "clinician", "receptionist"] },
   { href: "/inventory", label: "Inventory", icon: Package, roles: ["admin", "clinician"] },

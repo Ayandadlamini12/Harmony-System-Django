@@ -812,6 +812,75 @@ class AppointmentSchedulingTests(APITestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("can_create_appointment", response.data)
         self.assertIn("can_move_appointment", response.data)
+
+    def test_admin_can_manage_practitioner_availability(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.post("/api/practitioner-availabilities/", {
+            "practitioner": self.clinician.id,
+            "weekday": 1,
+            "start_time": "09:00:00",
+            "end_time": "15:30:00",
+            "effective_from": timezone.localdate().isoformat(),
+            "location": "Main clinic",
+        }, format="json")
+
+        self.assertEqual(response.status_code, 201)
+        availability_id = response.data["id"]
+
+        response = self.client.patch(f"/api/practitioner-availabilities/{availability_id}/", {
+            "end_time": "16:00:00",
+        }, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["end_time"], "16:00:00")
+
+        response = self.client.delete(f"/api/practitioner-availabilities/{availability_id}/")
+        self.assertEqual(response.status_code, 204)
+
+    def test_clinician_reads_only_own_availability_and_cannot_write(self):
+        other_clinician = User.objects.create_user(username="other_clinician_sched", password="password123", role="clinician")
+        own = PractitionerAvailability.objects.create(
+            practitioner=self.clinician,
+            weekday=1,
+            start_time="09:00:00",
+            end_time="15:00:00",
+            effective_from=timezone.localdate(),
+        )
+        PractitionerAvailability.objects.create(
+            practitioner=other_clinician,
+            weekday=1,
+            start_time="09:00:00",
+            end_time="15:00:00",
+            effective_from=timezone.localdate(),
+        )
+
+        self.client.force_authenticate(self.clinician)
+        response = self.client.get("/api/practitioner-availabilities/")
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.data["results"]] if "results" in response.data else [item["id"] for item in response.data]
+        self.assertIn(own.id, ids)
+        self.assertFalse(PractitionerAvailability.objects.exclude(practitioner=self.clinician).filter(id__in=ids).exists())
+
+        response = self.client.post("/api/practitioner-availabilities/", {
+            "practitioner": self.clinician.id,
+            "weekday": 2,
+            "start_time": "09:00:00",
+            "end_time": "15:00:00",
+            "effective_from": timezone.localdate().isoformat(),
+        }, format="json")
+        self.assertEqual(response.status_code, 403)
+
+    def test_availability_rejects_invalid_time_range(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.post("/api/practitioner-availabilities/", {
+            "practitioner": self.clinician.id,
+            "weekday": 1,
+            "start_time": "15:00:00",
+            "end_time": "09:00:00",
+            "effective_from": timezone.localdate().isoformat(),
+        }, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("end_time", response.data)
     
     def test_board_view(self):
         # Create an appointment for today
