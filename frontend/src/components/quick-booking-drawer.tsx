@@ -287,20 +287,67 @@ export function QuickBookingDrawer({
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent className="w-[min(100vw,540px)] sm:max-w-[540px] overflow-y-auto bg-white/95 backdrop-blur-md border-l border-[var(--hh-border)]">
-        <div className="pb-4 border-b border-[var(--hh-border)] space-y-1.5">
-          <SheetTitle className="text-xl font-bold text-[#3f1d58] flex items-center gap-2">
-            <UserPlus className="text-[var(--hh-purple)]" size={22} />
-            Quick Book Appointment
-          </SheetTitle>
-          <p className="text-sm text-[#66736d]">
-            Securely allocate practitioners, resources, and time-slots. Conflicting requests will be safely rejected.
-          </p>
+      {/* Premium custom animations */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        @keyframes drawerSlideInRight {
+          from {
+            transform: translateX(100%);
+            opacity: 0.9;
+          }
+          to {
+            transform: translateX(0);
+            opacity: 1;
+          }
+        }
+        @keyframes drawerSlideInBottom {
+          from {
+            transform: translateY(100%);
+            opacity: 0.9;
+          }
+          to {
+            transform: translateY(0);
+            opacity: 1;
+          }
+        }
+        .animate-drawer-right {
+          animation: drawerSlideInRight 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+        .animate-drawer-bottom {
+          animation: drawerSlideInBottom 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+      `}} />
+
+      <SheetContent className="
+        fixed z-50 bg-white/95 backdrop-blur-md overflow-y-auto outline-none border-[var(--hh-border)]
+        max-sm:inset-x-0 max-sm:bottom-0 max-sm:top-auto max-sm:h-[85vh] max-sm:w-full max-sm:rounded-t-2xl max-sm:border-t max-sm:animate-drawer-bottom
+        sm:inset-y-4 sm:right-4 sm:left-auto sm:h-[calc(100vh-32px)] sm:w-[min(calc(100vw-32px),540px)] sm:max-w-[540px] sm:rounded-2xl sm:border sm:shadow-2xl sm:animate-drawer-right
+        p-6
+      ">
+        {/* Sticky Header with clear close button */}
+        <div className="sticky top-0 bg-white/95 backdrop-blur-md z-30 pb-4 border-b border-[var(--hh-border)] flex items-start justify-between gap-4">
+          <div className="space-y-1.5">
+            <SheetTitle className="text-xl font-bold text-[#3f1d58] flex items-center gap-2">
+              <UserPlus className="text-[var(--hh-purple)]" size={22} />
+              Quick Book Appointment
+            </SheetTitle>
+            <p className="text-xs text-[#66736d] leading-relaxed">
+              Securely allocate practitioners, resources, and time-slots. Conflicting requests will be safely rejected.
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8 rounded-full hover:bg-slate-100 text-slate-500 shrink-0"
+            onClick={onClose}
+          >
+            <X size={18} />
+          </Button>
         </div>
 
-        <div className="py-6">
+        <div className="py-4">
           {/* Coordinates Banner */}
-          <div className="mb-5 p-3.5 bg-slate-50 border border-slate-200 rounded-lg text-sm space-y-1.5 text-[#3f1d58] shadow-sm animate-in fade-in duration-200">
+          <div className="mb-4 p-3.5 bg-slate-50 border border-slate-200/85 rounded-xl text-sm space-y-1.5 text-[#3f1d58] shadow-sm animate-in fade-in duration-200">
             <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
               <span className="font-semibold flex items-center gap-1.5">
                 <Calendar size={15} className="text-[var(--hh-purple)]" />
@@ -323,14 +370,14 @@ export function QuickBookingDrawer({
 
           {/* Missing Resources Warning */}
           {(resources.appointment_types.length === 0 || resources.practitioners.length === 0) && (
-            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50 p-4 text-amber-900 text-sm animate-in fade-in duration-200">
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 p-3.5 text-amber-900 text-sm animate-in fade-in duration-200">
               <div className="flex items-start gap-2.5">
                 <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
                 <div className="grid gap-1">
-                  <div className="font-bold">Missing Scheduling Resources</div>
-                  <p className="text-xs text-amber-800">
-                    {resources.appointment_types.length === 0 && "• No appointment types are configured. "}
-                    {resources.practitioners.length === 0 && "• No practitioners are registered. "}
+                  <div className="font-bold text-xs">Missing Scheduling Resources</div>
+                  <p className="text-[11px] text-amber-800 leading-relaxed">
+                    {resources.appointment_types.length === 0 && "- No appointment types are configured. "}
+                    {resources.practitioners.length === 0 && "- No practitioners are registered. "}
                     Please configure resources in administrative settings before booking.
                   </p>
                 </div>
@@ -338,15 +385,12 @@ export function QuickBookingDrawer({
             </div>
           )}
 
-          {/* Practitioner Availability Warning */}
+          {/* Practitioner Availability Warning (Compact format) */}
           {practitionerId && availabilityWarning && (
-            <div className="mb-5 rounded-lg border border-amber-200 bg-amber-50/70 p-4 text-amber-900 text-sm animate-in fade-in duration-200">
-              <div className="flex items-start gap-2.5">
-                <AlertTriangle className="text-amber-600 shrink-0 mt-0.5" size={18} />
-                <div className="grid gap-1">
-                  <div className="font-bold">Clinician Availability Warning</div>
-                  <p className="text-xs text-amber-800">{availabilityWarning}</p>
-                </div>
+            <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50/60 p-2.5 text-amber-900 text-xs animate-in fade-in duration-150">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="text-amber-600 shrink-0" size={14} />
+                <span className="font-medium text-amber-800 leading-normal">{availabilityWarning}</span>
               </div>
             </div>
           )}

@@ -78,21 +78,17 @@ export function SchedulingBoard({
   const [actingRole, setActingRole] = useState<string>(session.role);
   const [actingClinicianId, setActingClinicianId] = useState<number | null>(() => {
     // Default to the logged-in clinician matching their name or username
-    const match = resources.practitioners.find(
+    const clinicians = resources.practitioners.filter((p) => p.role.toLowerCase() === "clinician");
+    const match = clinicians.find(
       (p) =>
         p.name.toLowerCase().includes(session.name.toLowerCase()) ||
         p.name.toLowerCase().includes(session.username.toLowerCase())
     );
-    return match ? match.id : (resources.practitioners[0]?.id || null);
+    return match ? match.id : (clinicians[0]?.id || null);
   });
 
-  // Receptionist selected employee calendar dropdown (null is "All Clinicians")
-  const [selectedPractitionerId, setSelectedPractitionerId] = useState<number | null>(() => {
-    if (session.role === "receptionist") {
-      return resources.practitioners[0]?.id || null;
-    }
-    return null;
-  });
+  // Selected employee calendar dropdown (null is "All Clinicians")
+  const [selectedPractitionerId, setSelectedPractitionerId] = useState<number | null>(null);
 
   // Synchronize board data with server updates
   useEffect(() => {
@@ -122,7 +118,8 @@ export function SchedulingBoard({
   useEffect(() => {
     setActingRole(session.role);
     if (session.role === "clinician") {
-      const match = resources.practitioners.find(
+      const clinicians = resources.practitioners.filter((p) => p.role.toLowerCase() === "clinician");
+      const match = clinicians.find(
         (p) =>
           p.name.toLowerCase().includes(session.name.toLowerCase()) ||
           p.name.toLowerCase().includes(session.username.toLowerCase())
@@ -259,6 +256,11 @@ export function SchedulingBoard({
   // Filter columns based on who is logged in or selected
   const displayedColumns = boardData.columns.filter((col) => {
     if (viewBy === "rooms") return true;
+
+    // Filter out non-clinicians (e.g. admin, receptionist, etc.)
+    if ("role" in col && col.role.toLowerCase() !== "clinician") {
+      return false;
+    }
 
     if (actingRole === "clinician") {
       return col.id === actingClinicianId;
@@ -450,11 +452,8 @@ export function SchedulingBoard({
 
   // Filter practitioners list shown in dropdowns based on role
   const filterDropdownPractitioners = useMemo(() => {
-    if (actingRole === "receptionist") {
-      return resources.practitioners.filter((p) => p.role.toLowerCase() === "clinician");
-    }
-    return resources.practitioners;
-  }, [resources.practitioners, actingRole]);
+    return resources.practitioners.filter((p) => p.role.toLowerCase() === "clinician");
+  }, [resources.practitioners]);
 
   // Filter print summary entries
   const currentPrintedClinician = resources.practitioners.find(
@@ -527,7 +526,7 @@ export function SchedulingBoard({
                   variant={actingRole === "receptionist" ? "default" : "ghost"}
                   onClick={() => {
                     setActingRole("receptionist");
-                    setSelectedPractitionerId(resources.practitioners[0]?.id || null);
+                    setSelectedPractitionerId(null);
                   }}
                   className="h-8 text-xs font-semibold px-3"
                 >
@@ -552,11 +551,13 @@ export function SchedulingBoard({
                     value={actingClinicianId || ""}
                     onChange={(e) => setActingClinicianId(Number(e.target.value))}
                   >
-                    {resources.practitioners.map((prac) => (
-                      <option key={prac.id} value={prac.id}>
-                        Acting: {prac.name}
-                      </option>
-                    ))}
+                    {resources.practitioners
+                      .filter((p) => p.role.toLowerCase() === "clinician")
+                      .map((prac) => (
+                        <option key={prac.id} value={prac.id}>
+                          Acting: {prac.name}
+                        </option>
+                      ))}
                   </select>
                 </div>
               )}
@@ -666,7 +667,7 @@ export function SchedulingBoard({
                     value={selectedPractitionerId || ""}
                     onChange={(e) => setSelectedPractitionerId(e.target.value ? Number(e.target.value) : null)}
                   >
-                    {actingRole !== "receptionist" && <option value="">All Clinicians</option>}
+                    <option value="">All Clinicians</option>
                     {filterDropdownPractitioners.map((prac) => (
                       <option key={prac.id} value={prac.id}>
                         {prac.name} ({prac.role.toLowerCase().replace("_", " ")})
@@ -742,7 +743,31 @@ export function SchedulingBoard({
           </div>
 
           {/* GRID WRAPPER */}
-          <div className="hh-panel overflow-hidden border border-[var(--hh-border)] shadow-md bg-white rounded-xl">
+          {viewBy === "practitioners" && displayedColumns.length === 0 ? (
+            <div className="hh-panel border border-[var(--hh-border)] shadow-md bg-gradient-to-b from-white to-gray-50/50 rounded-xl p-12 text-center flex flex-col items-center justify-center min-h-[400px]">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 border border-amber-100 shadow-sm mb-6 animate-pulse">
+                <Users size={32} />
+              </div>
+              <h3 className="text-lg font-bold text-[#3f1d58] mb-2">No Clinicians Configured</h3>
+              <p className="text-sm text-gray-500 max-w-md mx-auto mb-6">
+                There are no active clinicians configured with schedule roles in the system.
+              </p>
+              {actingRole === "admin" ? (
+                <Button
+                  onClick={() => router.push("/appointments/availability")}
+                  className="bg-purple-700 hover:bg-purple-800 text-white font-bold px-6 py-2 rounded-lg gap-2 shadow-sm transition-all"
+                >
+                  <CalendarDays size={16} />
+                  Configure Availability Settings
+                </Button>
+              ) : (
+                <div className="text-xs font-semibold text-amber-700 bg-amber-50 border border-amber-150 px-4 py-2.5 rounded-lg max-w-sm mx-auto">
+                  Please ask an Administrator to configure clinician availability in "Availability Settings".
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="hh-panel overflow-hidden border border-[var(--hh-border)] shadow-md bg-white rounded-xl">
             <div className="overflow-x-auto">
               <div className="flex select-none border-b border-[var(--hh-border)] bg-[var(--hh-section)] sticky top-0 z-20 min-w-[960px]">
                 <div className="w-16 shrink-0 border-r border-[var(--hh-border)]" />
@@ -937,6 +962,7 @@ export function SchedulingBoard({
               </div>
             </div>
           </div>
+          )}
         </div>
       )}
 
@@ -964,7 +990,7 @@ export function SchedulingBoard({
                   value={selectedPractitionerId || ""}
                   onChange={(e) => setSelectedPractitionerId(e.target.value ? Number(e.target.value) : null)}
                 >
-                  {actingRole !== "receptionist" && <option value="">All Clinicians</option>}
+                  <option value="">All Clinicians</option>
                   {filterDropdownPractitioners.map((prac) => (
                     <option key={prac.id} value={prac.id}>
                       {prac.name}
