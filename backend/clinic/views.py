@@ -1176,12 +1176,16 @@ def range_appointments_view(request):
     if start_str:
         try:
             start_dt = timezone.datetime.fromisoformat(start_str.replace("Z", "+00:00"))
+            if timezone.is_naive(start_dt):
+                start_dt = timezone.make_aware(start_dt)
         except ValueError:
             return Response({"detail": "Invalid start_at ISO format."}, status=status.HTTP_400_BAD_REQUEST)
             
     if end_str:
         try:
             end_dt = timezone.datetime.fromisoformat(end_str.replace("Z", "+00:00"))
+            if timezone.is_naive(end_dt):
+                end_dt = timezone.make_aware(end_dt)
         except ValueError:
             return Response({"detail": "Invalid end_at ISO format."}, status=status.HTTP_400_BAD_REQUEST)
 
