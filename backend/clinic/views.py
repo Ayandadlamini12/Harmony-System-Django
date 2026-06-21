@@ -1085,6 +1085,18 @@ def emit_outbox_event(event_type, appointment, request_user=None):
     )
 
 
+def parse_iso_datetime_param(value, label):
+    if not value:
+        return None, None
+    try:
+        parsed = timezone.datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if timezone.is_naive(parsed):
+            parsed = timezone.make_aware(parsed)
+        return parsed, None
+    except ValueError:
+        return None, f"Invalid {label} ISO format."
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def board_view(request):
@@ -1174,20 +1186,14 @@ def range_appointments_view(request):
     end_dt = None
     
     if start_str:
-        try:
-            start_dt = timezone.datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-            if timezone.is_naive(start_dt):
-                start_dt = timezone.make_aware(start_dt)
-        except ValueError:
-            return Response({"detail": "Invalid start_at ISO format."}, status=status.HTTP_400_BAD_REQUEST)
+        start_dt, error = parse_iso_datetime_param(start_str, "start_at")
+        if error:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
             
     if end_str:
-        try:
-            end_dt = timezone.datetime.fromisoformat(end_str.replace("Z", "+00:00"))
-            if timezone.is_naive(end_dt):
-                end_dt = timezone.make_aware(end_dt)
-        except ValueError:
-            return Response({"detail": "Invalid end_at ISO format."}, status=status.HTTP_400_BAD_REQUEST)
+        end_dt, error = parse_iso_datetime_param(end_str, "end_at")
+        if error:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
 
     if start_dt and end_dt and start_dt >= end_dt:
         return Response({"detail": "start_at must be before end_at."}, status=status.HTTP_400_BAD_REQUEST)
@@ -1350,6 +1356,12 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     search_fields = ("patient__full_name_display", "patient__patient_code", "patient__national_id", "patient__primary_phone", "notes")
     filterset_fields = ("appointment_date", "appointment_type", "source", "status", "practitioner")
     ordering_fields = ("start_at", "end_at", "created_at", "updated_at")
+    cancellation_cutoff = timedelta(minutes=15)
+    history_statuses = (
+        Appointment.Status.CANCELLED,
+        Appointment.Status.NO_SHOW,
+        Appointment.Status.COMPLETED,
+    )
 
     def perform_create(self, serializer):
         start_at = serializer.validated_data.get("start_at")
@@ -1536,29 +1548,85 @@ class AppointmentViewSet(viewsets.ModelViewSet):
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         appointment = self.get_object()
-        cancel_reason = request.data.get("cancel_reason", "")
+        cancel_reason = (request.data.get("cancel_reason") or "").strip()
         if not cancel_reason:
             return Response({"detail": "A cancel reason must be provided."}, status=status.HTTP_400_BAD_REQUEST)
+        if appointment.status in self.history_statuses:
+            return Response({"detail": "This appointment is already in a terminal state and cannot be cancelled."}, status=status.HTTP_400_BAD_REQUEST)
+        if not appointment.start_at:
+            return Response({"detail": "Appointment start time is required before cancellation."}, status=status.HTTP_400_BAD_REQUEST)
+        if appointment.start_at <= timezone.now() + self.cancellation_cutoff:
+            return Response(
+                {"detail": "Appointments can only be cancelled more than 15 minutes before the scheduled start time."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
             
         before_data = snapshot_instance(appointment)
         
-        appointment.status = Appointment.Status.CANCELLED
-        appointment.cancel_reason = cancel_reason
-        appointment.updated_by = request.user if request.user.is_authenticated else None
-        appointment.save(update_fields=["status", "cancel_reason", "updated_by", "updated_at"])
-        
-        write_audit_log(
-            request=request,
-            action="update",
-            instance=appointment,
-            entity_type="appointment",
-            before_data=before_data,
-            after_data=snapshot_instance(appointment),
-            details=f"Appointment cancelled. Reason: {cancel_reason}",
-        )
-        emit_outbox_event("appointment.cancelled", appointment, request.user)
+        with transaction.atomic():
+            appointment.status = Appointment.Status.CANCELLED
+            appointment.cancel_reason = cancel_reason
+            appointment.updated_by = request.user if request.user.is_authenticated else None
+            appointment.save(update_fields=["status", "cancel_reason", "updated_by", "updated_at"])
+            
+            write_audit_log(
+                request=request,
+                action="update",
+                instance=appointment,
+                entity_type="appointment",
+                before_data=before_data,
+                after_data=snapshot_instance(appointment),
+                details=f"Appointment cancelled. Reason: {cancel_reason}",
+            )
+            emit_outbox_event("appointment.cancelled", appointment, request.user)
         
         return Response(AppointmentSerializer(appointment).data)
+
+    @action(detail=False, methods=["get"], url_path="history")
+    def history(self, request):
+        status_filter = request.query_params.get("status")
+        start_str = request.query_params.get("start_at")
+        end_str = request.query_params.get("end_at")
+        practitioner_id = request.query_params.get("practitioner")
+        patient_id = request.query_params.get("patient")
+
+        queryset = self.get_queryset().filter(status__in=self.history_statuses)
+
+        if status_filter:
+            if status_filter not in self.history_statuses:
+                return Response(
+                    {"detail": "status must be one of: cancelled, no_show, completed."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+            queryset = queryset.filter(status=status_filter)
+
+        start_dt, error = parse_iso_datetime_param(start_str, "start_at")
+        if error:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
+        end_dt, error = parse_iso_datetime_param(end_str, "end_at")
+        if error:
+            return Response({"detail": error}, status=status.HTTP_400_BAD_REQUEST)
+        if start_dt and end_dt and start_dt >= end_dt:
+            return Response({"detail": "start_at must be before end_at."}, status=status.HTTP_400_BAD_REQUEST)
+        if start_dt and end_dt:
+            queryset = queryset.filter(start_at__lt=end_dt, end_at__gt=start_dt)
+        elif start_dt:
+            queryset = queryset.filter(end_at__gt=start_dt)
+        elif end_dt:
+            queryset = queryset.filter(start_at__lt=end_dt)
+
+        if practitioner_id:
+            queryset = queryset.filter(practitioner_id=practitioner_id)
+        if patient_id:
+            queryset = queryset.filter(patient_id=patient_id)
+
+        queryset = queryset.order_by("-start_at", "-updated_at")
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
+        serializer = self.get_serializer(queryset, many=True)
+        return Response(serializer.data)
 
     @action(detail=True, methods=["post"], url_path="assign-room")
     def assign_room(self, request, pk=None):

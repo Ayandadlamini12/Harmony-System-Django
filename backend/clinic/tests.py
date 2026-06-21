@@ -1003,8 +1003,8 @@ class AppointmentSchedulingTests(APITestCase):
         self.assertTrue(outbox_exists)
 
     def test_cancel_appointment(self):
-        today = timezone.localdate()
-        start = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time())) + timedelta(hours=10)
+        service_date = timezone.localdate() + timedelta(days=7)
+        start = timezone.make_aware(timezone.datetime.combine(service_date, timezone.datetime.min.time())) + timedelta(hours=10)
         appt = Appointment.objects.create(
             patient=self.patient,
             appointment_type=self.appt_type,
@@ -1028,3 +1028,97 @@ class AppointmentSchedulingTests(APITestCase):
             aggregate_id=str(appt.id)
         ).exists()
         self.assertTrue(outbox_exists)
+
+    def test_cancel_appointment_requires_reason_and_more_than_15_minutes_notice(self):
+        late_start = timezone.now() + timedelta(minutes=10)
+        appt = Appointment.objects.create(
+            patient=self.patient,
+            appointment_type=self.appt_type,
+            start_at=late_start,
+            end_at=late_start + timedelta(minutes=30),
+            practitioner=self.clinician,
+            status=Appointment.Status.BOOKED
+        )
+
+        response = self.client.post(f"/api/appointments/{appt.id}/cancel/", {
+            "cancel_reason": "Patient cannot attend"
+        }, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("15 minutes", response.data["detail"])
+
+        service_date = timezone.localdate() + timedelta(days=7)
+        future_start = timezone.make_aware(timezone.datetime.combine(service_date, timezone.datetime.min.time())) + timedelta(hours=11)
+        future_appt = Appointment.objects.create(
+            patient=self.patient,
+            appointment_type=self.appt_type,
+            start_at=future_start,
+            end_at=future_start + timedelta(minutes=30),
+            practitioner=self.clinician,
+            status=Appointment.Status.BOOKED
+        )
+
+        response = self.client.post(f"/api/appointments/{future_appt.id}/cancel/", {
+            "cancel_reason": "  "
+        }, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("reason", response.data["detail"].lower())
+
+    def test_cancelled_appointment_reopens_slot_and_appears_in_history(self):
+        service_date = timezone.localdate() + timedelta(days=7)
+        start = timezone.make_aware(timezone.datetime.combine(service_date, timezone.datetime.min.time())) + timedelta(hours=12)
+        appt = Appointment.objects.create(
+            patient=self.patient,
+            appointment_type=self.appt_type,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+            practitioner=self.clinician,
+            room=self.room,
+            status=Appointment.Status.BOOKED
+        )
+
+        response = self.client.post(f"/api/appointments/{appt.id}/cancel/", {
+            "cancel_reason": "Patient chose another date"
+        }, format="json")
+        self.assertEqual(response.status_code, 200)
+
+        replacement = Patient.objects.create(first_name="Replacement", last_name="Patient", gender="female", primary_phone="+26876008888")
+        response = self.client.post("/api/appointments/", {
+            "patient": replacement.id,
+            "appointment_type": self.appt_type.id,
+            "start_at": start.isoformat(),
+            "end_at": (start + timedelta(minutes=30)).isoformat(),
+            "practitioner": self.clinician.id,
+            "room": self.room.id,
+            "source": "internal"
+        }, format="json")
+        self.assertEqual(response.status_code, 201)
+
+        response = self.client.get("/api/appointments/history/", {
+            "status": Appointment.Status.CANCELLED,
+            "start_at": (start - timedelta(minutes=1)).isoformat(),
+            "end_at": (start + timedelta(minutes=31)).isoformat(),
+        })
+        self.assertEqual(response.status_code, 200)
+        results = response.data["results"] if "results" in response.data else response.data
+        self.assertTrue(any(item["id"] == appt.id and item["cancel_reason"] == "Patient chose another date" for item in results))
+
+    def test_cancel_terminal_appointment_rejected(self):
+        service_date = timezone.localdate() + timedelta(days=7)
+        start = timezone.make_aware(timezone.datetime.combine(service_date, timezone.datetime.min.time())) + timedelta(hours=13)
+        appt = Appointment.objects.create(
+            patient=self.patient,
+            appointment_type=self.appt_type,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+            practitioner=self.clinician,
+            status=Appointment.Status.COMPLETED
+        )
+
+        response = self.client.post(f"/api/appointments/{appt.id}/cancel/", {
+            "cancel_reason": "Trying to cancel completed appointment"
+        }, format="json")
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("terminal", response.data["detail"])
