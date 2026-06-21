@@ -3,6 +3,7 @@ import os
 import random
 import secrets
 
+from django.contrib.sessions.models import Session
 from django.contrib.auth import get_user_model
 from django.conf import settings
 from django.utils import timezone
@@ -15,6 +16,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from clinic.audit import write_audit_log
+from clinic.models import AuditLog
 
 from .emailing import send_enrollment_under_review_email, send_system_email
 from .keycloak import HarmonyTokenSerializer
@@ -443,9 +445,28 @@ class SystemSecurityStatusView(APIView):
 
         access_lifetime = settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"]
         refresh_lifetime = settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"]
+        cookie_policy = self._cookie_policy()
+        session_activity = self._session_activity()
+        authentication_activity = self._authentication_activity()
+        policy_status = self._policy_status()
+        deployment_status = {
+            "required_keycloak_vars": list(self.keycloak_required_settings),
+            "backend_keycloak_env_ok": settings.KEYCLOAK_ENABLED and not missing_keycloak,
+            "worker_services_must_preserve_keycloak_env": True,
+            "compose_env_contract": "backend, celery, and celery-beat must all preserve the full Keycloak env block.",
+        }
+        warnings = self._warnings(missing_keycloak, cookie_policy)
 
         return Response(
             {
+                "tabs": [
+                    "overview",
+                    "keycloak",
+                    "sessions",
+                    "authentication_activity",
+                    "deployment_contract",
+                    "policies",
+                ],
                 "keycloak": {
                     "enabled": settings.KEYCLOAK_ENABLED,
                     "server_url": settings.KEYCLOAK_SERVER_URL,
@@ -461,19 +482,140 @@ class SystemSecurityStatusView(APIView):
                 "sessions": {
                     "access_token_lifetime_minutes": int(access_lifetime.total_seconds() // 60),
                     "refresh_token_lifetime_days": int(refresh_lifetime.total_seconds() // 86400),
-                    "cookie_secure": os.getenv("COOKIE_SECURE", "false").lower() == "true",
+                    "jwt_stateless": True,
+                    "server_side_session_store": "django.contrib.sessions",
+                    "active_django_sessions": session_activity["active_django_sessions"],
+                    "expired_django_sessions": session_activity["expired_django_sessions"],
+                    "active_authenticated_django_sessions": session_activity["active_authenticated_django_sessions"],
+                    "instrumentation_note": (
+                        "Harmony API authentication uses stateless JWT tokens. Django session counts only reflect "
+                        "server-side browser/admin sessions and are not a full count of active JWT users."
+                    ),
+                    "cookie_policy": cookie_policy,
                 },
-                "deployment": {
-                    "required_keycloak_vars": list(self.keycloak_required_settings),
-                    "backend_keycloak_env_ok": settings.KEYCLOAK_ENABLED and not missing_keycloak,
-                    "worker_services_must_preserve_keycloak_env": True,
-                    "compose_env_contract": "backend, celery, and celery-beat must all preserve the full Keycloak env block.",
+                "authentication_activity": authentication_activity,
+                "deployment": deployment_status,
+                "policies": policy_status,
+                "warnings": warnings,
+                "overview": {
+                    "keycloak_ready": settings.KEYCLOAK_ENABLED and not missing_keycloak,
+                    "secret_values_exposed": False,
+                    "active_warning_count": len(warnings),
+                    "active_django_sessions": session_activity["active_django_sessions"],
+                    "recent_successful_login_count": len(authentication_activity["recent_successful_logins"]),
+                    "recent_security_event_count": len(authentication_activity["recent_security_events"]),
+                    "local_fallback_enabled": settings.KEYCLOAK_ALLOW_LOCAL_FALLBACK,
+                    "deployment_env_contract_ok": deployment_status["backend_keycloak_env_ok"],
                 },
-                "warnings": self._warnings(missing_keycloak),
             }
         )
 
-    def _warnings(self, missing_keycloak):
+    def _cookie_policy(self):
+        return {
+            "session_cookie_secure": bool(getattr(settings, "SESSION_COOKIE_SECURE", False)),
+            "session_cookie_httponly": bool(getattr(settings, "SESSION_COOKIE_HTTPONLY", True)),
+            "session_cookie_samesite": getattr(settings, "SESSION_COOKIE_SAMESITE", "Lax"),
+            "csrf_cookie_secure": bool(getattr(settings, "CSRF_COOKIE_SECURE", False)),
+            "csrf_cookie_httponly": bool(getattr(settings, "CSRF_COOKIE_HTTPONLY", False)),
+            "csrf_cookie_samesite": getattr(settings, "CSRF_COOKIE_SAMESITE", "Lax"),
+            "secure_ssl_redirect": bool(getattr(settings, "SECURE_SSL_REDIRECT", False)),
+            "hsts_seconds": int(getattr(settings, "SECURE_HSTS_SECONDS", 0) or 0),
+            "proxy_cookie_secure_env": os.getenv("COOKIE_SECURE", "false").lower() == "true",
+        }
+
+    def _session_activity(self):
+        now = timezone.now()
+        sessions = Session.objects.all()
+        active_sessions = sessions.filter(expire_date__gt=now)
+        expired_sessions = sessions.filter(expire_date__lte=now)
+        authenticated_count = 0
+        sample_users = []
+        for session in active_sessions.order_by("-expire_date").iterator():
+            data = session.get_decoded()
+            user_id = data.get("_auth_user_id")
+            if user_id:
+                authenticated_count += 1
+                if len(sample_users) < 10:
+                    sample_users.append({"user_id": str(user_id), "expires_at": session.expire_date})
+
+        return {
+            "active_django_sessions": active_sessions.count(),
+            "expired_django_sessions": expired_sessions.count(),
+            "active_authenticated_django_sessions": authenticated_count,
+            "sample_authenticated_django_sessions": sample_users,
+        }
+
+    def _authentication_activity(self):
+        recent_logins = [
+            {
+                "id": user.id,
+                "username": user.username,
+                "display_name": user.get_full_name() or user.username,
+                "role": user.role,
+                "last_login": user.last_login,
+                "is_active": user.is_active,
+            }
+            for user in User.objects.exclude(last_login__isnull=True).order_by("-last_login")[:10]
+        ]
+        security_event_filters = [
+            ("user", "create"),
+            ("user", "update"),
+            ("user_notification_channel", "verify"),
+            ("user_notification_channel", "update"),
+            ("employee_enrollment_request", "approve"),
+            ("employee_enrollment_request", "reject"),
+            ("role_module_permission", "update"),
+        ]
+        security_events = AuditLog.objects.select_related("user").filter(
+            entity_type__in={entity_type for entity_type, _action in security_event_filters}
+        )
+        event_actions = {action for _entity_type, action in security_event_filters}
+        recent_security_events = [
+            {
+                "id": event.id,
+                "action": event.action,
+                "entity_type": event.entity_type,
+                "entity_id": event.entity_id,
+                "actor": event.user.get_full_name() or event.user.username if event.user else "System",
+                "created_at": event.created_at,
+                "details": event.details,
+            }
+            for event in security_events.filter(action__in=event_actions).order_by("-created_at")[:20]
+        ]
+
+        return {
+            "recent_successful_logins": recent_logins,
+            "recent_failed_logins": [],
+            "failed_login_instrumented": False,
+            "recent_security_events": recent_security_events,
+            "local_fallback_login_events": [],
+            "local_fallback_login_instrumented": False,
+            "instrumentation_note": (
+                "Successful login visibility comes from user.last_login. Failed login and local fallback usage "
+                "require dedicated authentication audit hooks before the UI can show real records."
+            ),
+        }
+
+    def _policy_status(self):
+        validators = getattr(settings, "AUTH_PASSWORD_VALIDATORS", [])
+        return {
+            "password_validators_enabled": bool(validators),
+            "password_validator_count": len(validators),
+            "password_validators": [
+                validator.get("NAME", "").split(".")[-1]
+                for validator in validators
+                if validator.get("NAME")
+            ],
+            "mfa_status_source": "keycloak",
+            "mfa_status_available": False,
+            "account_lockout_status_source": "keycloak",
+            "account_lockout_status_available": False,
+            "admin_only": True,
+            "read_only": True,
+            "secret_values_exposed": False,
+        }
+
+    def _warnings(self, missing_keycloak, cookie_policy):
         warnings = []
         if settings.KEYCLOAK_ENABLED and missing_keycloak:
             warnings.append(
@@ -500,6 +642,15 @@ class SystemSecurityStatusView(APIView):
                     "severity": "warning",
                     "detail": "Keycloak is disabled. Production MIS should normally authenticate through Keycloak.",
                     "fields": ["KEYCLOAK_ENABLED"],
+                }
+            )
+        if not cookie_policy["session_cookie_secure"] and not cookie_policy["proxy_cookie_secure_env"]:
+            warnings.append(
+                {
+                    "code": "session_cookie_secure_not_confirmed",
+                    "severity": "warning",
+                    "detail": "Secure session cookie handling is not confirmed by Django or the deployment cookie env.",
+                    "fields": ["SESSION_COOKIE_SECURE", "COOKIE_SECURE"],
                 }
             )
         return warnings

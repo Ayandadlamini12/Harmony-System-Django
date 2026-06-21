@@ -511,6 +511,17 @@ class SystemSecurityStatusApiTests(APITestCase):
         self.assertEqual(response.data["keycloak"]["missing_required"], [])
         self.assertEqual(response.data["sessions"]["access_token_lifetime_minutes"], 30)
         self.assertEqual(response.data["sessions"]["refresh_token_lifetime_days"], 7)
+        self.assertTrue(response.data["sessions"]["jwt_stateless"])
+        self.assertIn("cookie_policy", response.data["sessions"])
+        self.assertIn("authentication_activity", response.data)
+        self.assertIn("recent_successful_logins", response.data["authentication_activity"])
+        self.assertFalse(response.data["authentication_activity"]["failed_login_instrumented"])
+        self.assertIn("policies", response.data)
+        self.assertTrue(response.data["policies"]["read_only"])
+        self.assertFalse(response.data["policies"]["secret_values_exposed"])
+        self.assertIn("keycloak", response.data["tabs"])
+        self.assertIn("sessions", response.data["tabs"])
+        self.assertIn("authentication_activity", response.data["tabs"])
 
     def test_non_admin_cannot_read_security_status(self):
         self.client.force_authenticate(self.receptionist)
@@ -538,3 +549,16 @@ class SystemSecurityStatusApiTests(APITestCase):
         self.assertIn("KEYCLOAK_CLIENT_SECRET", response.data["keycloak"]["missing_required"])
         self.assertFalse(response.data["deployment"]["backend_keycloak_env_ok"])
         self.assertTrue(any(warning["code"] == "keycloak_missing_required_env" for warning in response.data["warnings"]))
+
+    def test_security_status_includes_recent_login_activity(self):
+        self.admin.last_login = timezone.now()
+        self.admin.save(update_fields=["last_login"])
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.get("/api/system/security-status/")
+
+        self.assertEqual(response.status_code, 200)
+        recent_logins = response.data["authentication_activity"]["recent_successful_logins"]
+        self.assertEqual(recent_logins[0]["username"], "security_admin")
+        self.assertEqual(recent_logins[0]["role"], "admin")
+        self.assertIn("last_login", recent_logins[0])
