@@ -1,5 +1,5 @@
 import type { Appointment, Case, ClinicianProfile, DashboardStats, ElevatedAccessRequest, EmployeeEnrollmentRequest, EmailDeliveryLog, FormDraft, MessageRecipient, MessageThread, Paginated, PartnerCompany, Patient, PatientCheckIn, PatientJourney, RoleModuleMatrix, SupportTicket, SystemEmailSettings, User, Visit, Vital, UserNotificationSettings } from "@/types/clinic";
-import type { SchedulingBoardData, SchedulingResources, UserCapabilities } from "@/types/scheduling";
+import type { SchedulingBoardData, SchedulingRangeData, SchedulingResources, UserCapabilities } from "@/types/scheduling";
 import { cookies } from "next/headers";
 
 const API_BASE_URL = process.env.API_BASE_URL || process.env.NEXT_PUBLIC_API_BASE_URL || "http://127.0.0.1:8000/api";
@@ -276,6 +276,22 @@ export function getSchedulingBoard(date = "", viewBy = "practitioners") {
     date: date || new Date().toISOString().slice(0, 10),
     view_by: viewBy as "practitioners" | "rooms",
     columns: [],
+    appointments: []
+  });
+}
+
+export function getSchedulingAppointmentsRange(startAt: string, endAt: string, filters: { practitioner?: number | string | null; room?: number | string | null; patient?: number | string | null } = {}) {
+  const params = new URLSearchParams({
+    start_at: startAt,
+    end_at: endAt,
+  });
+  if (filters.practitioner) params.set("practitioner", String(filters.practitioner));
+  if (filters.room) params.set("room", String(filters.room));
+  if (filters.patient) params.set("patient", String(filters.patient));
+
+  return apiGet<SchedulingRangeData>(`/scheduling/appointments/?${params.toString()}`, {
+    start_at: startAt,
+    end_at: endAt,
     appointments: []
   });
 }

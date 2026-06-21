@@ -903,6 +903,47 @@ class AppointmentSchedulingTests(APITestCase):
         self.assertEqual(len(response.data["appointments"]), 1)
         self.assertEqual(response.data["appointments"][0]["id"], appt.id)
 
+    def test_range_appointments_returns_overlapping_enriched_appointments(self):
+        today = timezone.localdate()
+        start = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time())) + timedelta(hours=10)
+        appointment = Appointment.objects.create(
+            patient=self.patient,
+            appointment_type=self.appt_type,
+            start_at=start,
+            end_at=start + timedelta(minutes=30),
+            practitioner=self.clinician,
+            room=self.room,
+            status=Appointment.Status.BOOKED
+        )
+        PatientJourney.objects.create(
+            patient=self.patient,
+            service_date=today,
+            current_stage=PatientJourney.Stage.WAITING_CLINICIAN,
+            is_active=True,
+        )
+
+        response = self.client.get("/api/scheduling/appointments/", {
+            "start_at": (start + timedelta(minutes=10)).isoformat(),
+            "end_at": (start + timedelta(hours=1)).isoformat(),
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["appointments"][0]["id"], appointment.id)
+        self.assertEqual(response.data["appointments"][0]["flow_state"], PatientJourney.Stage.WAITING_CLINICIAN)
+        self.assertIn("consent_completed", response.data["appointments"][0])
+
+    def test_range_appointments_rejects_invalid_range(self):
+        today = timezone.localdate()
+        start = timezone.make_aware(timezone.datetime.combine(today, timezone.datetime.min.time())) + timedelta(hours=10)
+
+        response = self.client.get("/api/scheduling/appointments/", {
+            "start_at": (start + timedelta(hours=1)).isoformat(),
+            "end_at": start.isoformat(),
+        })
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("start_at", response.data["detail"])
+
     def test_double_booking_conflict(self):
         # Create one appointment
         today = timezone.localdate()

@@ -92,6 +92,12 @@ export interface SchedulingBoardData {
   appointments: BoardAppointment[];
 }
 
+export interface SchedulingRangeData {
+  start_at: string | null;
+  end_at: string | null;
+  appointments: BoardAppointment[];
+}
+
 export interface SchedulingConflict {
   type: string;
   id: number;

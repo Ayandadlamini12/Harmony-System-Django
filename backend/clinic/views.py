@@ -1169,21 +1169,31 @@ def range_appointments_view(request):
     room_id = request.query_params.get("room")
     patient_id = request.query_params.get("patient")
     
-    qs = Appointment.objects.all().select_related("patient", "practitioner", "room", "appointment_type")
+    qs = Appointment.objects.all().select_related("patient", "practitioner", "room", "appointment_type").order_by("start_at", "created_at")
+    start_dt = None
+    end_dt = None
     
     if start_str:
         try:
             start_dt = timezone.datetime.fromisoformat(start_str.replace("Z", "+00:00"))
-            qs = qs.filter(start_at__gte=start_dt)
         except ValueError:
             return Response({"detail": "Invalid start_at ISO format."}, status=status.HTTP_400_BAD_REQUEST)
             
     if end_str:
         try:
             end_dt = timezone.datetime.fromisoformat(end_str.replace("Z", "+00:00"))
-            qs = qs.filter(end_at__lte=end_dt)
         except ValueError:
             return Response({"detail": "Invalid end_at ISO format."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if start_dt and end_dt and start_dt >= end_dt:
+        return Response({"detail": "start_at must be before end_at."}, status=status.HTTP_400_BAD_REQUEST)
+
+    if start_dt and end_dt:
+        qs = qs.filter(start_at__lt=end_dt, end_at__gt=start_dt)
+    elif start_dt:
+        qs = qs.filter(end_at__gt=start_dt)
+    elif end_dt:
+        qs = qs.filter(start_at__lt=end_dt)
             
     if practitioner_id:
         qs = qs.filter(practitioner_id=practitioner_id)
@@ -1192,8 +1202,34 @@ def range_appointments_view(request):
     if patient_id:
         qs = qs.filter(patient_id=patient_id)
         
-    serializer = AppointmentSerializer(qs, many=True)
-    return Response(serializer.data)
+    appointments = list(qs)
+    journey_dates = set()
+    for appointment in appointments:
+        if appointment.start_at:
+            journey_dates.add(timezone.localtime(appointment.start_at).date())
+        elif appointment.appointment_date:
+            journey_dates.add(appointment.appointment_date)
+
+    journeys = {
+        (journey.patient_id, journey.service_date): journey
+        for journey in PatientJourney.objects.filter(service_date__in=journey_dates, is_active=True)
+    }
+
+    serialized_appts = []
+    for appointment in appointments:
+        data = AppointmentSerializer(appointment).data
+        service_date = timezone.localtime(appointment.start_at).date() if appointment.start_at else appointment.appointment_date
+        journey = journeys.get((appointment.patient_id, service_date))
+        data["flow_state"] = journey.current_stage if journey else None
+        data["consent_status"] = appointment.patient.consent_status
+        data["consent_completed"] = appointment.patient.consent_status in ["signed", "verified"]
+        serialized_appts.append(data)
+
+    return Response({
+        "start_at": start_dt.isoformat() if start_dt else None,
+        "end_at": end_dt.isoformat() if end_dt else None,
+        "appointments": serialized_appts,
+    })
 
 
 @api_view(["GET"])
