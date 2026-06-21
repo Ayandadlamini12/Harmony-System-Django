@@ -581,5 +581,35 @@ export type VerificationInitiationResponse = {
   telegram_start_link?: string;
 };
 
-
+export type SystemSecurityStatus = {
+  keycloak: {
+    enabled: boolean;
+    server_url: string;
+    realm: string;
+    client_id: string;
+    client_secret_configured: boolean;
+    admin_username_configured: boolean;
+    admin_password_configured: boolean;
+    allow_local_fallback: boolean;
+    action_email_lifespan: number;
+    missing_required: string[];
+  };
+  sessions: {
+    access_token_lifetime_minutes: number;
+    refresh_token_lifetime_days: number;
+    cookie_secure: boolean;
+  };
+  deployment: {
+    required_keycloak_vars: string[];
+    backend_keycloak_env_ok: boolean;
+    worker_services_must_preserve_keycloak_env: boolean;
+    compose_env_contract: string;
+  };
+  warnings: {
+    code: string;
+    severity: "warning" | "critical";
+    detail: string;
+    fields: string[];
+  }[];
+};
 
