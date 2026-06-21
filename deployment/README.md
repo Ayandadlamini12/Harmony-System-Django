@@ -43,6 +43,10 @@ DB_DATABASE=harmony
 DB_USERNAME=harmony
 DB_PASSWORD=<secret>
 HARMONY_WEBHOOK_SECRET=<secret>
+N8N_CALLBACK_SECRET=<secret>
+N8N_CALENDAR_SYNC_ENABLED=false
+N8N_CALENDAR_SYNC_WEBHOOK_URL=<n8n-calendar-sync-webhook-url>
+N8N_CALENDAR_SYNC_OUTBOUND_SECRET=<calendar-sync-shared-secret>
 TUNNEL_TOKEN=<cloudflare-token>
 KEYCLOAK_ENABLED=true
 KEYCLOAK_SERVER_URL=https://auth.harmonyhealthsz.com
@@ -74,6 +78,9 @@ ZULIP_BOT_TIMEOUT=10
 ZULIP_RETRY_LIMIT=5
 ZULIP_RETRY_BATCH_SIZE=25
 ZULIP_RETRY_WINDOW_MINUTES=5
+N8N_CALENDAR_SYNC_ENABLED=false
+N8N_CALENDAR_SYNC_WEBHOOK_URL=<n8n-calendar-sync-webhook-url>
+N8N_CALENDAR_SYNC_OUTBOUND_SECRET=<calendar-sync-shared-secret>
 ```
 
 ## Deploy
@@ -97,3 +104,5 @@ Do not switch the live stack until a staging stack has successfully pulled and r
 If using the older Portainer stack redeploy flow, make sure the stack env list preserves the full Keycloak block above. The helper script `redeploy-harmony.ps1` now merges missing Keycloak env values from the running `harmony-django-backend` container before it sends the stack update.
 
 For Zulip-backed coordination, keep the same Zulip env block on the backend, Celery worker, and Celery beat containers. If any of those services are recreated without the Zulip values, outbound coordination events can stop posting or stop retrying even while the main MIS API stays healthy.
+
+For future Google Calendar sync through n8n, keep the `N8N_CALENDAR_SYNC_*` variables on the backend, Celery worker, and Celery beat containers. Leave `N8N_CALENDAR_SYNC_ENABLED=false` until the n8n workflow and Google Calendar credential are tested.
