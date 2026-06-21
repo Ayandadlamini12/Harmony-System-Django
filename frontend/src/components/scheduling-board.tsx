@@ -33,7 +33,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { QuickBookingDrawer } from "./quick-booking-drawer";
 import { AppointmentDetailDialog } from "./appointment-detail-dialog";
-import { moveAppointment } from "@/app/appointments/actions";
+import { moveAppointment, getAppointmentsRangeAction } from "@/app/appointments/actions";
 import type { SessionUser } from "@/lib/session";
 import type { Patient, BookingPatient } from "@/types/clinic";
 import type {
@@ -44,6 +44,58 @@ import type {
   PractitionerColumn,
   RoomColumn
 } from "@/types/scheduling";
+
+// Local Date Math Helpers (Monday-start week)
+function getLocalDateString(date: Date): string {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const dd = String(date.getDate()).padStart(2, "0");
+  return `${yyyy}-${mm}-${dd}`;
+}
+
+function getWeekRangeAndDays(dateStr: string) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const date = new Date(y, m - 1, d);
+  const dayOfWeek = date.getDay();
+  // Monday is day index 1.
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  
+  const monday = new Date(date);
+  monday.setDate(date.getDate() + diffToMonday);
+  
+  const days: Date[] = [];
+  for (let i = 0; i < 7; i++) {
+    const day = new Date(monday);
+    day.setDate(monday.getDate() + i);
+    days.push(day);
+  }
+  
+  const startAt = getLocalDateString(days[0]);
+  const endAt = getLocalDateString(days[6]);
+  return { startAt, endAt, days };
+}
+
+function getMonthRangeAndDays(dateStr: string) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  const firstOfMonth = new Date(y, m - 1, 1);
+  const dayOfWeek = firstOfMonth.getDay();
+  // Monday is day index 1.
+  const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+  
+  const startGridDate = new Date(firstOfMonth);
+  startGridDate.setDate(firstOfMonth.getDate() + diffToMonday);
+  
+  const days: Date[] = [];
+  for (let i = 0; i < 42; i++) {
+    const day = new Date(startGridDate);
+    day.setDate(startGridDate.getDate() + i);
+    days.push(day);
+  }
+  
+  const startAt = getLocalDateString(days[0]);
+  const endAt = getLocalDateString(days[41]);
+  return { startAt, endAt, days };
+}
 
 // Grid configuration constants
 const START_HOUR = 8; // Grid begins at 08:00
@@ -67,9 +119,18 @@ export function SchedulingBoard({
 }: SchedulingBoardProps) {
   const router = useRouter();
   const [boardData, setBoardData] = useState<SchedulingBoardData>(initialBoardData);
+  const currentDate = boardData.date;
+  const viewBy = boardData.view_by;
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedStatusFilter, setSelectedStatusFilter] = useState<string>("all");
   const [nowLineTop, setNowLineTop] = useState<number | null>(null);
+
+  // Calendar views and range states
+  const [currentView, setCurrentView] = useState<"day" | "week" | "month">("day");
+  const [rangeAppointments, setRangeAppointments] = useState<BoardAppointment[]>([]);
+  const [isLoadingRange, setIsLoadingRange] = useState(false);
+  const [bookingDate, setBookingDate] = useState<string>(initialBoardData.date);
+  const [rangeRefreshKey, setRangeRefreshKey] = useState<number>(0);
 
   // Tabs layout navigation
   const [activeTab, setActiveTab] = useState<"schedule" | "print">("schedule");
@@ -95,6 +156,60 @@ export function SchedulingBoard({
     setBoardData(initialBoardData);
   }, [initialBoardData]);
 
+  // Sync booking date on currentDate updates
+  useEffect(() => {
+    setBookingDate(initialBoardData.date);
+  }, [initialBoardData.date]);
+
+  // Load appointments range on-the-fly for week/month views
+  useEffect(() => {
+    if (currentView === "day") {
+      setRangeAppointments([]);
+      return;
+    }
+
+    let isCurrent = true;
+    const loadRange = async () => {
+      setIsLoadingRange(true);
+      let startStr = "";
+      let endStr = "";
+      if (currentView === "week") {
+        const week = getWeekRangeAndDays(initialBoardData.date);
+        startStr = week.startAt;
+        endStr = week.endAt;
+      } else {
+        const month = getMonthRangeAndDays(initialBoardData.date);
+        startStr = month.startAt;
+        endStr = month.endAt;
+      }
+
+      const startIso = `${startStr}T00:00:00`;
+      const endIso = `${endStr}T23:59:59`;
+
+      const filters: { practitioner?: number | null; room?: number | null } = {};
+      if (viewBy === "practitioners") {
+        filters.practitioner = actingRole === "clinician" ? actingClinicianId : selectedPractitionerId;
+      }
+
+      const res = await getAppointmentsRangeAction(startIso, endIso, filters);
+      if (isCurrent) {
+        if (res.success) {
+          setRangeAppointments(res.appointments || []);
+        } else {
+          toast.error(res.error || "Failed to load range schedules.");
+          setRangeAppointments([]);
+        }
+        setIsLoadingRange(false);
+      }
+    };
+
+    loadRange();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [currentView, initialBoardData.date, selectedPractitionerId, actingClinicianId, viewBy, actingRole, rangeRefreshKey]);
+
   // Dialog and Drawer states
   const [isBookingOpen, setIsBookingOpen] = useState(false);
   const [bookingTime, setBookingTime] = useState("08:00");
@@ -111,9 +226,6 @@ export function SchedulingBoard({
 
   const [isPending, startTransition] = useTransition();
 
-  const currentDate = boardData.date;
-  const viewBy = boardData.view_by;
-
   // Sync acting clinicians when session loads
   useEffect(() => {
     setActingRole(session.role);
@@ -128,18 +240,52 @@ export function SchedulingBoard({
     }
   }, [session, resources.practitioners]);
 
+  const weekDays = useMemo(() => {
+    return getWeekRangeAndDays(currentDate).days;
+  }, [currentDate]);
 
+  const monthDays = useMemo(() => {
+    return getMonthRangeAndDays(currentDate).days;
+  }, [currentDate]);
+
+  const appointmentsToFilter = useMemo(() => {
+    return currentView === "day" ? boardData.appointments : rangeAppointments;
+  }, [currentView, boardData.appointments, rangeAppointments]);
+
+  const formattedDateHeader = useMemo(() => {
+    const [y, m, d] = currentDate.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    if (currentView === "day") {
+      return date.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+    } else if (currentView === "week") {
+      const start = weekDays[0];
+      const end = weekDays[6];
+      const startStr = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+      const endStr = end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+      return `Week of ${startStr} - ${endStr}`;
+    } else {
+      return date.toLocaleDateString("en-US", { year: "numeric", month: "long" });
+    }
+  }, [currentDate, currentView, weekDays]);
 
   const navigateDate = (newDateStr: string) => {
     router.push(`/appointments?date=${newDateStr}&view_by=${viewBy}`);
   };
 
-  const shiftDate = (days: number) => {
-    const d = new Date(currentDate);
-    d.setDate(d.getDate() + days);
-    const formatted = d.toISOString().slice(0, 10);
+  const shiftDate = (amount: number) => {
+    const [y, m, d] = currentDate.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    if (currentView === "day") {
+      date.setDate(date.getDate() + amount);
+    } else if (currentView === "week") {
+      date.setDate(date.getDate() + amount * 7);
+    } else if (currentView === "month") {
+      date.setMonth(date.getMonth() + amount);
+    }
+    const formatted = getLocalDateString(date);
     navigateDate(formatted);
   };
+
 
   const toggleViewMode = () => {
     const targetView = viewBy === "practitioners" ? "rooms" : "practitioners";
@@ -212,7 +358,7 @@ export function SchedulingBoard({
   }, [currentDate]);
 
   // Apply filters including text matching, status, and acting role filters
-  const filteredAppointments = boardData.appointments.filter((appt) => {
+  const filteredAppointments = appointmentsToFilter.filter((appt) => {
     // 1. Text Search matching
     const searchLower = searchTerm.trim().toLowerCase();
     if (searchLower) {
@@ -365,6 +511,7 @@ export function SchedulingBoard({
       if (res.success) {
         toast.success(`Rescheduled ${appt.patient_name} to ${targetStartTimeStr}.`);
         router.refresh();
+        setRangeRefreshKey((prev) => prev + 1);
       } else {
         setBoardData({ ...boardData, appointments: originalAppointmentsSnapshot });
         if (res.status === 409 && res.conflicts) {
@@ -408,6 +555,68 @@ export function SchedulingBoard({
     toast.success(`Selected slot at ${timeStr}. Prefilling creation form.`);
   };
 
+  const handleWeekGridCellClick = (e: React.MouseEvent, dayStr: string, slotIndex: number) => {
+    if ((e.target as HTMLElement).closest(".appointment-card-trigger")) {
+      return;
+    }
+    if (!capabilities.can_create_appointment && actingRole !== "admin") {
+      toast.error("You do not have capabilities to schedule new appointments.");
+      return;
+    }
+
+    const elapsedMins = slotIndex * 30;
+    const dropMinsFromMidnight = elapsedMins + START_HOUR * 60;
+    const h = Math.floor(dropMinsFromMidnight / 60);
+    const m = dropMinsFromMidnight % 60;
+    const timeStr = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`;
+
+    setBookingPatient(null);
+    setBookingTime(timeStr);
+    setBookingDate(dayStr);
+
+    if (viewBy === "practitioners") {
+      const practitionerId = actingRole === "clinician" ? actingClinicianId : selectedPractitionerId;
+      setBookingPractitionerId(practitionerId);
+      setBookingRoomId(null);
+    } else {
+      setBookingRoomId(null);
+      setBookingPractitionerId(null);
+    }
+
+    setIsBookingOpen(true);
+    toast.success(`Selected slot at ${timeStr} on ${dayStr}. Prefilling creation form.`);
+  };
+
+  const handleMonthCellClick = (e: React.MouseEvent, dayStr: string) => {
+    if (
+      (e.target as HTMLElement).closest(".appointment-card-trigger") ||
+      (e.target as HTMLElement).closest("a") ||
+      (e.target as HTMLElement).closest("button")
+    ) {
+      return;
+    }
+    if (!capabilities.can_create_appointment && actingRole !== "admin") {
+      toast.error("You do not have capabilities to schedule new appointments.");
+      return;
+    }
+
+    setBookingPatient(null);
+    setBookingTime("08:00");
+    setBookingDate(dayStr);
+
+    if (viewBy === "practitioners") {
+      const practitionerId = actingRole === "clinician" ? actingClinicianId : selectedPractitionerId;
+      setBookingPractitionerId(practitionerId);
+      setBookingRoomId(null);
+    } else {
+      setBookingRoomId(null);
+      setBookingPractitionerId(null);
+    }
+
+    setIsBookingOpen(true);
+    toast.success(`Selected date ${dayStr}. Prefilling creation form.`);
+  };
+
   const handleOpenDetails = (appt: BoardAppointment) => {
     setSelectedAppointment(appt);
     setIsDetailOpen(true);
@@ -433,6 +642,7 @@ export function SchedulingBoard({
 
   const handleSuccessCallback = () => {
     router.refresh();
+    setRangeRefreshKey((prev) => prev + 1);
   };
 
   const handlePrintTrigger = () => {
@@ -466,7 +676,7 @@ export function SchedulingBoard({
       <QuickBookingDrawer
         isOpen={isBookingOpen}
         onClose={() => setIsBookingOpen(false)}
-        selectedDate={currentDate}
+        selectedDate={bookingDate}
         selectedTime={bookingTime}
         selectedPractitionerId={bookingPractitionerId}
         selectedRoomId={bookingRoomId}
@@ -640,12 +850,36 @@ export function SchedulingBoard({
                 <Button
                   variant="ghost"
                   className="h-8 text-xs font-bold text-[#53605a] px-3 border-x border-[var(--hh-border)] rounded-none"
-                  onClick={() => navigateDate(new Date().toISOString().slice(0, 10))}
+                  onClick={() => navigateDate(getLocalDateString(new Date()))}
                 >
                   Today
                 </Button>
                 <Button size="icon" variant="ghost" className="h-8 w-8 text-[#53605a]" onClick={() => shiftDate(1)}>
                   <ChevronRight size={16} />
+                </Button>
+              </div>
+
+              <div className="inline-flex rounded-lg border border-[var(--hh-border)] bg-white p-0.5 shadow-sm">
+                <Button
+                  variant={currentView === "day" ? "secondary" : "ghost"}
+                  onClick={() => setCurrentView("day")}
+                  className={`h-8 text-xs font-bold px-3 ${currentView === "day" ? "bg-gray-100 text-[#3f1d58]" : "text-[#53605a]"}`}
+                >
+                  Day
+                </Button>
+                <Button
+                  variant={currentView === "week" ? "secondary" : "ghost"}
+                  onClick={() => setCurrentView("week")}
+                  className={`h-8 text-xs font-bold px-3 border-x border-[var(--hh-border)] rounded-none ${currentView === "week" ? "bg-gray-100 text-[#3f1d58]" : "text-[#53605a]"}`}
+                >
+                  Week
+                </Button>
+                <Button
+                  variant={currentView === "month" ? "secondary" : "ghost"}
+                  onClick={() => setCurrentView("month")}
+                  className={`h-8 text-xs font-bold px-3 ${currentView === "month" ? "bg-gray-100 text-[#3f1d58]" : "text-[#53605a]"}`}
+                >
+                  Month
                 </Button>
               </div>
 
@@ -657,6 +891,10 @@ export function SchedulingBoard({
                   value={currentDate}
                   onChange={(e) => navigateDate(e.target.value)}
                 />
+              </div>
+
+              <div className="text-sm font-bold text-[#3f1d58] ml-2">
+                {formattedDateHeader}
               </div>
 
               {actingRole !== "clinician" && (
@@ -768,200 +1006,492 @@ export function SchedulingBoard({
             </div>
           ) : (
             <div className="hh-panel overflow-hidden border border-[var(--hh-border)] shadow-md bg-white rounded-xl">
-            <div className="overflow-x-auto">
-              <div className="flex select-none border-b border-[var(--hh-border)] bg-[var(--hh-section)] sticky top-0 z-20 min-w-[960px]">
-                <div className="w-16 shrink-0 border-r border-[var(--hh-border)]" />
-                {displayedColumns.map((col) => (
-                  <div
-                    key={col.id}
-                    className="flex-1 min-w-[220px] p-4 text-center border-r border-[var(--hh-border)] last:border-r-0 flex flex-col justify-center items-center"
-                  >
-                    <div className="text-sm font-bold text-[#3f1d58] tracking-wide">{col.name}</div>
-                    {"role" in col ? (
-                      <Badge variant="outline" className="text-[10px] mt-1 bg-white border capitalize font-semibold text-purple-700">
-                        {col.role.toLowerCase().replace("_", " ")}
-                      </Badge>
-                    ) : (
-                      <Badge variant="harmony" className="text-[10px] mt-1 bg-white border capitalize font-semibold">
-                        {"capacity" in col ? `Capacity: ${col.capacity}` : "Resource Room"}
-                      </Badge>
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* TIMELINE ROWS */}
-              <div className="relative flex min-w-[960px] select-none" ref={gridContainerRef}>
-                <div className="w-16 shrink-0 border-r border-[var(--hh-border)] bg-gray-50 flex flex-col z-10 sticky left-0 shadow-sm">
-                  {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => {
-                    const hour = START_HOUR + i;
-                    return (
-                      <div
-                        key={hour}
-                        className="border-b border-[var(--hh-border)] text-right pr-2 text-[10px] font-bold text-[#66736d] font-mono select-none flex items-start pt-1.5"
-                        style={{ height: `${ROW_HEIGHT * 2}px` }}
-                      >
-                        {String(hour).padStart(2, "0")}:00
-                      </div>
-                    );
-                  })}
+              {isLoadingRange ? (
+                <div className="flex flex-col items-center justify-center p-12 min-h-[400px] text-[#53605a]">
+                  <RefreshCw className="h-8 w-8 animate-spin mb-4 text-[var(--hh-purple)] animate-infinite" />
+                  <p className="text-sm font-semibold">Loading schedule range...</p>
                 </div>
-
-                {/* HORIZONTAL DASHED LINES */}
-                <div className="absolute top-0 bottom-0 left-16 right-0 pointer-events-none flex flex-col">
-                  {Array.from({ length: (END_HOUR - START_HOUR) * 2 }).map((_, idx) => {
-                    const isHour = idx % 2 === 0;
-                    return (
-                      <div
-                        key={idx}
-                        className={`border-b ${isHour ? "border-[var(--hh-border)]" : "border-dashed border-gray-100"}`}
-                        style={{ height: `${ROW_HEIGHT}px` }}
-                      />
-                    );
-                  })}
-                </div>
-
-                {/* NOW TIMELINE INDICATOR */}
-                {nowLineTop !== null && (
-                  <div
-                    className="absolute left-16 right-0 border-t-2 border-red-500 z-10 pointer-events-none flex items-center"
-                    style={{ top: `${nowLineTop}px` }}
-                  >
-                    <div className="h-2.5 w-2.5 rounded-full bg-red-600 -ml-1.5 shadow-md" />
-                    <span className="text-[8px] font-bold font-mono text-white bg-red-600 px-1 py-0.5 rounded ml-1 leading-none shadow-sm">
-                      Now
-                    </span>
-                  </div>
-                )}
-
-                {/* ABSOLUTE COLUMN APPOINTMENT CHIPS */}
-                {displayedColumns.map((col) => {
-                  const colAppointments = filteredAppointments.filter((appt) => {
-                    if (viewBy === "practitioners") {
-                      return appt.practitioner === col.id;
-                    } else {
-                      return appt.room === col.id;
-                    }
-                  });
-
-                  const isDragOver = dragOverColumnId === col.id;
-
-                  return (
-                    <div
-                      key={col.id}
-                      onDragOver={(e) => handleDragOver(e, col.id)}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, col.id)}
-                      className={`flex-1 min-w-[220px] border-r border-[var(--hh-border)] last:border-r-0 relative transition-colors duration-150`}
-                      style={{
-                        height: `${ROW_HEIGHT * 2 * (END_HOUR - START_HOUR)}px`,
-                        backgroundColor: isDragOver ? "#fbf6fc" : "transparent"
-                      }}
-                    >
-                      {/* Cell Click to Schedule Overlay */}
-                      <div className="absolute inset-0 z-0 flex flex-col">
-                        {Array.from({ length: (END_HOUR - START_HOUR) * 2 }).map((_, slotIdx) => (
+              ) : (
+                <>
+                  {currentView === "day" && (
+                    <div className="overflow-x-auto">
+                      <div className="flex select-none border-b border-[var(--hh-border)] bg-[var(--hh-section)] sticky top-0 z-20 min-w-[960px]">
+                        <div className="w-16 shrink-0 border-r border-[var(--hh-border)]" />
+                        {displayedColumns.map((col) => (
                           <div
-                            key={slotIdx}
-                            onClick={(e) => handleGridCellClick(e, col.id, slotIdx)}
-                            className="w-full hover:bg-gray-100/60 cursor-cell border-b border-transparent transition-colors"
-                            style={{ height: `${ROW_HEIGHT}px` }}
-                            title="Click slot to schedule appointment here"
-                          />
+                            key={col.id}
+                            className="flex-1 min-w-[220px] p-4 text-center border-r border-[var(--hh-border)] last:border-r-0 flex flex-col justify-center items-center"
+                          >
+                            <div className="text-sm font-bold text-[#3f1d58] tracking-wide">{col.name}</div>
+                            {"role" in col ? (
+                              <Badge variant="outline" className="text-[10px] mt-1 bg-white border capitalize font-semibold text-purple-700">
+                                {col.role.toLowerCase().replace("_", " ")}
+                              </Badge>
+                            ) : (
+                              <Badge variant="harmony" className="text-[10px] mt-1 bg-white border capitalize font-semibold">
+                                {"capacity" in col ? `Capacity: ${col.capacity}` : "Resource Room"}
+                              </Badge>
+                            )}
+                          </div>
                         ))}
                       </div>
 
-                      {colAppointments.map((appt) => {
-                        const durationMins = getAppointmentDuration(appt);
-                        const top = getTopOffset(appt.appointment_time, appt.start_at);
-                        const height = getCardHeight(durationMins);
+                      {/* TIMELINE ROWS */}
+                      <div className="relative flex min-w-[960px] select-none" ref={gridContainerRef}>
+                        <div className="w-16 shrink-0 border-r border-[var(--hh-border)] bg-gray-50 flex flex-col z-10 sticky left-0 shadow-sm">
+                          {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => {
+                            const hour = START_HOUR + i;
+                            return (
+                              <div
+                                key={hour}
+                                className="border-b border-[var(--hh-border)] text-right pr-2 text-[10px] font-bold text-[#66736d] font-mono select-none flex items-start pt-1.5"
+                                style={{ height: `${ROW_HEIGHT * 2}px` }}
+                              >
+                                {String(hour).padStart(2, "0")}:00
+                              </div>
+                            );
+                          })}
+                        </div>
 
-                        const isHighPriority = appt.priority === "high";
-                        const hasUnsignedConsentAlert = appt.consent_status !== "signed" && appt.consent_status !== "verified";
+                        {/* HORIZONTAL DASHED LINES */}
+                        <div className="absolute top-0 bottom-0 left-16 right-0 pointer-events-none flex flex-col">
+                          {Array.from({ length: (END_HOUR - START_HOUR) * 2 }).map((_, idx) => {
+                            const isHour = idx % 2 === 0;
+                            return (
+                              <div
+                                key={idx}
+                                className={`border-b ${isHour ? "border-[var(--hh-border)]" : "border-dashed border-gray-100"}`}
+                                style={{ height: `${ROW_HEIGHT}px` }}
+                              />
+                            );
+                          })}
+                        </div>
 
-                        return (
+                        {/* NOW TIMELINE INDICATOR */}
+                        {nowLineTop !== null && (
                           <div
-                            key={appt.id}
-                            draggable
-                            onDragStart={(e) => handleDragStart(e, appt.id)}
-                            onClick={() => handleOpenDetails(appt)}
-                            style={{
-                              top: `${top}px`,
-                              height: `${height}px`,
-                            }}
-                            className={`appointment-card-trigger absolute left-1 right-1 p-2.5 rounded-lg shadow-sm border border-[var(--hh-border)] text-left flex flex-col justify-between transition-all cursor-grab active:cursor-grabbing z-10 overflow-hidden ${getAccentBorderClass(
-                              appt.appointment_type_label || appt.appointment_type
-                            )}`}
+                            className="absolute left-16 right-0 border-t-2 border-red-500 z-10 pointer-events-none flex items-center"
+                            style={{ top: `${nowLineTop}px` }}
                           >
-                            <div className="w-full">
-                              <div className="flex items-center justify-between">
-                                <span className="text-[9px] font-mono font-bold text-[#66736d] flex items-center gap-0.5">
-                                  <Clock size={9} />
-                                  {appt.start_at && appt.end_at
-                                    ? `${new Date(appt.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`
-                                    : appt.appointment_time?.slice(0, 5)}
+                            <div className="h-2.5 w-2.5 rounded-full bg-red-600 -ml-1.5 shadow-md" />
+                            <span className="text-[8px] font-bold font-mono text-white bg-red-600 px-1 py-0.5 rounded ml-1 leading-none shadow-sm">
+                              Now
+                            </span>
+                          </div>
+                        )}
+
+                        {/* ABSOLUTE COLUMN APPOINTMENT CHIPS */}
+                        {displayedColumns.map((col) => {
+                          const colAppointments = filteredAppointments.filter((appt) => {
+                            if (viewBy === "practitioners") {
+                              return appt.practitioner === col.id;
+                            } else {
+                              return appt.room === col.id;
+                            }
+                          });
+
+                          const isDragOver = dragOverColumnId === col.id;
+
+                          return (
+                            <div
+                              key={col.id}
+                              onDragOver={(e) => handleDragOver(e, col.id)}
+                              onDragLeave={handleDragLeave}
+                              onDrop={(e) => handleDrop(e, col.id)}
+                              className={`flex-1 min-w-[220px] border-r border-[var(--hh-border)] last:border-r-0 relative transition-colors duration-150`}
+                              style={{
+                                height: `${ROW_HEIGHT * 2 * (END_HOUR - START_HOUR)}px`,
+                                backgroundColor: isDragOver ? "#fbf6fc" : "transparent"
+                              }}
+                            >
+                              {/* Cell Click to Schedule Overlay */}
+                              <div className="absolute inset-0 z-0 flex flex-col">
+                                {Array.from({ length: (END_HOUR - START_HOUR) * 2 }).map((_, slotIdx) => (
+                                  <div
+                                    key={slotIdx}
+                                    onClick={(e) => handleGridCellClick(e, col.id, slotIdx)}
+                                    className="w-full hover:bg-gray-100/60 cursor-cell border-b border-transparent transition-colors"
+                                    style={{ height: `${ROW_HEIGHT}px` }}
+                                    title="Click slot to schedule appointment here"
+                                  />
+                                ))}
+                              </div>
+
+                              {colAppointments.map((appt) => {
+                                const durationMins = getAppointmentDuration(appt);
+                                const top = getTopOffset(appt.appointment_time, appt.start_at);
+                                const height = getCardHeight(durationMins);
+
+                                const isHighPriority = appt.priority === "high";
+                                const hasUnsignedConsentAlert = appt.consent_status !== "signed" && appt.consent_status !== "verified";
+
+                                return (
+                                  <div
+                                    key={appt.id}
+                                    draggable
+                                    onDragStart={(e) => handleDragStart(e, appt.id)}
+                                    onClick={() => handleOpenDetails(appt)}
+                                    style={{
+                                      top: `${top}px`,
+                                      height: `${height}px`,
+                                    }}
+                                    className={`appointment-card-trigger absolute left-1 right-1 p-2.5 rounded-lg shadow-sm border border-[var(--hh-border)] text-left flex flex-col justify-between transition-all cursor-grab active:cursor-grabbing z-10 overflow-hidden ${getAccentBorderClass(
+                                      appt.appointment_type_label || appt.appointment_type
+                                    )}`}
+                                  >
+                                    <div className="w-full">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[9px] font-mono font-bold text-[#66736d] flex items-center gap-0.5">
+                                          <Clock size={9} />
+                                          {appt.start_at && appt.end_at
+                                            ? `${new Date(appt.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`
+                                            : appt.appointment_time?.slice(0, 5)}
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                          {hasUnsignedConsentAlert && (
+                                            <span className="text-[10px] font-bold text-red-600 bg-red-100 p-0.5 rounded animate-pulse" title="Consent signature is missing!">
+                                              <AlertTriangle size={10} />
+                                            </span>
+                                          )}
+                                          {isHighPriority && (
+                                            <span className="h-1.5 w-1.5 rounded-full bg-red-600 animate-ping" title="High Priority!" />
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <h4 className="text-xs font-bold text-[#3f1d58] mt-1.5 truncate">
+                                        {appt.patient_name}
+                                      </h4>
+                                      <span className="text-[9px] font-mono text-[var(--hh-purple)] block leading-none mt-0.5 font-bold">
+                                        {appt.patient_code}
+                                      </span>
+                                    </div>
+
+                                    {/* CLINICIAN PERSONALIZED ACTION BUTTONS */}
+                                    {actingRole === "clinician" && (
+                                      <div className="mt-1 flex items-center gap-1 z-20">
+                                        <Button
+                                          size="icon"
+                                          variant="ghost"
+                                          className="h-5 w-5 rounded-md hover:bg-purple-100"
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            router.push(`/patients/${appt.patient_public_id || appt.patient}`);
+                                          }}
+                                          title="Open patient record workspace"
+                                        >
+                                          <FileText size={11} className="text-[var(--hh-purple)]" />
+                                        </Button>
+                                      </div>
+                                    )}
+
+                                    <div className="flex items-center justify-between text-[8px] border-t border-gray-200/50 pt-1 mt-1 shrink-0">
+                                      <span className="text-[#66736d] truncate font-medium max-w-[90px]">
+                                        {appt.appointment_type_label || appt.appointment_type.replaceAll("_", " ")}
+                                      </span>
+                                      {appt.flow_state ? (
+                                        <Badge className="text-[7px] bg-[var(--hh-purple)] text-white hover:bg-[var(--hh-purple)] rounded px-1 uppercase tracking-tight py-0">
+                                          {appt.flow_state.replace("_", " ")}
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-[8px] font-bold uppercase text-sky-800">
+                                          {appt.status_label || appt.status}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentView === "week" && (
+                    <div className="overflow-x-auto">
+                      <div className="flex select-none border-b border-[var(--hh-border)] bg-[var(--hh-section)] sticky top-0 z-20 min-w-[960px]">
+                        <div className="w-16 shrink-0 border-r border-[var(--hh-border)]" />
+                        {weekDays.map((day) => {
+                          const dayName = day.toLocaleDateString("en-US", { weekday: "short" });
+                          const dayNum = day.getDate();
+                          const dayStr = getLocalDateString(day);
+                          const isToday = dayStr === getLocalDateString(new Date());
+                          return (
+                            <div
+                              key={dayStr}
+                              className="flex-1 min-w-[130px] p-4 text-center border-r border-[var(--hh-border)] last:border-r-0 flex flex-col justify-center items-center"
+                            >
+                              <div className="text-sm font-bold text-[#3f1d58] tracking-wide flex items-center gap-1.5">
+                                <span>{dayName}</span>
+                                <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${isToday ? "bg-[var(--hh-purple)] text-white" : "bg-gray-100 text-[#53605a]"}`}>
+                                  {dayNum}
                                 </span>
-                                <div className="flex items-center gap-1">
-                                  {hasUnsignedConsentAlert && (
-                                    <span className="text-[10px] font-bold text-red-600 bg-red-100 p-0.5 rounded animate-pulse" title="Consent signature is missing!">
-                                      <AlertTriangle size={10} />
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* TIMELINE ROWS */}
+                      <div className="relative flex min-w-[960px] select-none">
+                        <div className="w-16 shrink-0 border-r border-[var(--hh-border)] bg-gray-50 flex flex-col z-10 sticky left-0 shadow-sm">
+                          {Array.from({ length: END_HOUR - START_HOUR }).map((_, i) => {
+                            const hour = START_HOUR + i;
+                            return (
+                              <div
+                                key={hour}
+                                className="border-b border-[var(--hh-border)] text-right pr-2 text-[10px] font-bold text-[#66736d] font-mono select-none flex items-start pt-1.5"
+                                style={{ height: `${ROW_HEIGHT * 2}px` }}
+                              >
+                                {String(hour).padStart(2, "0")}:00
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* HORIZONTAL DASHED LINES */}
+                        <div className="absolute top-0 bottom-0 left-16 right-0 pointer-events-none flex flex-col">
+                          {Array.from({ length: (END_HOUR - START_HOUR) * 2 }).map((_, idx) => {
+                            const isHour = idx % 2 === 0;
+                            return (
+                              <div
+                                key={idx}
+                                className={`border-b ${isHour ? "border-[var(--hh-border)]" : "border-dashed border-gray-100"}`}
+                                style={{ height: `${ROW_HEIGHT}px` }}
+                              />
+                            );
+                          })}
+                        </div>
+
+                        {/* ABSOLUTE COLUMN APPOINTMENT CHIPS FOR EACH DAY OF WEEK */}
+                        {weekDays.map((day) => {
+                          const dayStr = getLocalDateString(day);
+                          const isToday = dayStr === getLocalDateString(new Date());
+
+                          const dayAppointments = filteredAppointments.filter((appt) => {
+                            const apptDateStr = appt.start_at ? getLocalDateString(new Date(appt.start_at)) : (appt.appointment_date || "");
+                            return apptDateStr === dayStr;
+                          });
+
+                          return (
+                            <div
+                              key={dayStr}
+                              className="flex-1 min-w-[130px] border-r border-[var(--hh-border)] last:border-r-0 relative"
+                              style={{
+                                height: `${ROW_HEIGHT * 2 * (END_HOUR - START_HOUR)}px`,
+                              }}
+                            >
+                              {/* NOW TIMELINE INDICATOR (Only for today's column) */}
+                              {isToday && nowLineTop !== null && (
+                                <div
+                                  className="absolute left-0 right-0 border-t-2 border-red-500 z-10 pointer-events-none flex items-center"
+                                  style={{ top: `${nowLineTop}px` }}
+                                >
+                                  <div className="h-2.5 w-2.5 rounded-full bg-red-600 -ml-1.2 shadow-md" />
+                                </div>
+                              )}
+
+                              {/* Cell Click to Schedule Overlay */}
+                              <div className="absolute inset-0 z-0 flex flex-col">
+                                {Array.from({ length: (END_HOUR - START_HOUR) * 2 }).map((_, slotIdx) => (
+                                  <div
+                                    key={slotIdx}
+                                    onClick={(e) => handleWeekGridCellClick(e, dayStr, slotIdx)}
+                                    className="w-full hover:bg-gray-100/60 cursor-cell border-b border-transparent transition-colors"
+                                    style={{ height: `${ROW_HEIGHT}px` }}
+                                    title="Click slot to schedule appointment here"
+                                  />
+                                ))}
+                              </div>
+
+                              {dayAppointments.map((appt) => {
+                                const durationMins = getAppointmentDuration(appt);
+                                const top = getTopOffset(appt.appointment_time, appt.start_at);
+                                const height = getCardHeight(durationMins);
+
+                                const isHighPriority = appt.priority === "high";
+                                const hasUnsignedConsentAlert = appt.consent_status !== "signed" && appt.consent_status !== "verified";
+
+                                return (
+                                  <div
+                                    key={appt.id}
+                                    onClick={() => handleOpenDetails(appt)}
+                                    style={{
+                                      top: `${top}px`,
+                                      height: `${height}px`,
+                                    }}
+                                    className={`appointment-card-trigger absolute left-1 right-1 p-2 rounded-lg shadow-sm border border-[var(--hh-border)] text-left flex flex-col justify-between transition-all cursor-pointer z-10 overflow-hidden hover:scale-[1.01] hover:shadow-md ${getAccentBorderClass(
+                                      appt.appointment_type_label || appt.appointment_type
+                                    )}`}
+                                  >
+                                    <div className="w-full">
+                                      <div className="flex items-center justify-between">
+                                        <span className="text-[9px] font-mono font-bold text-[#66736d] flex items-center gap-0.5">
+                                          <Clock size={9} />
+                                          {appt.start_at && appt.end_at
+                                            ? `${new Date(appt.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })}`
+                                            : appt.appointment_time?.slice(0, 5)}
+                                        </span>
+                                        <div className="flex items-center gap-1">
+                                          {hasUnsignedConsentAlert && (
+                                            <span className="text-[10px] font-bold text-red-600 bg-red-100 p-0.5 rounded animate-pulse" title="Consent signature is missing!">
+                                              <AlertTriangle size={10} />
+                                            </span>
+                                          )}
+                                          {isHighPriority && (
+                                            <span className="h-1.5 w-1.5 rounded-full bg-red-600 animate-ping" title="High Priority!" />
+                                          )}
+                                        </div>
+                                      </div>
+
+                                      <h4 className="text-[11px] font-bold text-[#3f1d58] mt-1 truncate">
+                                        {appt.patient_name}
+                                      </h4>
+                                      {/* Include compact clinician display if viewing all practitioners */}
+                                      {selectedPractitionerId === null && actingRole !== "clinician" && (
+                                        <span className="text-[8px] font-semibold text-gray-500 block truncate leading-none mt-0.5">
+                                          {appt.practitioner_name}
+                                        </span>
+                                      )}
+                                    </div>
+
+                                    <div className="flex items-center justify-between text-[8px] border-t border-gray-200/50 pt-1 mt-1 shrink-0">
+                                      <span className="text-[#66736d] truncate font-medium max-w-[85px]">
+                                        {appt.appointment_type_label || appt.appointment_type.replaceAll("_", " ")}
+                                      </span>
+                                      {appt.flow_state ? (
+                                        <Badge className="text-[7px] bg-[var(--hh-purple)] text-white hover:bg-[var(--hh-purple)] rounded px-1 uppercase tracking-tight py-0">
+                                          {appt.flow_state.replace("_", " ")}
+                                        </Badge>
+                                      ) : (
+                                        <span className="text-[8px] font-bold uppercase text-sky-800">
+                                          {appt.status_label || appt.status}
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
+                  {currentView === "month" && (
+                    <div className="overflow-x-auto">
+                      <div className="min-w-[960px]">
+                        <div className="grid grid-cols-7 border-b border-[var(--hh-border)] bg-[var(--hh-section)] sticky top-0 z-20 select-none text-center">
+                          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((wd) => (
+                            <div key={wd} className="p-3 text-xs font-bold text-[#3f1d58] border-r border-[var(--hh-border)] last:border-r-0">
+                              {wd}
+                            </div>
+                          ))}
+                        </div>
+
+                        <div className="grid grid-cols-7 bg-gray-50/50">
+                          {monthDays.map((day) => {
+                            const dayStr = getLocalDateString(day);
+                            const isToday = dayStr === getLocalDateString(new Date());
+                            const [currentY, currentM] = currentDate.split("-").map(Number);
+                            const isCurrentMonth = day.getMonth() === currentM - 1;
+
+                            const dayAppointments = filteredAppointments.filter((appt) => {
+                              const apptDateStr = appt.start_at ? getLocalDateString(new Date(appt.start_at)) : (appt.appointment_date || "");
+                              return apptDateStr === dayStr;
+                            });
+
+                            const visibleAppointments = dayAppointments.slice(0, 3);
+                            const extraCount = dayAppointments.length - 3;
+
+                            return (
+                              <div
+                                key={dayStr}
+                                onClick={(e) => handleMonthCellClick(e, dayStr)}
+                                className={`min-h-[110px] p-2 border-b border-r border-[var(--hh-border)] last:border-r-0 bg-white flex flex-col justify-between cursor-pointer transition-colors duration-150 hover:bg-gray-50/70 relative ${
+                                  !isCurrentMonth ? "bg-gray-50/30 text-gray-400" : "text-gray-900"
+                                }`}
+                              >
+                                <div className="flex justify-between items-center mb-1">
+                                  <span
+                                    className={`text-xs font-bold px-1.5 py-0.5 rounded-full ${
+                                      isToday ? "bg-[var(--hh-purple)] text-white" : !isCurrentMonth ? "text-gray-300 animate-none opacity-50" : "text-gray-600"
+                                    }`}
+                                  >
+                                    {day.getDate()}
+                                  </span>
+                                  {dayAppointments.length > 0 && (
+                                    <span className="text-[10px] font-bold text-[#53605a] bg-gray-100 px-1.5 py-0.5 rounded-full font-mono">
+                                      {dayAppointments.length}
                                     </span>
                                   )}
-                                  {isHighPriority && (
-                                    <span className="h-1.5 w-1.5 rounded-full bg-red-600 animate-ping" title="High Priority!" />
-                                  )}
                                 </div>
+
+                                {/* Chips List */}
+                                <div className="flex-1 flex flex-col gap-1 z-10">
+                                  {visibleAppointments.map((appt) => {
+                                    const isHighPriority = appt.priority === "high";
+                                    const hasUnsignedConsentAlert = appt.consent_status !== "signed" && appt.consent_status !== "verified";
+
+                                    // Compact accent color class
+                                    const tok = String(appt.appointment_type_label || appt.appointment_type).toLowerCase().trim();
+                                    let chipColor = "border-l-2 border-l-gray-400 bg-gray-50 hover:bg-gray-100";
+                                    if (tok.includes("purple") || tok.includes("review")) chipColor = "border-l-2 border-l-[var(--hh-purple)] bg-purple-50 hover:bg-purple-100";
+                                    if (tok.includes("green") || tok.includes("acupuncture")) chipColor = "border-l-2 border-l-[#225c2c] bg-green-50 hover:bg-green-100";
+                                    if (tok.includes("blue") || tok.includes("consult")) chipColor = "border-l-2 border-l-[#006687] bg-sky-50 hover:bg-sky-100";
+                                    if (tok.includes("amber") || tok.includes("warn") || tok.includes("follow")) chipColor = "border-l-2 border-l-[#875400] bg-amber-50 hover:bg-amber-100";
+                                    if (tok.includes("red") || tok.includes("emerg")) chipColor = "border-l-2 border-l-red-600 bg-red-50 hover:bg-red-100";
+
+                                    return (
+                                      <div
+                                        key={appt.id}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          handleOpenDetails(appt);
+                                        }}
+                                        className={`appointment-card-trigger p-1 px-1.5 rounded text-[10px] font-bold flex items-center justify-between truncate shadow-sm border border-gray-100 cursor-pointer ${chipColor}`}
+                                      >
+                                        <span className="truncate flex items-center gap-1">
+                                          <span className="font-mono text-[9px] text-[#66736d] font-bold shrink-0">
+                                            {appt.start_at
+                                              ? new Date(appt.start_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+                                              : appt.appointment_time?.slice(0, 5)}
+                                          </span>
+                                          <span className="truncate text-[#3f1d58]">
+                                            {appt.patient_name}
+                                          </span>
+                                        </span>
+                                        <div className="flex items-center gap-0.5 shrink-0 ml-1">
+                                          {hasUnsignedConsentAlert && (
+                                            <AlertTriangle size={9} className="text-red-600" />
+                                          )}
+                                          {isHighPriority && (
+                                            <span className="h-1.5 w-1.5 rounded-full bg-red-600 shrink-0" />
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+
+                                {extraCount > 0 && (
+                                  <div className="text-[9px] font-bold text-[var(--hh-purple)] bg-purple-50 hover:bg-purple-100 px-1.5 py-0.5 rounded mt-1 text-right font-mono self-end">
+                                    + {extraCount} more
+                                  </div>
+                                )}
                               </div>
-
-                              <h4 className="text-xs font-bold text-[#3f1d58] mt-1.5 truncate">
-                                {appt.patient_name}
-                              </h4>
-                              <span className="text-[9px] font-mono text-[var(--hh-purple)] block leading-none mt-0.5 font-bold">
-                                {appt.patient_code}
-                              </span>
-                            </div>
-
-                            {/* CLINICIAN PERSONALIZED ACTION BUTTONS */}
-                            {actingRole === "clinician" && (
-                              <div className="mt-1 flex items-center gap-1 z-20">
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="h-5 w-5 rounded-md hover:bg-purple-100"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    router.push(`/patients/${appt.patient_public_id || appt.patient}`);
-                                  }}
-                                  title="Open patient record workspace"
-                                >
-                                  <FileText size={11} className="text-[var(--hh-purple)]" />
-                                </Button>
-                              </div>
-                            )}
-
-                            <div className="flex items-center justify-between text-[8px] border-t border-gray-200/50 pt-1 mt-1 shrink-0">
-                              <span className="text-[#66736d] truncate font-medium max-w-[90px]">
-                                {appt.appointment_type_label || appt.appointment_type.replaceAll("_", " ")}
-                              </span>
-                              {appt.flow_state ? (
-                                <Badge className="text-[7px] bg-[var(--hh-purple)] text-white hover:bg-[var(--hh-purple)] rounded px-1 uppercase tracking-tight py-0">
-                                  {appt.flow_state.replace("_", " ")}
-                                </Badge>
-                              ) : (
-                                <span className="text-[8px] font-bold uppercase text-sky-800">
-                                  {appt.status_label || appt.status}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
+                            );
+                          })}
+                        </div>
+                      </div>
                     </div>
-                  );
-                })}
-              </div>
+                  )}
+                </>
+              )}
             </div>
-          </div>
           )}
         </div>
       )}

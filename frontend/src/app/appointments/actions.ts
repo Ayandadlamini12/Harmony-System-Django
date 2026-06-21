@@ -198,3 +198,45 @@ export async function getPractitionerAvailabilitiesForDate(date: string) {
   }
 }
 
+export async function getAppointmentsRangeAction(
+  startAt: string,
+  endAt: string,
+  filters: { practitioner?: number | string | null; room?: number | string | null } = {}
+) {
+  try {
+    const auth = await getAuthHeader();
+    const params = new URLSearchParams({
+      start_at: startAt,
+      end_at: endAt,
+    });
+    if (filters.practitioner) params.set("practitioner", String(filters.practitioner));
+    if (filters.room) params.set("room", String(filters.room));
+
+    const response = await fetch(`${API_BASE_URL}/scheduling/appointments/?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        Authorization: auth,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        success: false,
+        appointments: [],
+        error: data.detail || "Failed to load range appointments.",
+      };
+    }
+
+    return { success: true, appointments: data.appointments || [] };
+  } catch (err: any) {
+    return {
+      success: false,
+      appointments: [],
+      error: "Network connection error.",
+    };
+  }
+}
+
