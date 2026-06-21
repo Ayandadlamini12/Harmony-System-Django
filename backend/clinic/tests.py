@@ -806,6 +806,7 @@ class AppointmentSchedulingTests(APITestCase):
         self.assertEqual(len(response.data["rooms"]), 1)
         self.assertEqual(len(response.data["appointment_types"]), 4)
         self.assertTrue(any(p["id"] == self.clinician.id for p in response.data["practitioners"]))
+        self.assertFalse(any(p["role"] != User.Role.CLINICIAN for p in response.data["practitioners"]))
 
     def test_capabilities_view(self):
         response = self.client.get("/api/me/capabilities/")

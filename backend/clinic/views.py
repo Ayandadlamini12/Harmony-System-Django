@@ -1123,7 +1123,7 @@ def board_view(request):
                 "resource_type": room.resource_type,
             })
     else:
-        practitioners = User.objects.filter(role__in=[User.Role.CLINICIAN, User.Role.ADMIN], is_active=True)
+        practitioners = User.objects.filter(role=User.Role.CLINICIAN, is_active=True)
         weekday = date_val.weekday()
         availabilities = PractitionerAvailability.objects.filter(
             weekday=weekday,
@@ -1248,7 +1248,7 @@ def resources_metadata_view(request):
     rooms = ResourceRoomSerializer(ResourceRoom.objects.filter(is_active=True), many=True).data
     types = AppointmentTypeSerializer(AppointmentType.objects.filter(is_active=True), many=True).data
     practitioners = []
-    users = User.objects.filter(role__in=[User.Role.CLINICIAN, User.Role.ADMIN], is_active=True)
+    users = User.objects.filter(role=User.Role.CLINICIAN, is_active=True)
     for u in users:
         practitioners.append({
             "id": u.id,
