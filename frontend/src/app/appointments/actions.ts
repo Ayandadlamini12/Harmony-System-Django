@@ -57,7 +57,6 @@ export async function createAppointment(payload: {
     };
   }
 }
-
 export async function moveAppointment(
   appointmentId: number,
   payload: {
@@ -235,6 +234,60 @@ export async function getAppointmentsRangeAction(
     return {
       success: false,
       appointments: [],
+      error: "Network connection error.",
+    };
+  }
+}
+
+export async function getAppointmentsHistoryAction(filters: {
+  status?: string;
+  start_at?: string;
+  end_at?: string;
+  practitioner?: string | number;
+  patient?: string | number;
+  page?: number;
+} = {}) {
+  try {
+    const auth = await getAuthHeader();
+    const params = new URLSearchParams();
+    if (filters.status) params.set("status", filters.status);
+    if (filters.start_at) params.set("start_at", filters.start_at);
+    if (filters.end_at) params.set("end_at", filters.end_at);
+    if (filters.practitioner) params.set("practitioner", String(filters.practitioner));
+    if (filters.patient) params.set("patient", String(filters.patient));
+    if (filters.page) params.set("page", String(filters.page));
+
+    const response = await fetch(`${API_BASE_URL}/appointments/history/?${params.toString()}`, {
+      method: "GET",
+      headers: {
+        Authorization: auth,
+        "Content-Type": "application/json",
+      },
+    });
+
+    const data = await response.json().catch(() => ({}));
+
+    if (!response.ok) {
+      return {
+        success: false,
+        results: [],
+        count: 0,
+        error: data.detail || "Failed to load appointment history.",
+      };
+    }
+
+    if (Array.isArray(data)) {
+      return { success: true, results: data, count: data.length };
+    } else if (data && Array.isArray(data.results)) {
+      return { success: true, results: data.results, count: data.count || data.results.length };
+    } else {
+      return { success: true, results: [], count: 0 };
+    }
+  } catch (err: any) {
+    return {
+      success: false,
+      results: [],
+      count: 0,
       error: "Network connection error.",
     };
   }

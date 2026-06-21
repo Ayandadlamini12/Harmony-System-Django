@@ -73,6 +73,7 @@ export const navItems: NavItem[] = [
     roles: ["admin", "clinician", "receptionist"],
     children: [
       { href: "/appointments", label: "Calendar", icon: CalendarCheck, roles: ["admin", "clinician", "receptionist"] },
+      { href: "/appointments/history", label: "History/Logs", icon: FileText, roles: ["admin", "clinician", "receptionist"] },
       { href: "/appointments/availability", label: "Availability Settings", icon: CalendarCheck, roles: ["admin", "clinician"] }
     ]
   },

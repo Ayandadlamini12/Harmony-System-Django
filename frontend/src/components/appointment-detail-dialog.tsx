@@ -52,6 +52,9 @@ export function AppointmentDetailDialog({
   const [isCancelling, setIsCancelling] = useState(false);
   const [cancelReason, setCancelReason] = useState("");
 
+  const startsAt = appointment?.start_at ? new Date(appointment.start_at).getTime() : null;
+  const isWithin15Mins = startsAt ? (startsAt - Date.now()) <= 15 * 60 * 1000 : false;
+
   // Edit action states
   const [isEditing, setIsEditMode] = useState(false);
   const [editDate, setEditDate] = useState("");
@@ -497,6 +500,20 @@ export function AppointmentDetailDialog({
                 Cancel Appointment Slot
               </h3>
 
+              {isWithin15Mins && (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-4 text-red-900 text-sm">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="text-red-600 shrink-0 mt-0.5" size={18} />
+                    <div className="grid gap-1">
+                      <div className="font-bold">Cancellation Lockout Active</div>
+                      <p className="text-xs text-red-800 leading-relaxed">
+                        This appointment is inside the 15-minute cancellation lockout. It cannot be cancelled from the standard workflow.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div className="grid gap-1.5">
                 <span className="hh-label text-red-900">Reason for Cancellation *</span>
                 <Textarea
@@ -514,7 +531,7 @@ export function AppointmentDetailDialog({
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isPending}
+                  disabled={isPending || isWithin15Mins}
                   className="bg-red-600 hover:bg-red-700 text-white"
                 >
                   {isPending ? "Cancelling..." : "Confirm Cancellation"}
