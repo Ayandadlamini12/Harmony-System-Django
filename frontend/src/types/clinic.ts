@@ -582,6 +582,7 @@ export type VerificationInitiationResponse = {
 };
 
 export type SystemSecurityStatus = {
+  tabs: string[];
   keycloak: {
     enabled: boolean;
     server_url: string;
@@ -597,7 +598,47 @@ export type SystemSecurityStatus = {
   sessions: {
     access_token_lifetime_minutes: number;
     refresh_token_lifetime_days: number;
-    cookie_secure: boolean;
+    jwt_stateless: boolean;
+    server_side_session_store: string;
+    active_django_sessions: number;
+    expired_django_sessions: number;
+    active_authenticated_django_sessions: number;
+    instrumentation_note: string;
+    cookie_policy: {
+      session_cookie_secure: boolean;
+      session_cookie_httponly: boolean;
+      session_cookie_samesite: string;
+      csrf_cookie_secure: boolean;
+      csrf_cookie_httponly: boolean;
+      csrf_cookie_samesite: string;
+      secure_ssl_redirect: boolean;
+      hsts_seconds: number;
+      proxy_cookie_secure_env: boolean;
+    };
+  };
+  authentication_activity: {
+    recent_successful_logins: {
+      id: number;
+      username: string;
+      display_name: string;
+      role: string;
+      last_login: string | null;
+      is_active: boolean;
+    }[];
+    recent_failed_logins: any[];
+    failed_login_instrumented: boolean;
+    recent_security_events: {
+      id: number;
+      action: string;
+      entity_type: string;
+      entity_id: string | number | null;
+      actor: string;
+      created_at: string;
+      details: any;
+    }[];
+    local_fallback_login_events: any[];
+    local_fallback_login_instrumented: boolean;
+    instrumentation_note: string;
   };
   deployment: {
     required_keycloak_vars: string[];
@@ -605,11 +646,33 @@ export type SystemSecurityStatus = {
     worker_services_must_preserve_keycloak_env: boolean;
     compose_env_contract: string;
   };
+  policies: {
+    password_validators_enabled: boolean;
+    password_validator_count: number;
+    password_validators: string[];
+    mfa_status_source: string;
+    mfa_status_available: boolean;
+    account_lockout_status_source: string;
+    account_lockout_status_available: boolean;
+    admin_only: boolean;
+    read_only: boolean;
+    secret_values_exposed: boolean;
+  };
   warnings: {
     code: string;
     severity: "warning" | "critical";
     detail: string;
     fields: string[];
   }[];
+  overview: {
+    keycloak_ready: boolean;
+    secret_values_exposed: boolean;
+    active_warning_count: number;
+    active_django_sessions: number;
+    recent_successful_login_count: number;
+    recent_security_event_count: number;
+    local_fallback_enabled: boolean;
+    deployment_env_contract_ok: boolean;
+  };
 };
 
