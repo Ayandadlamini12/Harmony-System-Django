@@ -1,4 +1,5 @@
 import mimetypes
+import os
 import random
 import secrets
 
@@ -417,6 +418,91 @@ class SystemEmailSettingsView(generics.GenericAPIView):
         except Exception as exc:
             return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
         return Response({"detail": f"Test email sent to {recipient}."})
+
+
+class SystemSecurityStatusView(APIView):
+    permission_classes = [IsAdminUserRole]
+
+    keycloak_required_settings = (
+        "KEYCLOAK_SERVER_URL",
+        "KEYCLOAK_REALM",
+        "KEYCLOAK_CLIENT_ID",
+        "KEYCLOAK_CLIENT_SECRET",
+        "KEYCLOAK_ADMIN_USERNAME",
+        "KEYCLOAK_ADMIN_PASSWORD",
+    )
+
+    def get(self, request):
+        missing_keycloak = [
+            key
+            for key in self.keycloak_required_settings
+            if not str(getattr(settings, key, "") or "").strip()
+        ]
+        if not settings.KEYCLOAK_ENABLED:
+            missing_keycloak = []
+
+        access_lifetime = settings.SIMPLE_JWT["ACCESS_TOKEN_LIFETIME"]
+        refresh_lifetime = settings.SIMPLE_JWT["REFRESH_TOKEN_LIFETIME"]
+
+        return Response(
+            {
+                "keycloak": {
+                    "enabled": settings.KEYCLOAK_ENABLED,
+                    "server_url": settings.KEYCLOAK_SERVER_URL,
+                    "realm": settings.KEYCLOAK_REALM,
+                    "client_id": settings.KEYCLOAK_CLIENT_ID,
+                    "client_secret_configured": bool(settings.KEYCLOAK_CLIENT_SECRET),
+                    "admin_username_configured": bool(settings.KEYCLOAK_ADMIN_USERNAME),
+                    "admin_password_configured": bool(settings.KEYCLOAK_ADMIN_PASSWORD),
+                    "allow_local_fallback": settings.KEYCLOAK_ALLOW_LOCAL_FALLBACK,
+                    "action_email_lifespan": settings.KEYCLOAK_ACTION_EMAIL_LIFESPAN,
+                    "missing_required": missing_keycloak,
+                },
+                "sessions": {
+                    "access_token_lifetime_minutes": int(access_lifetime.total_seconds() // 60),
+                    "refresh_token_lifetime_days": int(refresh_lifetime.total_seconds() // 86400),
+                    "cookie_secure": os.getenv("COOKIE_SECURE", "false").lower() == "true",
+                },
+                "deployment": {
+                    "required_keycloak_vars": list(self.keycloak_required_settings),
+                    "backend_keycloak_env_ok": settings.KEYCLOAK_ENABLED and not missing_keycloak,
+                    "worker_services_must_preserve_keycloak_env": True,
+                    "compose_env_contract": "backend, celery, and celery-beat must all preserve the full Keycloak env block.",
+                },
+                "warnings": self._warnings(missing_keycloak),
+            }
+        )
+
+    def _warnings(self, missing_keycloak):
+        warnings = []
+        if settings.KEYCLOAK_ENABLED and missing_keycloak:
+            warnings.append(
+                {
+                    "code": "keycloak_missing_required_env",
+                    "severity": "critical",
+                    "detail": "Keycloak is enabled but required identity configuration is missing.",
+                    "fields": missing_keycloak,
+                }
+            )
+        if settings.KEYCLOAK_ENABLED and settings.KEYCLOAK_ALLOW_LOCAL_FALLBACK:
+            warnings.append(
+                {
+                    "code": "local_fallback_enabled",
+                    "severity": "warning",
+                    "detail": "Local fallback login is enabled. Keep this only as an operational recovery path.",
+                    "fields": ["KEYCLOAK_ALLOW_LOCAL_FALLBACK"],
+                }
+            )
+        if not settings.KEYCLOAK_ENABLED:
+            warnings.append(
+                {
+                    "code": "keycloak_disabled",
+                    "severity": "warning",
+                    "detail": "Keycloak is disabled. Production MIS should normally authenticate through Keycloak.",
+                    "fields": ["KEYCLOAK_ENABLED"],
+                }
+            )
+        return warnings
 
 
 class EmailDeliveryLogViewSet(viewsets.ReadOnlyModelViewSet):

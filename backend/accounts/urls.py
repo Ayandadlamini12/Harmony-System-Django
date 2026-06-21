@@ -9,6 +9,7 @@ from .views import (
     RegisterView,
     RoleModulePermissionViewSet,
     SystemEmailSettingsView,
+    SystemSecurityStatusView,
     UserViewSet,
 )
 
@@ -22,5 +23,6 @@ urlpatterns = [
     path("auth/register/", RegisterView.as_view(), name="register"),
     path("auth/change-password/", ChangePasswordView.as_view(), name="change_password"),
     path("system/email-settings/", SystemEmailSettingsView.as_view(), name="system_email_settings"),
+    path("system/security-status/", SystemSecurityStatusView.as_view(), name="system_security_status"),
     path("webhooks/verify-channel/", ChannelVerificationWebhookView.as_view(), name="channel_verification_webhook"),
 ] + router.urls

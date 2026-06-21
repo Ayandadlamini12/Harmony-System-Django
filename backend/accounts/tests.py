@@ -478,3 +478,63 @@ class ChannelVerificationApiTests(APITestCase):
         self.assertEqual(channel.verification_status, UserNotificationChannel.VerificationStatus.VERIFIED)
         self.assertIsNotNone(channel.verified_at)
         mock_dispatch.assert_not_called()
+
+
+class SystemSecurityStatusApiTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="security_admin", password="password123", role="admin")
+        self.receptionist = User.objects.create_user(username="security_reception", password="password123", role="receptionist")
+
+    def test_admin_can_read_security_status_without_secret_values(self):
+        self.client.force_authenticate(self.admin)
+
+        with self.settings(
+            KEYCLOAK_ENABLED=True,
+            KEYCLOAK_SERVER_URL="https://auth.harmonyhealthsz.com",
+            KEYCLOAK_REALM="harmony-health",
+            KEYCLOAK_CLIENT_ID="harmony-mis",
+            KEYCLOAK_CLIENT_SECRET="secret-value",
+            KEYCLOAK_ADMIN_USERNAME="admin-user",
+            KEYCLOAK_ADMIN_PASSWORD="admin-password",
+            KEYCLOAK_ALLOW_LOCAL_FALLBACK=True,
+            KEYCLOAK_ACTION_EMAIL_LIFESPAN=432000,
+        ):
+            response = self.client.get("/api/system/security-status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.data["keycloak"]["enabled"])
+        self.assertEqual(response.data["keycloak"]["server_url"], "https://auth.harmonyhealthsz.com")
+        self.assertTrue(response.data["keycloak"]["client_secret_configured"])
+        self.assertTrue(response.data["keycloak"]["admin_password_configured"])
+        self.assertNotIn("secret-value", str(response.data))
+        self.assertNotIn("admin-password", str(response.data))
+        self.assertEqual(response.data["keycloak"]["missing_required"], [])
+        self.assertEqual(response.data["sessions"]["access_token_lifetime_minutes"], 30)
+        self.assertEqual(response.data["sessions"]["refresh_token_lifetime_days"], 7)
+
+    def test_non_admin_cannot_read_security_status(self):
+        self.client.force_authenticate(self.receptionist)
+
+        response = self.client.get("/api/system/security-status/")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_missing_keycloak_configuration_is_reported_when_enabled(self):
+        self.client.force_authenticate(self.admin)
+
+        with self.settings(
+            KEYCLOAK_ENABLED=True,
+            KEYCLOAK_SERVER_URL="",
+            KEYCLOAK_REALM="harmony-health",
+            KEYCLOAK_CLIENT_ID="harmony-mis",
+            KEYCLOAK_CLIENT_SECRET="",
+            KEYCLOAK_ADMIN_USERNAME="",
+            KEYCLOAK_ADMIN_PASSWORD="",
+        ):
+            response = self.client.get("/api/system/security-status/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("KEYCLOAK_SERVER_URL", response.data["keycloak"]["missing_required"])
+        self.assertIn("KEYCLOAK_CLIENT_SECRET", response.data["keycloak"]["missing_required"])
+        self.assertFalse(response.data["deployment"]["backend_keycloak_env_ok"])
+        self.assertTrue(any(warning["code"] == "keycloak_missing_required_env" for warning in response.data["warnings"]))
