@@ -5,6 +5,8 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
+from accounts.models import AuthenticationEvent
+
 from .models import (
     Appointment, AppointmentType, AuditLog, BlockedSlot, ElevatedAccessRequest, 
     FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, 
@@ -14,6 +16,150 @@ from .models import (
 )
 
 User = get_user_model()
+
+
+class SystemAuditLogsApiTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="audit_admin", password="password123", role="admin")
+        self.clinician = User.objects.create_user(username="audit_clinician", password="password123", role="clinician")
+        self.receptionist = User.objects.create_user(
+            username="audit_reception",
+            password="password123",
+            role="receptionist",
+        )
+        self.patient = Patient.objects.create(first_name="Audit", last_name="Patient", gender="female")
+
+    def test_system_wide_audit_logs_are_admin_only(self):
+        AuditLog.objects.create(
+            user=self.admin,
+            entity_type="user",
+            entity_id=self.admin.id,
+            action="update",
+            details="Admin user updated.",
+        )
+        self.client.force_authenticate(self.receptionist)
+        response = self.client.get("/api/audit-logs/")
+        self.assertEqual(response.status_code, 403)
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/audit-logs/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_clinician_retains_patient_scoped_audit_access(self):
+        AuditLog.objects.create(
+            user=self.clinician,
+            entity_type="patient",
+            entity_id=self.patient.id,
+            action="view",
+            details="Patient record viewed.",
+        )
+        self.client.force_authenticate(self.clinician)
+        response = self.client.get(f"/api/audit-logs/?entity_type=patient&entity_id={self.patient.id}")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+
+    def test_standard_audit_response_redacts_secret_fields(self):
+        AuditLog.objects.create(
+            user=self.admin,
+            entity_type="system_email_settings",
+            entity_id=1,
+            action="update",
+            before_data={"smtp_host": "mail.test", "password": "old-secret"},
+            after_data={"smtp_host": "mail.test", "password": "new-secret", "api_key": "key-value"},
+            changed_fields={"password": {"before": "old-secret", "after": "new-secret"}},
+        )
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/audit-logs/")
+        self.assertEqual(response.status_code, 200)
+        payload = str(response.data)
+        self.assertNotIn("old-secret", payload)
+        self.assertNotIn("new-secret", payload)
+        self.assertNotIn("key-value", payload)
+        self.assertIn("[REDACTED]", payload)
+
+    def test_unified_timeline_summary_and_filters_include_authentication(self):
+        AuditLog.objects.create(
+            user=self.admin,
+            entity_type="appointment",
+            entity_id=12,
+            action="create",
+            details="Appointment created.",
+        )
+        AuthenticationEvent.objects.create(
+            user=self.admin,
+            attempted_identifier=self.admin.username,
+            outcome=AuthenticationEvent.Outcome.SUCCESS,
+            method=AuthenticationEvent.Method.KEYCLOAK,
+            reason_code="authenticated",
+        )
+        self.client.force_authenticate(self.admin)
+
+        timeline = self.client.get("/api/audit-logs/unified/?page_size=10")
+        self.assertEqual(timeline.status_code, 200)
+        self.assertEqual(timeline.data["count"], 2)
+        self.assertEqual({row["source"] for row in timeline.data["results"]}, {"system", "authentication"})
+
+        security = self.client.get("/api/audit-logs/unified/?category=security")
+        self.assertEqual(security.status_code, 200)
+        self.assertEqual(security.data["count"], 1)
+        self.assertEqual(security.data["results"][0]["source"], "authentication")
+
+        summary = self.client.get("/api/audit-logs/summary/")
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(summary.data["total_events"], 2)
+        self.assertEqual(summary.data["category_counts"]["clinical"], 1)
+        self.assertEqual(summary.data["category_counts"]["security"], 1)
+        self.assertTrue(summary.data["read_only"])
+
+        invalid_page = self.client.get("/api/audit-logs/unified/?page=invalid")
+        self.assertEqual(invalid_page.status_code, 400)
+
+    def test_csv_export_is_secret_safe_and_audited(self):
+        AuditLog.objects.create(
+            user=self.admin,
+            entity_type="user",
+            entity_id=self.admin.id,
+            action="update",
+            details="=HYPERLINK(\"https://invalid.test\")",
+            changed_fields={"password": {"before": "old-secret", "after": "new-secret"}},
+        )
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/audit-logs/export/")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response["Content-Type"], "text/csv")
+        content = response.content.decode("utf-8")
+        self.assertIn("Timestamp,Source,Category", content)
+        self.assertNotIn("old-secret", content)
+        self.assertNotIn("new-secret", content)
+        self.assertIn("'=HYPERLINK", content)
+        self.assertTrue(AuditLog.objects.filter(entity_type="audit_log_export", action="export").exists())
+
+    def test_audit_retention_prunes_expired_records_and_records_action(self):
+        from .tasks import prune_audit_logs
+
+        expired = AuditLog.objects.create(
+            entity_type="user",
+            entity_id=1,
+            action="update",
+            details="Expired audit record.",
+        )
+        AuditLog.objects.filter(pk=expired.pk).update(
+            created_at=timezone.now() - timezone.timedelta(days=2556)
+        )
+        recent = AuditLog.objects.create(
+            entity_type="user",
+            entity_id=2,
+            action="update",
+            details="Recent audit record.",
+        )
+        with self.settings(AUDIT_LOG_RETENTION_DAYS=2555):
+            deleted_count = prune_audit_logs()
+
+        self.assertEqual(deleted_count, 1)
+        self.assertFalse(AuditLog.objects.filter(pk=expired.pk).exists())
+        self.assertTrue(AuditLog.objects.filter(pk=recent.pk).exists())
+        self.assertTrue(AuditLog.objects.filter(action="retention_prune").exists())
 
 
 class PatientApiTests(APITestCase):

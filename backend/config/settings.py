@@ -204,6 +204,8 @@ AUTH_MAX_FAILED_ATTEMPTS = int(os.getenv("AUTH_MAX_FAILED_ATTEMPTS", "5"))
 AUTH_FAILURE_WINDOW_MINUTES = int(os.getenv("AUTH_FAILURE_WINDOW_MINUTES", "15"))
 AUTH_LOCKOUT_DURATION_MINUTES = int(os.getenv("AUTH_LOCKOUT_DURATION_MINUTES", "15"))
 AUTH_EVENT_RETENTION_DAYS = int(os.getenv("AUTH_EVENT_RETENTION_DAYS", "365"))
+AUDIT_LOG_RETENTION_DAYS = int(os.getenv("AUDIT_LOG_RETENTION_DAYS", "2555"))
+AUDIT_EXPORT_MAX_ROWS = int(os.getenv("AUDIT_EXPORT_MAX_ROWS", "10000"))
 
 ZULIP_SITE = os.getenv("ZULIP_SITE", "").rstrip("/")
 ZULIP_BOT_EMAIL = os.getenv("ZULIP_BOT_EMAIL", "")
@@ -221,6 +223,10 @@ CELERY_BEAT_SCHEDULE = {
     "prune-authentication-events": {
         "task": "accounts.tasks.prune_authentication_events",
         "schedule": crontab(hour=2, minute=15),
+    },
+    "prune-audit-logs": {
+        "task": "clinic.tasks.prune_audit_logs",
+        "schedule": crontab(hour=2, minute=30),
     },
 }
 

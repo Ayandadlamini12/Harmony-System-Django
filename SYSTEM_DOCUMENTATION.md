@@ -809,3 +809,18 @@ To deploy Phase 2 and Phase 3 features safely on the production server without c
 - **Zero Package Bloat**: All interactive charts, body mappings, and sliders must be built utilizing native SVG/CSS and lightweight React primitives rather than adding heavy charting packages.
 - **Strict Keycloak Access Scoping**: Clinical workspaces must read Keycloak roles (`clinician`, `receptionist`) before initializing sensitive tabs (Assessments, Diagnosis, Remedies, and Notes), hiding or locking inputs dynamically based on token claims.
 - **RESTful Endpoints & Schema Extensions**: All new structured forms (like system-by-system examinations or subjective scores) will store their structured data under JSONField schemas on the `Visit` or `Case` models, avoiding painful PostgreSQL migrations during rapid UI prototyping.
+
+---
+
+## System Audit Logs Contract
+
+The administration Audit Logs module is read-only and admin-only for system-wide access. Patient-scoped audit history remains available to clinicians and users with active elevated patient access.
+
+- `GET /api/audit-logs/`: Existing paginated audit records. Structured before/after/change payloads redact passwords, secrets, API keys, credentials, authorization values, cookies, verification codes, and tokens.
+- `GET /api/audit-logs/unified/`: Admin-only normalized timeline combining system audit records and authentication events.
+- `GET /api/audit-logs/summary/`: Admin-only category counts and retention/export policy status.
+- `GET /api/audit-logs/export/`: Admin-only CSV export. Exports metadata only and creates an `audit_log_export` audit record.
+
+Supported unified filters include `source`, `category`, `user`, `action`, `search`, `date_from`, `date_to`, `page`, and `page_size`. Categories are `clinical`, `administration`, `security`, `integration`, and `system`.
+
+Audit retention is controlled by `AUDIT_LOG_RETENTION_DAYS` (default 2555 days). CSV volume is capped by `AUDIT_EXPORT_MAX_ROWS` (default 10000). Celery Beat runs the retention task daily and records pruning activity.

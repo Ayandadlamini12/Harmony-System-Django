@@ -1009,6 +1009,8 @@ class PatientDetailSerializer(PatientListSerializer):
 
 class AuditLogSerializer(serializers.ModelSerializer):
     user_name = serializers.CharField(source="user.get_full_name", read_only=True)
+    user_role = serializers.CharField(source="user.role", read_only=True, allow_null=True)
+    category = serializers.SerializerMethodField()
 
     class Meta:
         model = AuditLog
@@ -1016,6 +1018,8 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "id",
             "user",
             "user_name",
+            "user_role",
+            "category",
             "entity_type",
             "entity_id",
             "action",
@@ -1028,6 +1032,19 @@ class AuditLogSerializer(serializers.ModelSerializer):
             "user_agent",
             "created_at",
         )
+
+    def get_category(self, obj):
+        from .audit_policy import audit_category
+
+        return audit_category(obj.entity_type)
+
+    def to_representation(self, instance):
+        from .audit_policy import redact_sensitive_data
+
+        data = super().to_representation(instance)
+        for field in ("change_summary", "before_data", "after_data", "changed_fields"):
+            data[field] = redact_sensitive_data(data.get(field))
+        return data
 
 
 class ElevatedAccessRequestSerializer(serializers.ModelSerializer):

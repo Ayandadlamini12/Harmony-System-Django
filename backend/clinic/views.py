@@ -1,4 +1,5 @@
 from datetime import timedelta
+import csv
 import re
 import uuid
 
@@ -8,14 +9,18 @@ from django.db import transaction
 from django.http import FileResponse, HttpResponse
 from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from django.db.models import Max, Q
+from django.db.models import Count, Max, Q
+from django.utils.dateparse import parse_date
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
+from accounts.models import AuthenticationEvent
+
 from .access import has_patient_clinical_access, is_clinical_user
 from .audit import snapshot_instance, write_audit_log
+from .audit_policy import audit_category, entity_types_for_category, redact_sensitive_data
 from .document_generation import consent_document_reference, generate_consent_pdf, render_consent_html, save_consent_pdf, sign_consent_document
 from .models import (
     Appointment, AuditLog, Case, ElevatedAccessRequest, FormDraft, Message,
@@ -1999,11 +2004,26 @@ class MessageThreadViewSet(viewsets.ModelViewSet):
         return Response(self.get_serializer(thread).data)
 
 
+class AuditLogAccessPermission(permissions.BasePermission):
+    def has_permission(self, request, view):
+        if not request.user or not request.user.is_authenticated:
+            return False
+        if getattr(request.user, "role", "") == "admin":
+            return True
+        return (
+            getattr(view, "action", None) == "list"
+            and request.query_params.get("entity_type") == "patient"
+            and bool(request.query_params.get("entity_id"))
+        )
+
+
 class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = AuditLog.objects.select_related("user")
     serializer_class = AuditLogSerializer
-    filterset_fields = ("entity_type", "entity_id")
-    ordering_fields = ("created_at",)
+    permission_classes = [AuditLogAccessPermission]
+    filterset_fields = ("entity_type", "entity_id", "action", "user")
+    search_fields = ("entity_type", "action", "details", "ip_address", "user__username", "user__first_name", "user__last_name")
+    ordering_fields = ("created_at", "entity_type", "action")
 
     def filter_queryset(self, queryset):
         entity_type = self.request.query_params.get("entity_type")
@@ -2035,6 +2055,9 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
                     pass
             
             if patient_id is None:
+                return queryset.none()
+
+            if not has_patient_clinical_access(self.request.user, patient_id):
                 return queryset.none()
                 
             # Gather related record IDs
@@ -2089,8 +2112,242 @@ class AuditLogViewSet(viewsets.ReadOnlyModelViewSet):
             else:
                 queryset = queryset.order_by("-created_at")
             return queryset
-            
+
+        queryset = self._apply_admin_filters(queryset)
         return super().filter_queryset(queryset)
+
+    def _apply_admin_filters(self, queryset):
+        category = self.request.query_params.get("category", "").strip().lower()
+        if category:
+            entity_types = entity_types_for_category(category)
+            if category == "system":
+                known_types = set().union(
+                    entity_types_for_category("clinical"),
+                    entity_types_for_category("administration"),
+                    entity_types_for_category("security"),
+                    entity_types_for_category("integration"),
+                )
+                queryset = queryset.exclude(entity_type__in=known_types)
+            elif entity_types:
+                queryset = queryset.filter(entity_type__in=entity_types)
+            else:
+                queryset = queryset.none()
+
+        date_from = parse_date(self.request.query_params.get("date_from", ""))
+        date_to = parse_date(self.request.query_params.get("date_to", ""))
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
+        return queryset
+
+    def _filtered_authentication_events(self):
+        queryset = AuthenticationEvent.objects.select_related("user").all()
+        params = self.request.query_params
+        source = params.get("source", "").strip().lower()
+        category = params.get("category", "").strip().lower()
+        if source and source != "authentication":
+            return queryset.none()
+        if category and category != "security":
+            return queryset.none()
+
+        user_id = params.get("user")
+        action = params.get("action", "").strip().lower()
+        search = params.get("search", "").strip()
+        date_from = parse_date(params.get("date_from", ""))
+        date_to = parse_date(params.get("date_to", ""))
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+        if action:
+            queryset = queryset.filter(outcome=action)
+        if search:
+            queryset = queryset.filter(
+                Q(attempted_identifier__icontains=search)
+                | Q(reason_code__icontains=search)
+                | Q(ip_address__icontains=search)
+                | Q(user__username__icontains=search)
+                | Q(user__first_name__icontains=search)
+                | Q(user__last_name__icontains=search)
+            )
+        if date_from:
+            queryset = queryset.filter(created_at__date__gte=date_from)
+        if date_to:
+            queryset = queryset.filter(created_at__date__lte=date_to)
+        return queryset
+
+    def _filtered_system_events(self):
+        queryset = AuditLog.objects.select_related("user").all()
+        if self.request.query_params.get("source", "").strip().lower() == "authentication":
+            return queryset.none()
+        queryset = self._apply_admin_filters(queryset)
+        params = self.request.query_params
+        if params.get("user"):
+            queryset = queryset.filter(user_id=params["user"])
+        if params.get("action"):
+            queryset = queryset.filter(action=params["action"])
+        if params.get("search"):
+            search = params["search"].strip()
+            queryset = queryset.filter(
+                Q(entity_type__icontains=search)
+                | Q(action__icontains=search)
+                | Q(details__icontains=search)
+                | Q(ip_address__icontains=search)
+                | Q(user__username__icontains=search)
+                | Q(user__first_name__icontains=search)
+                | Q(user__last_name__icontains=search)
+            )
+        return queryset
+
+    @staticmethod
+    def _normalize_system_event(event):
+        return {
+            "id": f"audit-{event.id}",
+            "source": "system",
+            "category": audit_category(event.entity_type),
+            "action": event.action,
+            "entity_type": event.entity_type,
+            "entity_id": event.entity_id,
+            "actor_id": event.user_id,
+            "actor_name": event.user.get_full_name() or event.user.username if event.user else "System",
+            "actor_role": event.user.role if event.user else None,
+            "details": event.details,
+            "ip_address": event.ip_address,
+            "user_agent": event.user_agent,
+            "changes": redact_sensitive_data(event.changed_fields),
+            "created_at": event.created_at,
+        }
+
+    @staticmethod
+    def _normalize_authentication_event(event):
+        return {
+            "id": f"auth-{event.id}",
+            "source": "authentication",
+            "category": "security",
+            "action": event.outcome,
+            "entity_type": "authentication",
+            "entity_id": event.user_id or 0,
+            "actor_id": event.user_id,
+            "actor_name": event.user.get_full_name() or event.user.username if event.user else event.attempted_identifier,
+            "actor_role": event.user.role if event.user else None,
+            "details": event.reason_code,
+            "ip_address": event.ip_address,
+            "user_agent": event.user_agent,
+            "changes": {
+                "method": event.method,
+                "outcome": event.outcome,
+                "reason_code": event.reason_code,
+            },
+            "created_at": event.created_at,
+        }
+
+    @staticmethod
+    def _csv_safe(value):
+        text = "" if value is None else str(value)
+        if text.startswith(("=", "+", "-", "@")):
+            return f"'{text}"
+        return text
+
+    def _unified_events(self, limit, offset=0):
+        system_queryset = self._filtered_system_events()
+        authentication_queryset = self._filtered_authentication_events()
+        fetch_count = offset + limit
+        events = [
+            *(self._normalize_system_event(event) for event in system_queryset.order_by("-created_at")[:fetch_count]),
+            *(
+                self._normalize_authentication_event(event)
+                for event in authentication_queryset.order_by("-created_at")[:fetch_count]
+            ),
+        ]
+        events.sort(key=lambda event: event["created_at"], reverse=True)
+        return events[offset : offset + limit], system_queryset.count() + authentication_queryset.count()
+
+    @action(detail=False, methods=["get"])
+    def unified(self, request):
+        try:
+            page = max(int(request.query_params.get("page", 1)), 1)
+            page_size = min(max(int(request.query_params.get("page_size", 25)), 1), 100)
+        except (TypeError, ValueError):
+            return Response(
+                {"detail": "page and page_size must be valid integers."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        offset = (page - 1) * page_size
+        events, total = self._unified_events(page_size, offset)
+        return Response(
+            {
+                "count": total,
+                "page": page,
+                "page_size": page_size,
+                "next_page": page + 1 if offset + page_size < total else None,
+                "previous_page": page - 1 if page > 1 else None,
+                "results": events,
+            }
+        )
+
+    @action(detail=False, methods=["get"])
+    def summary(self, request):
+        system_queryset = self._filtered_system_events()
+        authentication_queryset = self._filtered_authentication_events()
+        category_counts = {category: 0 for category in ("clinical", "administration", "security", "integration", "system")}
+        for row in system_queryset.values("entity_type").annotate(count=Count("id")):
+            category_counts[audit_category(row["entity_type"])] += row["count"]
+        category_counts["security"] += authentication_queryset.count()
+        return Response(
+            {
+                "total_events": system_queryset.count() + authentication_queryset.count(),
+                "system_events": system_queryset.count(),
+                "authentication_events": authentication_queryset.count(),
+                "category_counts": category_counts,
+                "retention_days": settings.AUDIT_LOG_RETENTION_DAYS,
+                "export_max_rows": settings.AUDIT_EXPORT_MAX_ROWS,
+                "read_only": True,
+            }
+        )
+
+    @action(detail=False, methods=["get"])
+    def export(self, request):
+        rows, total = self._unified_events(settings.AUDIT_EXPORT_MAX_ROWS)
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = f'attachment; filename="harmony-audit-logs-{timezone.localdate().isoformat()}.csv"'
+        writer = csv.writer(response)
+        writer.writerow(
+            [
+                "Timestamp",
+                "Source",
+                "Category",
+                "Action",
+                "Entity Type",
+                "Entity ID",
+                "Actor",
+                "Actor Role",
+                "IP Address",
+                "Details",
+            ]
+        )
+        for event in rows:
+            writer.writerow(
+                [
+                    event["created_at"].isoformat(),
+                    self._csv_safe(event["source"]),
+                    self._csv_safe(event["category"]),
+                    self._csv_safe(event["action"]),
+                    self._csv_safe(event["entity_type"]),
+                    event["entity_id"],
+                    self._csv_safe(event["actor_name"]),
+                    self._csv_safe(event["actor_role"]),
+                    self._csv_safe(event["ip_address"]),
+                    self._csv_safe(event["details"]),
+                ]
+            )
+        write_audit_log(
+            request=request,
+            action="export",
+            entity_type="audit_log_export",
+            entity_id=0,
+            details=f"Exported {len(rows)} of {total} matching audit events as CSV.",
+            change_summary={"exported_rows": len(rows), "matching_rows": total},
+        )
+        return response
 
 
 class ElevatedAccessRequestViewSet(viewsets.ModelViewSet):

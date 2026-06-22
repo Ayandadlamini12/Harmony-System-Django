@@ -1,9 +1,26 @@
 from celery import shared_task
 from django.conf import settings
+from django.utils import timezone
 
 from .audit import snapshot_instance, write_audit_log
-from .models import ZulipOutboundEvent
+from .models import AuditLog, ZulipOutboundEvent
 from .zulip import ZulipIntegrationError, post_stream_message, zulip_enabled
+
+
+@shared_task
+def prune_audit_logs():
+    retention_days = max(int(settings.AUDIT_LOG_RETENTION_DAYS), 1)
+    cutoff = timezone.now() - timezone.timedelta(days=retention_days)
+    deleted_count, _ = AuditLog.objects.filter(created_at__lt=cutoff).delete()
+    if deleted_count:
+        write_audit_log(
+            action="retention_prune",
+            entity_type="system_audit_log_retention",
+            entity_id=0,
+            details=f"Pruned {deleted_count} audit log records older than {retention_days} days.",
+            change_summary={"deleted_records": deleted_count, "retention_days": retention_days},
+        )
+    return deleted_count
 
 
 @shared_task(bind=True, max_retries=5, default_retry_delay=60)

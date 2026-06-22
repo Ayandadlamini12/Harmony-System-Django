@@ -1015,7 +1015,12 @@ class AuditLog(models.Model):
 
     class Meta:
         ordering = ("-created_at",)
-        indexes = [models.Index(fields=["entity_type", "entity_id"])]
+        indexes = [
+            models.Index(fields=["entity_type", "entity_id"]),
+            models.Index(fields=["created_at"]),
+            models.Index(fields=["user", "created_at"]),
+            models.Index(fields=["action", "created_at"]),
+        ]
 
     def __str__(self) -> str:
         return f"{self.action} {self.entity_type}#{self.entity_id}"
