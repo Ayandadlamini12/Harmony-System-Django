@@ -26,6 +26,20 @@ export async function POST(request: Request) {
   }
 
   if (!response.ok) {
+    if (response.status === 429) {
+      try {
+        const errData = await response.json().catch(() => ({}));
+        if (errData?.code === "temporary_lockout") {
+          return NextResponse.json(
+            { success: false, error: "temporary_lockout", detail: "Too many failed login attempts. Please wait before trying again." },
+            { status: 429 }
+          );
+        }
+      } catch {
+        // Unknown backend errors remain generic.
+      }
+      return NextResponse.json({ success: false, error: "invalid" }, { status: 401 });
+    }
     return NextResponse.json({ success: false, error: "invalid" }, { status: 401 });
   }
 

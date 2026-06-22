@@ -530,8 +530,6 @@ export type SupportTicket = {
   created_at: string;
   updated_at: string;
 };
-
-
 export type PartnerCompany = {
   id: number;
   public_id: string;
@@ -624,8 +622,18 @@ export type SystemSecurityStatus = {
       role: string;
       last_login: string | null;
       is_active: boolean;
+      method?: string;
+      ip_address?: string | null;
     }[];
-    recent_failed_logins: any[];
+    recent_failed_logins: {
+      id: number;
+      attempted_identifier: string;
+      method: string;
+      reason_code: string;
+      ip_address: string | null;
+      created_at: string;
+      blocked: boolean;
+    }[];
     failed_login_instrumented: boolean;
     recent_security_events: {
       id: number;
@@ -636,7 +644,14 @@ export type SystemSecurityStatus = {
       created_at: string;
       details: any;
     }[];
-    local_fallback_login_events: any[];
+    local_fallback_login_events: {
+      id: number;
+      attempted_identifier: string;
+      outcome: string;
+      reason_code: string;
+      ip_address: string | null;
+      created_at: string;
+    }[];
     local_fallback_login_instrumented: boolean;
     instrumentation_note: string;
   };
@@ -654,6 +669,13 @@ export type SystemSecurityStatus = {
     mfa_status_available: boolean;
     account_lockout_status_source: string;
     account_lockout_status_available: boolean;
+    mis_login_protection?: {
+      enabled: boolean;
+      max_failed_attempts: number;
+      failure_window_minutes: number;
+      lockout_duration_minutes: number;
+      event_retention_days: number;
+    };
     admin_only: boolean;
     read_only: boolean;
     secret_values_exposed: boolean;
@@ -675,4 +697,35 @@ export type SystemSecurityStatus = {
     deployment_env_contract_ok: boolean;
   };
 };
+export type AuthenticationEvent = {
+  id: number;
+  user: number | null;
+  user_name: string;
+  user_role: string | null;
+  attempted_identifier: string;
+  outcome: "success" | "failure" | "blocked";
+  method: "keycloak" | "local" | "local_fallback" | "unknown";
+  reason_code: string | null;
+  ip_address: string | null;
+  user_agent: string | null;
+  created_at: string;
+};
 
+export type AuthenticationEventsSummary = {
+  period_hours: number;
+  successful_logins: number;
+  failed_logins: number;
+  blocked_attempts: number;
+  local_fallback_attempts: number;
+  unique_failure_ip_count: number;
+  locked_accounts: {
+    attempted_identifier: string;
+    failed_attempts: number;
+    locked_until: string;
+  }[];
+  policy: {
+    max_failed_attempts: number;
+    failure_window_minutes: number;
+    lockout_duration_minutes: number;
+  };
+};

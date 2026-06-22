@@ -28,15 +28,18 @@ function LoginForm() {
         body: JSON.stringify({ user_id: form.get("user_id"), password: form.get("password") }),
       });
 
-      const data = (await res.json().catch(() => ({ success: false }))) as { success?: boolean };
+      const data = (await res.json().catch(() => ({ success: false }))) as { success?: boolean; error?: string; detail?: string };
       if (data.success) {
         const redirectTo = params.get("redirect") || "/";
         router.push(redirectTo);
       } else {
-        setError("invalid");
+        const errType = data.error === "temporary_lockout" ? "temporary_lockout" : "invalid";
+        setError(errType);
         showActionError({
-          title: "Sign in failed",
-          message: "Invalid User ID or password."
+          title: errType === "temporary_lockout" ? "Account Locked" : "Sign in failed",
+          message: errType === "temporary_lockout"
+            ? "Too many failed login attempts. Please wait before trying again."
+            : "Invalid User ID or password."
         });
         setLoading(false);
       }
@@ -86,6 +89,12 @@ function LoginForm() {
               </div>
             )}
 
+            {error === "temporary_lockout" && (
+              <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-semibold text-red-700">
+                Too many failed login attempts. Please wait before trying again.
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="grid gap-4">
               <label>
                 <span className="hh-label">User ID</span>
@@ -102,7 +111,7 @@ function LoginForm() {
 
             <div className="mt-5 rounded-lg border border-[var(--hh-border)] bg-[#f8fbf9] p-3 text-sm text-[#66736d]">
               <p className="font-semibold text-[#314238]">Example IDs</p>
-              <p className="mt-1">Admin: HH2005110 · Clinician: HH2005187 · Reception: HH2005264</p>
+              <p className="mt-1">Admin: HH2005110 | Clinician: HH2005187 | Reception: HH2005264</p>
             </div>
 
             <p className="mt-5 text-center text-sm text-[#66736d] md:text-left">
