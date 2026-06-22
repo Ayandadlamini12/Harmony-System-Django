@@ -26,6 +26,44 @@ class User(AbstractUser):
         return self.get_full_name() or self.username or self.email
 
 
+class AuthenticationEvent(models.Model):
+    class Outcome(models.TextChoices):
+        SUCCESS = "success", "Successful login"
+        FAILURE = "failure", "Failed login"
+        BLOCKED = "blocked", "Blocked by login protection"
+
+    class Method(models.TextChoices):
+        KEYCLOAK = "keycloak", "Keycloak"
+        LOCAL = "local", "Local authentication"
+        LOCAL_FALLBACK = "local_fallback", "Local fallback"
+        UNKNOWN = "unknown", "Unknown"
+
+    user = models.ForeignKey(
+        User,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="authentication_events",
+    )
+    attempted_identifier = models.CharField(max_length=180, db_index=True)
+    outcome = models.CharField(max_length=20, choices=Outcome.choices, db_index=True)
+    method = models.CharField(max_length=30, choices=Method.choices, default=Method.UNKNOWN, db_index=True)
+    reason_code = models.CharField(max_length=80, blank=True)
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+    user_agent = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True, db_index=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["attempted_identifier", "outcome", "created_at"]),
+            models.Index(fields=["method", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.outcome} {self.method} login for {self.attempted_identifier}"
+
+
 class UserNotificationChannel(models.Model):
     class Channel(models.TextChoices):
         EMAIL = "email", "Email"

@@ -1,8 +1,13 @@
 import requests
 from django.conf import settings
 from django.contrib.auth import authenticate, get_user_model
+from django.contrib.auth.models import update_last_login
 from rest_framework import serializers
+from rest_framework.exceptions import APIException
 from rest_framework_simplejwt.tokens import RefreshToken
+
+from .auth_audit import get_lockout_status, record_authentication_event
+from .models import AuthenticationEvent
 
 User = get_user_model()
 
@@ -13,6 +18,15 @@ class KeycloakAuthenticationError(Exception):
 
 class KeycloakProvisioningError(Exception):
     pass
+
+
+class TemporaryLoginLockout(APIException):
+    status_code = 429
+    default_detail = {
+        "code": "temporary_lockout",
+        "detail": "Too many failed login attempts. Please try again later.",
+    }
+    default_code = "temporary_lockout"
 
 
 def keycloak_enabled() -> bool:
@@ -223,24 +237,73 @@ class HarmonyTokenSerializer(serializers.Serializer):
         if not user_id or not password:
             raise serializers.ValidationError("User ID and password are required.")
 
+        request = self.context.get("request")
+        lockout = get_lockout_status(user_id)
+        if lockout.locked:
+            record_authentication_event(
+                request=request,
+                identifier=user_id,
+                outcome=AuthenticationEvent.Outcome.BLOCKED,
+                method=AuthenticationEvent.Method.UNKNOWN,
+                reason_code="temporary_lockout",
+            )
+            raise TemporaryLoginLockout()
+
         user = None
+        authentication_method = AuthenticationEvent.Method.LOCAL
         if keycloak_enabled():
             try:
                 login_data = keycloak_password_login(user_id, password)
                 user = sync_keycloak_user(user_id, login_data["userinfo"])
+                authentication_method = AuthenticationEvent.Method.KEYCLOAK
             except KeycloakAuthenticationError:
                 if not settings.KEYCLOAK_ALLOW_LOCAL_FALLBACK:
+                    record_authentication_event(
+                        request=request,
+                        identifier=user_id,
+                        outcome=AuthenticationEvent.Outcome.FAILURE,
+                        method=AuthenticationEvent.Method.KEYCLOAK,
+                        reason_code="invalid_credentials",
+                        user=User.objects.filter(username__iexact=user_id).first(),
+                    )
                     raise serializers.ValidationError("Invalid User ID or password.")
+                authentication_method = AuthenticationEvent.Method.LOCAL_FALLBACK
             except requests.RequestException:
                 if not settings.KEYCLOAK_ALLOW_LOCAL_FALLBACK:
+                    record_authentication_event(
+                        request=request,
+                        identifier=user_id,
+                        outcome=AuthenticationEvent.Outcome.FAILURE,
+                        method=AuthenticationEvent.Method.KEYCLOAK,
+                        reason_code="identity_service_unavailable",
+                        user=User.objects.filter(username__iexact=user_id).first(),
+                    )
                     raise serializers.ValidationError("Identity service unavailable. Please try again.")
+                authentication_method = AuthenticationEvent.Method.LOCAL_FALLBACK
 
         if user is None:
             user = authenticate(username=user_id, password=password)
 
         if user is None or not user.is_active:
+            record_authentication_event(
+                request=request,
+                identifier=user_id,
+                outcome=AuthenticationEvent.Outcome.FAILURE,
+                method=authentication_method,
+                reason_code="invalid_credentials",
+                user=User.objects.filter(username__iexact=user_id).first(),
+            )
             raise serializers.ValidationError("Invalid User ID or password.")
 
+        update_last_login(None, user)
+        record_authentication_event(
+            request=request,
+            identifier=user_id,
+            outcome=AuthenticationEvent.Outcome.SUCCESS,
+            method=authentication_method,
+            reason_code="authenticated",
+            user=user,
+        )
         refresh = RefreshToken.for_user(user)
         return {
             "refresh": str(refresh),

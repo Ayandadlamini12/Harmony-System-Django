@@ -2,8 +2,19 @@ import logging
 import requests
 from celery import shared_task
 from django.conf import settings
+from django.utils import timezone
+
+from .models import AuthenticationEvent
 
 logger = logging.getLogger(__name__)
+
+
+@shared_task
+def prune_authentication_events():
+    retention_days = max(int(settings.AUTH_EVENT_RETENTION_DAYS), 1)
+    cutoff = timezone.now() - timezone.timedelta(days=retention_days)
+    deleted_count, _ = AuthenticationEvent.objects.filter(created_at__lt=cutoff).delete()
+    return deleted_count
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=10)
 def dispatch_n8n_webhook_task(self, event_type, payload):

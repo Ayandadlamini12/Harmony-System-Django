@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import ClinicianProfile, EmployeeEnrollmentRequest, UserNotificationChannel
+from .models import AuthenticationEvent, ClinicianProfile, EmployeeEnrollmentRequest, UserNotificationChannel
 
 User = get_user_model()
 
@@ -515,7 +515,7 @@ class SystemSecurityStatusApiTests(APITestCase):
         self.assertIn("cookie_policy", response.data["sessions"])
         self.assertIn("authentication_activity", response.data)
         self.assertIn("recent_successful_logins", response.data["authentication_activity"])
-        self.assertFalse(response.data["authentication_activity"]["failed_login_instrumented"])
+        self.assertTrue(response.data["authentication_activity"]["failed_login_instrumented"])
         self.assertIn("policies", response.data)
         self.assertTrue(response.data["policies"]["read_only"])
         self.assertFalse(response.data["policies"]["secret_values_exposed"])
@@ -551,8 +551,13 @@ class SystemSecurityStatusApiTests(APITestCase):
         self.assertTrue(any(warning["code"] == "keycloak_missing_required_env" for warning in response.data["warnings"]))
 
     def test_security_status_includes_recent_login_activity(self):
-        self.admin.last_login = timezone.now()
-        self.admin.save(update_fields=["last_login"])
+        AuthenticationEvent.objects.create(
+            user=self.admin,
+            attempted_identifier=self.admin.username,
+            outcome=AuthenticationEvent.Outcome.SUCCESS,
+            method=AuthenticationEvent.Method.KEYCLOAK,
+            reason_code="authenticated",
+        )
         self.client.force_authenticate(self.admin)
 
         response = self.client.get("/api/system/security-status/")
@@ -562,3 +567,138 @@ class SystemSecurityStatusApiTests(APITestCase):
         self.assertEqual(recent_logins[0]["username"], "security_admin")
         self.assertEqual(recent_logins[0]["role"], "admin")
         self.assertIn("last_login", recent_logins[0])
+
+
+class AuthenticationProtectionApiTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="auth_admin", password="password123", role="admin")
+        self.user = User.objects.create_user(username="auth_user", password="password123", role="receptionist")
+
+    def test_successful_local_login_is_recorded_without_credentials(self):
+        with self.settings(KEYCLOAK_ENABLED=False):
+            response = self.client.post(
+                "/api/auth/token/",
+                {"user_id": "auth_user", "password": "password123"},
+                format="json",
+                REMOTE_ADDR="10.0.0.5",
+                HTTP_USER_AGENT="Harmony test client",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        event = AuthenticationEvent.objects.get()
+        self.assertEqual(event.outcome, AuthenticationEvent.Outcome.SUCCESS)
+        self.assertEqual(event.method, AuthenticationEvent.Method.LOCAL)
+        self.assertEqual(event.user, self.user)
+        self.assertEqual(event.ip_address, "10.0.0.5")
+        self.assertNotIn("password123", str(event.__dict__))
+        self.user.refresh_from_db()
+        self.assertIsNotNone(self.user.last_login)
+
+    def test_failed_login_is_recorded(self):
+        with self.settings(KEYCLOAK_ENABLED=False):
+            response = self.client.post(
+                "/api/auth/token/",
+                {"user_id": "auth_user", "password": "wrong-password"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 400)
+        event = AuthenticationEvent.objects.get()
+        self.assertEqual(event.outcome, AuthenticationEvent.Outcome.FAILURE)
+        self.assertEqual(event.reason_code, "invalid_credentials")
+
+    def test_temporary_lockout_blocks_even_correct_password(self):
+        policy = self.settings(
+            KEYCLOAK_ENABLED=False,
+            AUTH_MAX_FAILED_ATTEMPTS=2,
+            AUTH_FAILURE_WINDOW_MINUTES=15,
+            AUTH_LOCKOUT_DURATION_MINUTES=15,
+        )
+        with policy:
+            for _ in range(2):
+                self.client.post(
+                    "/api/auth/token/",
+                    {"user_id": "auth_user", "password": "wrong-password"},
+                    format="json",
+                )
+            response = self.client.post(
+                "/api/auth/token/",
+                {"user_id": "auth_user", "password": "password123"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 429)
+        self.assertEqual(str(response.data["code"]), "temporary_lockout")
+        self.assertEqual(AuthenticationEvent.objects.filter(outcome="failure").count(), 2)
+        self.assertEqual(AuthenticationEvent.objects.filter(outcome="blocked").count(), 1)
+        self.assertFalse(AuthenticationEvent.objects.filter(outcome="success").exists())
+
+    @patch("accounts.keycloak.keycloak_password_login")
+    def test_local_fallback_success_is_attributed(self, mock_keycloak_login):
+        from .keycloak import KeycloakAuthenticationError
+
+        mock_keycloak_login.side_effect = KeycloakAuthenticationError("invalid")
+        with self.settings(
+            KEYCLOAK_ENABLED=True,
+            KEYCLOAK_SERVER_URL="https://auth.example.test",
+            KEYCLOAK_REALM="test",
+            KEYCLOAK_CLIENT_ID="test-client",
+            KEYCLOAK_ALLOW_LOCAL_FALLBACK=True,
+        ):
+            response = self.client.post(
+                "/api/auth/token/",
+                {"user_id": "auth_user", "password": "password123"},
+                format="json",
+            )
+
+        self.assertEqual(response.status_code, 200)
+        event = AuthenticationEvent.objects.get()
+        self.assertEqual(event.method, AuthenticationEvent.Method.LOCAL_FALLBACK)
+        self.assertEqual(event.outcome, AuthenticationEvent.Outcome.SUCCESS)
+
+    def test_authentication_event_api_is_admin_only_and_filterable(self):
+        AuthenticationEvent.objects.create(
+            user=self.user,
+            attempted_identifier=self.user.username,
+            outcome=AuthenticationEvent.Outcome.FAILURE,
+            method=AuthenticationEvent.Method.LOCAL,
+            reason_code="invalid_credentials",
+        )
+        self.client.force_authenticate(self.user)
+        denied = self.client.get("/api/authentication-events/")
+        self.assertEqual(denied.status_code, 403)
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/authentication-events/?outcome=failure&method=local")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["results"][0]["reason_code"], "invalid_credentials")
+
+        summary = self.client.get("/api/authentication-events/summary/")
+        self.assertEqual(summary.status_code, 200)
+        self.assertEqual(summary.data["failed_logins"], 1)
+        self.assertIn("policy", summary.data)
+
+    def test_authentication_event_retention_prunes_only_expired_events(self):
+        from .tasks import prune_authentication_events
+
+        expired = AuthenticationEvent.objects.create(
+            attempted_identifier="expired_user",
+            outcome=AuthenticationEvent.Outcome.FAILURE,
+            method=AuthenticationEvent.Method.LOCAL,
+        )
+        AuthenticationEvent.objects.filter(pk=expired.pk).update(
+            created_at=timezone.now() - timezone.timedelta(days=366)
+        )
+        recent = AuthenticationEvent.objects.create(
+            attempted_identifier="recent_user",
+            outcome=AuthenticationEvent.Outcome.FAILURE,
+            method=AuthenticationEvent.Method.LOCAL,
+        )
+
+        with self.settings(AUTH_EVENT_RETENTION_DAYS=365):
+            deleted_count = prune_authentication_events()
+
+        self.assertEqual(deleted_count, 1)
+        self.assertFalse(AuthenticationEvent.objects.filter(pk=expired.pk).exists())
+        self.assertTrue(AuthenticationEvent.objects.filter(pk=recent.pk).exists())

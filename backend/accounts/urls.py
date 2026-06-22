@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    AuthenticationEventViewSet,
     ChangePasswordView,
     ChannelVerificationWebhookView,
     EmailDeliveryLogViewSet,
@@ -14,6 +15,7 @@ from .views import (
 )
 
 router = DefaultRouter()
+router.register("authentication-events", AuthenticationEventViewSet, basename="authentication-events")
 router.register("users", UserViewSet, basename="users")
 router.register("employee-enrollment-requests", EmployeeEnrollmentRequestViewSet, basename="employee-enrollment-requests")
 router.register("role-module-permissions", RoleModulePermissionViewSet, basename="role-module-permissions")

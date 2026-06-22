@@ -1,7 +1,15 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import ClinicianProfile, EmailDeliveryLog, EmployeeEnrollmentRequest, RoleModulePermission, SystemEmailSettings, User
+from .models import (
+    AuthenticationEvent,
+    ClinicianProfile,
+    EmailDeliveryLog,
+    EmployeeEnrollmentRequest,
+    RoleModulePermission,
+    SystemEmailSettings,
+    User,
+)
 
 
 @admin.register(User)
@@ -9,6 +17,23 @@ class HarmonyUserAdmin(UserAdmin):
     fieldsets = UserAdmin.fieldsets + (("Harmony", {"fields": ("role", "profile_image")}),)
     list_display = ("username", "email", "first_name", "last_name", "role", "is_active")
     list_filter = UserAdmin.list_filter + ("role",)
+
+
+@admin.register(AuthenticationEvent)
+class AuthenticationEventAdmin(admin.ModelAdmin):
+    list_display = ("attempted_identifier", "outcome", "method", "reason_code", "ip_address", "created_at")
+    list_filter = ("outcome", "method", "reason_code", "created_at")
+    search_fields = ("attempted_identifier", "ip_address", "user__username")
+    readonly_fields = (
+        "user",
+        "attempted_identifier",
+        "outcome",
+        "method",
+        "reason_code",
+        "ip_address",
+        "user_agent",
+        "created_at",
+    )
 
 
 @admin.register(ClinicianProfile)

@@ -200,6 +200,11 @@ KEYCLOAK_ADMIN_USERNAME = os.getenv("KEYCLOAK_ADMIN_USERNAME", "")
 KEYCLOAK_ADMIN_PASSWORD = os.getenv("KEYCLOAK_ADMIN_PASSWORD", "")
 KEYCLOAK_ACTION_EMAIL_LIFESPAN = int(os.getenv("KEYCLOAK_ACTION_EMAIL_LIFESPAN", "432000"))
 
+AUTH_MAX_FAILED_ATTEMPTS = int(os.getenv("AUTH_MAX_FAILED_ATTEMPTS", "5"))
+AUTH_FAILURE_WINDOW_MINUTES = int(os.getenv("AUTH_FAILURE_WINDOW_MINUTES", "15"))
+AUTH_LOCKOUT_DURATION_MINUTES = int(os.getenv("AUTH_LOCKOUT_DURATION_MINUTES", "15"))
+AUTH_EVENT_RETENTION_DAYS = int(os.getenv("AUTH_EVENT_RETENTION_DAYS", "365"))
+
 ZULIP_SITE = os.getenv("ZULIP_SITE", "").rstrip("/")
 ZULIP_BOT_EMAIL = os.getenv("ZULIP_BOT_EMAIL", "")
 ZULIP_BOT_API_KEY = os.getenv("ZULIP_BOT_API_KEY", "")
@@ -212,7 +217,11 @@ CELERY_BEAT_SCHEDULE = {
     "retry-buffered-zulip-events": {
         "task": "clinic.tasks.retry_buffered_zulip_events",
         "schedule": crontab(minute="*/5"),
-    }
+    },
+    "prune-authentication-events": {
+        "task": "accounts.tasks.prune_authentication_events",
+        "schedule": crontab(hour=2, minute=15),
+    },
 }
 
 ANYMAIL = {

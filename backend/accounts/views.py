@@ -19,8 +19,10 @@ from clinic.audit import write_audit_log
 from clinic.models import AuditLog
 
 from .emailing import send_enrollment_under_review_email, send_system_email
+from .auth_audit import get_lockout_status, login_protection_settings
 from .keycloak import HarmonyTokenSerializer
 from .models import (
+    AuthenticationEvent,
     ClinicianProfile,
     EmailDeliveryLog,
     EmployeeEnrollmentRequest,
@@ -31,6 +33,7 @@ from .models import (
 from .tasks import dispatch_n8n_webhook_task
 from .role_modules import ROLE_CHOICES, module_definition_map
 from .serializers import (
+    AuthenticationEventSerializer,
     ChangePasswordSerializer,
     ClinicianProfileSerializer,
     EmployeeEnrollmentRequestSerializer,
@@ -136,7 +139,7 @@ class HarmonyTokenView(APIView):
     permission_classes = [permissions.AllowAny]
 
     def post(self, request):
-        serializer = HarmonyTokenSerializer(data=request.data)
+        serializer = HarmonyTokenSerializer(data=request.data, context={"request": request})
         serializer.is_valid(raise_exception=True)
         return Response(serializer.validated_data)
 
@@ -548,14 +551,50 @@ class SystemSecurityStatusView(APIView):
     def _authentication_activity(self):
         recent_logins = [
             {
-                "id": user.id,
-                "username": user.username,
-                "display_name": user.get_full_name() or user.username,
-                "role": user.role,
-                "last_login": user.last_login,
-                "is_active": user.is_active,
+                "id": event.user_id,
+                "event_id": event.id,
+                "username": event.user.username if event.user else event.attempted_identifier,
+                "display_name": (
+                    event.user.get_full_name() or event.user.username
+                    if event.user
+                    else event.attempted_identifier
+                ),
+                "role": event.user.role if event.user else "unknown",
+                "last_login": event.created_at,
+                "is_active": event.user.is_active if event.user else False,
+                "method": event.method,
+                "ip_address": event.ip_address,
             }
-            for user in User.objects.exclude(last_login__isnull=True).order_by("-last_login")[:10]
+            for event in AuthenticationEvent.objects.select_related("user")
+            .filter(outcome=AuthenticationEvent.Outcome.SUCCESS)
+            .order_by("-created_at")[:10]
+        ]
+        recent_failures = [
+            {
+                "id": event.id,
+                "attempted_identifier": event.attempted_identifier,
+                "method": event.method,
+                "reason_code": event.reason_code,
+                "ip_address": event.ip_address,
+                "created_at": event.created_at,
+                "blocked": event.outcome == AuthenticationEvent.Outcome.BLOCKED,
+            }
+            for event in AuthenticationEvent.objects.filter(
+                outcome__in=[AuthenticationEvent.Outcome.FAILURE, AuthenticationEvent.Outcome.BLOCKED]
+            ).order_by("-created_at")[:20]
+        ]
+        fallback_events = [
+            {
+                "id": event.id,
+                "attempted_identifier": event.attempted_identifier,
+                "outcome": event.outcome,
+                "reason_code": event.reason_code,
+                "ip_address": event.ip_address,
+                "created_at": event.created_at,
+            }
+            for event in AuthenticationEvent.objects.filter(
+                method=AuthenticationEvent.Method.LOCAL_FALLBACK
+            ).order_by("-created_at")[:20]
         ]
         security_event_filters = [
             ("user", "create"),
@@ -585,19 +624,19 @@ class SystemSecurityStatusView(APIView):
 
         return {
             "recent_successful_logins": recent_logins,
-            "recent_failed_logins": [],
-            "failed_login_instrumented": False,
+            "recent_failed_logins": recent_failures,
+            "failed_login_instrumented": True,
             "recent_security_events": recent_security_events,
-            "local_fallback_login_events": [],
-            "local_fallback_login_instrumented": False,
+            "local_fallback_login_events": fallback_events,
+            "local_fallback_login_instrumented": True,
             "instrumentation_note": (
-                "Successful login visibility comes from user.last_login. Failed login and local fallback usage "
-                "require dedicated authentication audit hooks before the UI can show real records."
+                "Authentication outcomes are recorded without passwords, access tokens, refresh tokens, or secrets."
             ),
         }
 
     def _policy_status(self):
         validators = getattr(settings, "AUTH_PASSWORD_VALIDATORS", [])
+        login_protection = login_protection_settings()
         return {
             "password_validators_enabled": bool(validators),
             "password_validator_count": len(validators),
@@ -610,6 +649,11 @@ class SystemSecurityStatusView(APIView):
             "mfa_status_available": False,
             "account_lockout_status_source": "keycloak",
             "account_lockout_status_available": False,
+            "mis_login_protection": {
+                "enabled": login_protection["max_failed_attempts"] > 0,
+                **login_protection,
+                "event_retention_days": settings.AUTH_EVENT_RETENTION_DAYS,
+            },
             "admin_only": True,
             "read_only": True,
             "secret_values_exposed": False,
@@ -654,6 +698,59 @@ class SystemSecurityStatusView(APIView):
                 }
             )
         return warnings
+
+
+class AuthenticationEventViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = AuthenticationEvent.objects.select_related("user").order_by("-created_at")
+    serializer_class = AuthenticationEventSerializer
+    permission_classes = [IsAdminUserRole]
+    filterset_fields = ("outcome", "method", "reason_code", "user")
+    search_fields = (
+        "attempted_identifier",
+        "ip_address",
+        "user__username",
+        "user__first_name",
+        "user__last_name",
+    )
+    ordering_fields = ("created_at", "outcome", "method")
+
+    @action(detail=False, methods=["get"])
+    def summary(self, request):
+        now = timezone.now()
+        since = now - timezone.timedelta(hours=24)
+        recent = AuthenticationEvent.objects.filter(created_at__gte=since)
+        identifiers = recent.filter(outcome=AuthenticationEvent.Outcome.FAILURE).values_list(
+            "attempted_identifier",
+            flat=True,
+        ).distinct()
+        locked_accounts = []
+        for identifier in identifiers:
+            lockout = get_lockout_status(identifier)
+            if lockout.locked:
+                locked_accounts.append(
+                    {
+                        "attempted_identifier": identifier,
+                        "failed_attempts": lockout.failed_attempts,
+                        "locked_until": lockout.locked_until,
+                    }
+                )
+
+        return Response(
+            {
+                "period_hours": 24,
+                "successful_logins": recent.filter(outcome=AuthenticationEvent.Outcome.SUCCESS).count(),
+                "failed_logins": recent.filter(outcome=AuthenticationEvent.Outcome.FAILURE).count(),
+                "blocked_attempts": recent.filter(outcome=AuthenticationEvent.Outcome.BLOCKED).count(),
+                "local_fallback_attempts": recent.filter(method=AuthenticationEvent.Method.LOCAL_FALLBACK).count(),
+                "unique_failure_ip_count": recent.filter(outcome=AuthenticationEvent.Outcome.FAILURE)
+                .exclude(ip_address__isnull=True)
+                .values("ip_address")
+                .distinct()
+                .count(),
+                "locked_accounts": locked_accounts,
+                "policy": login_protection_settings(),
+            }
+        )
 
 
 class EmailDeliveryLogViewSet(viewsets.ReadOnlyModelViewSet):

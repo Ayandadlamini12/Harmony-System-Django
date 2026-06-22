@@ -7,6 +7,7 @@ from rest_framework import serializers
 from .emailing import send_user_account_created_email
 from .keycloak import KeycloakProvisioningError, keycloak_admin_enabled, upsert_keycloak_user
 from .models import (
+    AuthenticationEvent,
     ClinicianProfile,
     EmailDeliveryLog,
     EmployeeEnrollmentRequest,
@@ -17,6 +18,33 @@ from .models import (
 from .role_modules import ROLE_CHOICES, ROLE_MODULES
 
 User = get_user_model()
+
+
+class AuthenticationEventSerializer(serializers.ModelSerializer):
+    user_name = serializers.SerializerMethodField()
+    user_role = serializers.CharField(source="user.role", read_only=True, allow_null=True)
+
+    class Meta:
+        model = AuthenticationEvent
+        fields = (
+            "id",
+            "user",
+            "user_name",
+            "user_role",
+            "attempted_identifier",
+            "outcome",
+            "method",
+            "reason_code",
+            "ip_address",
+            "user_agent",
+            "created_at",
+        )
+        read_only_fields = fields
+
+    def get_user_name(self, obj):
+        if not obj.user:
+            return "Unknown user"
+        return obj.user.get_full_name() or obj.user.username
 
 
 IDENTITY_TYPE_PREFIXES = {
