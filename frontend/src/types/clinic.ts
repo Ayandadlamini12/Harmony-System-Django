@@ -729,3 +729,30 @@ export type AuthenticationEventsSummary = {
     lockout_duration_minutes: number;
   };
 };
+
+export type UnifiedAuditLogEntry = {
+  id: string;
+  source: "system" | "authentication";
+  category: "clinical" | "administration" | "security" | "integration" | "system";
+  action: string;
+  entity_type: string;
+  entity_id: number;
+  actor_id: number | null;
+  actor_name: string;
+  actor_role: string | null;
+  details: string;
+  ip_address: string | null;
+  user_agent: string;
+  changes: Record<string, unknown> | null;
+  created_at: string;
+};
+
+export type AuditLogSummary = {
+  total_events: number;
+  system_events: number;
+  authentication_events: number;
+  category_counts: Record<string, number>;
+  retention_days: number;
+  export_max_rows: number;
+  read_only: boolean;
+};
