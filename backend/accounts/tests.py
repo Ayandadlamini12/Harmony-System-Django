@@ -4,7 +4,7 @@ from django.contrib.auth import get_user_model
 from django.utils import timezone
 from rest_framework.test import APITestCase
 
-from .models import AuthenticationEvent, ClinicianProfile, EmployeeEnrollmentRequest, UserNotificationChannel
+from .models import ApiToken, AuthenticationEvent, ClinicianProfile, EmployeeEnrollmentRequest, UserNotificationChannel
 
 User = get_user_model()
 
@@ -702,3 +702,127 @@ class AuthenticationProtectionApiTests(APITestCase):
         self.assertEqual(deleted_count, 1)
         self.assertFalse(AuthenticationEvent.objects.filter(pk=expired.pk).exists())
         self.assertTrue(AuthenticationEvent.objects.filter(pk=recent.pk).exists())
+
+
+class ApiTokenApiTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="token_admin", password="password123", role="admin")
+        self.receptionist = User.objects.create_user(username="token_reception", password="password123", role="receptionist")
+
+    def test_admin_can_create_token_and_plain_value_is_returned_once(self):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.post(
+            "/api/system/api-tokens/",
+            {
+                "name": "n8n calendar sync",
+                "scopes": ["n8n", "calendar_sync"],
+                "notes": "Used by n8n appointment workflows.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201)
+        self.assertIn("token", response.data)
+        self.assertTrue(response.data["token"].startswith("hmis_"))
+        self.assertNotIn("token_hash", response.data)
+        token = ApiToken.objects.get()
+        self.assertEqual(token.created_by, self.admin)
+        self.assertEqual(token.scopes, ["calendar_sync", "n8n"])
+        self.assertNotEqual(token.token_hash, response.data["token"])
+
+        list_response = self.client.get("/api/system/api-tokens/")
+        self.assertEqual(list_response.status_code, 200)
+        self.assertNotIn(response.data["token"], str(list_response.data))
+        self.assertNotIn("token_hash", str(list_response.data))
+
+    def test_non_admin_cannot_manage_tokens(self):
+        self.client.force_authenticate(self.receptionist)
+
+        response = self.client.get("/api/system/api-tokens/")
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_invalid_scope_is_rejected(self):
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.post(
+            "/api/system/api-tokens/",
+            {"name": "bad token", "scopes": ["root"]},
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(ApiToken.objects.exists())
+
+    def test_admin_can_revoke_token_but_not_delete_it(self):
+        self.client.force_authenticate(self.admin)
+        create_response = self.client.post(
+            "/api/system/api-tokens/",
+            {"name": "external reporting", "scopes": ["read"]},
+            format="json",
+        )
+        token_id = create_response.data["id"]
+
+        revoke_response = self.client.post(f"/api/system/api-tokens/{token_id}/revoke/")
+        delete_response = self.client.delete(f"/api/system/api-tokens/{token_id}/")
+
+        self.assertEqual(revoke_response.status_code, 200)
+        self.assertIsNotNone(revoke_response.data["revoked_at"])
+        self.assertEqual(delete_response.status_code, 405)
+        token = ApiToken.objects.get(pk=token_id)
+        self.assertEqual(token.revoked_by, self.admin)
+
+    def test_active_api_token_authenticates_request_and_updates_last_used(self):
+        self.client.force_authenticate(self.admin)
+        create_response = self.client.post(
+            "/api/system/api-tokens/",
+            {"name": "admin automation", "scopes": ["read"]},
+            format="json",
+        )
+        raw_token = create_response.data["token"]
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(
+            "/api/system/security-status/",
+            HTTP_X_HARMONY_API_TOKEN=raw_token,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        token = ApiToken.objects.get(pk=create_response.data["id"])
+        self.assertIsNotNone(token.last_used_at)
+
+    def test_revoked_api_token_is_rejected(self):
+        self.client.force_authenticate(self.admin)
+        create_response = self.client.post(
+            "/api/system/api-tokens/",
+            {"name": "revoked automation", "scopes": ["read"]},
+            format="json",
+        )
+        raw_token = create_response.data["token"]
+        self.client.post(f"/api/system/api-tokens/{create_response.data['id']}/revoke/")
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(
+            "/api/system/security-status/",
+            HTTP_X_HARMONY_API_TOKEN=raw_token,
+        )
+
+        self.assertEqual(response.status_code, 401)
+
+    def test_api_token_scope_limits_request_access(self):
+        self.client.force_authenticate(self.admin)
+        create_response = self.client.post(
+            "/api/system/api-tokens/",
+            {"name": "narrow integration", "scopes": ["n8n", "calendar_sync"]},
+            format="json",
+        )
+        raw_token = create_response.data["token"]
+        self.client.force_authenticate(user=None)
+
+        response = self.client.get(
+            "/api/system/security-status/",
+            HTTP_X_HARMONY_API_TOKEN=raw_token,
+        )
+
+        self.assertEqual(response.status_code, 401)

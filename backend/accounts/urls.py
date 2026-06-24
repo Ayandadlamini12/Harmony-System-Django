@@ -2,6 +2,7 @@ from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from .views import (
+    ApiTokenViewSet,
     AuthenticationEventViewSet,
     ChangePasswordView,
     ChannelVerificationWebhookView,
@@ -16,6 +17,7 @@ from .views import (
 
 router = DefaultRouter()
 router.register("authentication-events", AuthenticationEventViewSet, basename="authentication-events")
+router.register("system/api-tokens", ApiTokenViewSet, basename="system-api-tokens")
 router.register("users", UserViewSet, basename="users")
 router.register("employee-enrollment-requests", EmployeeEnrollmentRequestViewSet, basename="employee-enrollment-requests")
 router.register("role-module-permissions", RoleModulePermissionViewSet, basename="role-module-permissions")

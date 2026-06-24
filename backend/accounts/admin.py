@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
 from .models import (
+    ApiToken,
     AuthenticationEvent,
     ClinicianProfile,
     EmailDeliveryLog,
@@ -33,6 +34,23 @@ class AuthenticationEventAdmin(admin.ModelAdmin):
         "ip_address",
         "user_agent",
         "created_at",
+    )
+
+
+@admin.register(ApiToken)
+class ApiTokenAdmin(admin.ModelAdmin):
+    list_display = ("name", "token_prefix", "created_by", "expires_at", "last_used_at", "revoked_at", "created_at")
+    list_filter = ("created_at", "expires_at", "revoked_at")
+    search_fields = ("name", "token_prefix", "created_by__username", "created_by__email")
+    readonly_fields = (
+        "token_prefix",
+        "token_hash",
+        "created_by",
+        "revoked_by",
+        "last_used_at",
+        "revoked_at",
+        "created_at",
+        "updated_at",
     )
 
 

@@ -1,5 +1,7 @@
+from django.conf import settings
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.utils import timezone
 from pathlib import Path
 
 
@@ -62,6 +64,62 @@ class AuthenticationEvent(models.Model):
 
     def __str__(self) -> str:
         return f"{self.outcome} {self.method} login for {self.attempted_identifier}"
+
+
+class ApiToken(models.Model):
+    class Scope(models.TextChoices):
+        READ = "read", "Read"
+        WRITE = "write", "Write"
+        N8N = "n8n", "n8n workflow integration"
+        CALENDAR_SYNC = "calendar_sync", "Calendar sync"
+        AUDIT_READ = "audit_read", "Audit log read"
+
+    name = models.CharField(max_length=120)
+    token_prefix = models.CharField(max_length=24, db_index=True)
+    token_hash = models.CharField(max_length=64, unique=True)
+    scopes = models.JSONField(default=list, blank=True)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="created_api_tokens",
+    )
+    revoked_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="revoked_api_tokens",
+    )
+    expires_at = models.DateTimeField(null=True, blank=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("-created_at",)
+        indexes = [
+            models.Index(fields=["revoked_at", "expires_at"]),
+            models.Index(fields=["created_by", "created_at"]),
+        ]
+
+    def __str__(self) -> str:
+        return f"{self.name} ({self.token_prefix})"
+
+    @property
+    def is_revoked(self) -> bool:
+        return self.revoked_at is not None
+
+    @property
+    def is_expired(self) -> bool:
+        return bool(self.expires_at and self.expires_at <= timezone.now())
+
+    @property
+    def is_active(self) -> bool:
+        return not self.is_revoked and not self.is_expired
 
 
 class UserNotificationChannel(models.Model):

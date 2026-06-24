@@ -7,6 +7,7 @@ from rest_framework import serializers
 from .emailing import send_user_account_created_email
 from .keycloak import KeycloakProvisioningError, keycloak_admin_enabled, upsert_keycloak_user
 from .models import (
+    ApiToken,
     AuthenticationEvent,
     ClinicianProfile,
     EmailDeliveryLog,
@@ -45,6 +46,68 @@ class AuthenticationEventSerializer(serializers.ModelSerializer):
         if not obj.user:
             return "Unknown user"
         return obj.user.get_full_name() or obj.user.username
+
+
+class ApiTokenSerializer(serializers.ModelSerializer):
+    created_by_name = serializers.CharField(source="created_by.get_full_name", read_only=True)
+    revoked_by_name = serializers.CharField(source="revoked_by.get_full_name", read_only=True)
+    is_active = serializers.BooleanField(read_only=True)
+    is_expired = serializers.BooleanField(read_only=True)
+    is_revoked = serializers.BooleanField(read_only=True)
+
+    class Meta:
+        model = ApiToken
+        fields = (
+            "id",
+            "name",
+            "token_prefix",
+            "scopes",
+            "notes",
+            "created_by",
+            "created_by_name",
+            "revoked_by",
+            "revoked_by_name",
+            "expires_at",
+            "last_used_at",
+            "revoked_at",
+            "created_at",
+            "updated_at",
+            "is_active",
+            "is_expired",
+            "is_revoked",
+        )
+        read_only_fields = (
+            "id",
+            "token_prefix",
+            "created_by",
+            "created_by_name",
+            "revoked_by",
+            "revoked_by_name",
+            "last_used_at",
+            "revoked_at",
+            "created_at",
+            "updated_at",
+            "is_active",
+            "is_expired",
+            "is_revoked",
+        )
+
+    def validate_scopes(self, value):
+        if not isinstance(value, list):
+            raise serializers.ValidationError("Scopes must be a list.")
+        valid_scopes = set(ApiToken.Scope.values)
+        invalid = [scope for scope in value if scope not in valid_scopes]
+        if invalid:
+            raise serializers.ValidationError(f"Unsupported scopes: {', '.join(invalid)}")
+        return sorted(set(value))
+
+
+class ApiTokenCreateSerializer(ApiTokenSerializer):
+    token = serializers.CharField(read_only=True)
+
+    class Meta(ApiTokenSerializer.Meta):
+        fields = ApiTokenSerializer.Meta.fields + ("token",)
+        read_only_fields = ApiTokenSerializer.Meta.read_only_fields + ("token",)
 
 
 IDENTITY_TYPE_PREFIXES = {

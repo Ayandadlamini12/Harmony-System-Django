@@ -6,6 +6,7 @@ import secrets
 from django.contrib.sessions.models import Session
 from django.contrib.auth import get_user_model
 from django.conf import settings
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.http import FileResponse, Http404
@@ -18,10 +19,12 @@ from rest_framework.views import APIView
 from clinic.audit import write_audit_log
 from clinic.models import AuditLog
 
+from .api_tokens import generate_api_token, hash_api_token, token_display_prefix
 from .emailing import send_enrollment_under_review_email, send_system_email
 from .auth_audit import get_lockout_status, login_protection_settings
 from .keycloak import HarmonyTokenSerializer
 from .models import (
+    ApiToken,
     AuthenticationEvent,
     ClinicianProfile,
     EmailDeliveryLog,
@@ -33,6 +36,8 @@ from .models import (
 from .tasks import dispatch_n8n_webhook_task
 from .role_modules import ROLE_CHOICES, module_definition_map
 from .serializers import (
+    ApiTokenCreateSerializer,
+    ApiTokenSerializer,
     AuthenticationEventSerializer,
     ChangePasswordSerializer,
     ClinicianProfileSerializer,
@@ -385,6 +390,118 @@ class RoleModulePermissionViewSet(viewsets.ModelViewSet):
                 )
 
         return Response(build_role_module_matrix())
+
+
+class ApiTokenViewSet(viewsets.ModelViewSet):
+    queryset = ApiToken.objects.select_related("created_by", "revoked_by").order_by("-created_at")
+    serializer_class = ApiTokenSerializer
+    permission_classes = [IsAdminUserRole]
+    filterset_fields = ("created_by",)
+    search_fields = (
+        "name",
+        "token_prefix",
+        "notes",
+        "created_by__username",
+        "created_by__first_name",
+        "created_by__last_name",
+    )
+    ordering_fields = ("created_at", "expires_at", "last_used_at", "revoked_at", "name")
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        status_filter = self.request.query_params.get("status")
+        now = timezone.now()
+        if status_filter == "active":
+            return queryset.filter(revoked_at__isnull=True).filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+        if status_filter == "revoked":
+            return queryset.filter(revoked_at__isnull=False)
+        if status_filter == "expired":
+            return queryset.filter(revoked_at__isnull=True, expires_at__lte=now)
+        return queryset
+
+    def create(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        raw_token = generate_api_token()
+        token = serializer.save(
+            created_by=request.user,
+            token_prefix=token_display_prefix(raw_token),
+            token_hash=hash_api_token(raw_token),
+        )
+        write_audit_log(
+            request=request,
+            action="create",
+            instance=token,
+            entity_type="api_token",
+            after_data=ApiTokenSerializer(token).data,
+            details="Administrative API token created. Plain token returned once to the requester only.",
+        )
+        response_data = ApiTokenCreateSerializer(token).data
+        response_data["token"] = raw_token
+        headers = self.get_success_headers(response_data)
+        return Response(response_data, status=status.HTTP_201_CREATED, headers=headers)
+
+    def perform_update(self, serializer):
+        token = self.get_object()
+        before = ApiTokenSerializer(token).data
+        updated = serializer.save()
+        write_audit_log(
+            request=self.request,
+            action="update",
+            instance=updated,
+            entity_type="api_token",
+            before_data=before,
+            after_data=ApiTokenSerializer(updated).data,
+            details="Administrative API token metadata updated.",
+        )
+
+    def destroy(self, request, *args, **kwargs):
+        return Response(
+            {"detail": "API tokens cannot be deleted. Revoke the token to preserve audit history."},
+            status=status.HTTP_405_METHOD_NOT_ALLOWED,
+        )
+
+    @action(detail=True, methods=["post"])
+    def revoke(self, request, pk=None):
+        token = self.get_object()
+        if token.revoked_at:
+            return Response(self.get_serializer(token).data)
+
+        before = ApiTokenSerializer(token).data
+        token.revoked_at = timezone.now()
+        token.revoked_by = request.user
+        token.save(update_fields=["revoked_at", "revoked_by", "updated_at"])
+        after = ApiTokenSerializer(token).data
+        write_audit_log(
+            request=request,
+            action="revoke",
+            instance=token,
+            entity_type="api_token",
+            before_data=before,
+            after_data=after,
+            details="Administrative API token revoked.",
+        )
+        return Response(after)
+
+    @action(detail=False, methods=["get"])
+    def summary(self, request):
+        queryset = ApiToken.objects.all()
+        now = timezone.now()
+        return Response(
+            {
+                "total": queryset.count(),
+                "active": queryset.filter(revoked_at__isnull=True)
+                .filter(Q(expires_at__isnull=True) | Q(expires_at__gt=now))
+                .count(),
+                "expired": queryset.filter(revoked_at__isnull=True, expires_at__lte=now).count(),
+                "revoked": queryset.filter(revoked_at__isnull=False).count(),
+                "available_scopes": [{"value": value, "label": label} for value, label in ApiToken.Scope.choices],
+                "secret_values_exposed": False,
+                "token_value_returned_once": True,
+                "scopes_enforced": True,
+                "delete_supported": False,
+            }
+        )
 
 
 class SystemEmailSettingsView(generics.GenericAPIView):

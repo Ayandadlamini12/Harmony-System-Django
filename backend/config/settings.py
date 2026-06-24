@@ -159,6 +159,7 @@ CORS_ALLOWED_ORIGINS = os.getenv(
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
+        "accounts.api_tokens.ApiTokenAuthentication",
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
     "DEFAULT_PERMISSION_CLASSES": (
