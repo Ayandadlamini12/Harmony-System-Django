@@ -756,3 +756,40 @@ export type AuditLogSummary = {
   export_max_rows: number;
   read_only: boolean;
 };
+
+export type ApiToken = {
+  id: number;
+  name: string;
+  token_prefix: string;
+  scopes: string[];
+  notes: string;
+  created_by: number | null;
+  created_by_name: string | null;
+  revoked_by: number | null;
+  revoked_by_name: string | null;
+  expires_at: string | null;
+  last_used_at: string | null;
+  revoked_at: string | null;
+  created_at: string;
+  updated_at: string;
+  is_active: boolean;
+  is_expired: boolean;
+  is_revoked: boolean;
+};
+
+export type ApiTokenSummary = {
+  total: number;
+  active: number;
+  expired: number;
+  revoked: number;
+  available_scopes: Array<{ value: string; label: string }>;
+  secret_values_exposed: false;
+  token_value_returned_once: true;
+  scopes_enforced: true;
+  delete_supported: false;
+};
+
+export type ApiTokenCreateResponse = ApiToken & {
+  token: string;
+};
+

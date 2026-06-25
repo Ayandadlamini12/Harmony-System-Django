@@ -17,6 +17,7 @@ import { notFound } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
 import { Button } from "@/components/ui/button";
 import { AdminAuditLogsViewer } from "@/components/admin-audit-logs-viewer";
+import { AdminApiTokensViewer } from "@/components/admin-api-tokens-viewer";
 
 type SectionConfig = {
   title: string;
@@ -179,6 +180,10 @@ export default async function AdministrationSectionPage({
         {section === "audit-logs" ? (
           <div className="mt-6">
             <AdminAuditLogsViewer />
+          </div>
+        ) : section === "api-tokens" ? (
+          <div className="mt-6">
+            <AdminApiTokensViewer />
           </div>
         ) : (
           <div className="mt-6 grid gap-3 md:grid-cols-2">
