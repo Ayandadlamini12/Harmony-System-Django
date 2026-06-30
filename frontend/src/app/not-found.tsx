@@ -55,7 +55,7 @@ export default async function NotFound() {
     message: backendData?.message || "The link may be old, incomplete, or no longer part of the MIS workspace.",
     primary_label: backendData?.primary_label || "Go to dashboard",
     primary_href: backendData?.primary_href || "/",
-    login_href: backendData?.login_href || `/login?redirect=${encodeURIComponent(path || "/")}`,
+    login_href: "/login",
     dashboard_href: backendData?.dashboard_href || "/",
     support_label: backendData?.support_label || "Contact support",
     support_href: backendData?.support_href || "/administration/support-tickets",
