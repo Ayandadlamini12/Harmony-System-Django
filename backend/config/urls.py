@@ -18,11 +18,12 @@ Including another URLconf
 from django.contrib import admin
 from django.urls import include, path
 from accounts.views import HarmonyTokenView
-from config.views import health_check
+from config.views import health_check, not_found_context
 from rest_framework_simplejwt.views import TokenRefreshView
 
 urlpatterns = [
     path("health/", health_check, name="health"),
+    path("api/system/not-found-context/", not_found_context, name="not_found_context"),
     path("admin/", admin.site.urls),
     path("api/auth/token/", HarmonyTokenView.as_view(), name="token_obtain_pair"),
     path("api/auth/token/refresh/", TokenRefreshView.as_view(), name="token_refresh"),
