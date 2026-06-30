@@ -141,17 +141,33 @@ export default async function NotFound() {
             {context.message}
           </p>
 
-          {/* Quiet Monospace Path Row */}
-          {path && (
-            <div className="mb-6 p-2 rounded bg-slate-50 border border-slate-100">
-              <div className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mb-1 text-left">
-                Requested Location
+          {/* Restrained lost/not found clinical illustration */}
+          <div className="flex justify-center items-center mb-8">
+            <div className="relative w-full max-w-[20rem] h-24 flex items-center justify-center bg-slate-50 rounded-lg border border-slate-100 p-4 overflow-hidden">
+              {/* Map Grid SVG background pattern */}
+              <svg className="absolute inset-0 w-full h-full text-slate-200/40" width="100%" height="100%" xmlns="http://www.w3.org/2000/svg">
+                <defs>
+                  <pattern id="grid-pattern" width="14" height="14" patternUnits="userSpaceOnUse">
+                    <path d="M 14 0 L 0 0 0 14" fill="none" stroke="currentColor" strokeWidth="0.75" />
+                  </pattern>
+                </defs>
+                <rect width="100%" height="100%" fill="url(#grid-pattern)" />
+              </svg>
+
+              {/* Locator pin with low-motion pulsing radar circles */}
+              <div className="relative z-10 flex items-center justify-center">
+                {/* Subtle slow animation wave (low motion) */}
+                <span className="absolute inline-flex h-10 w-10 rounded-full bg-[#7030A0]/8 animate-ping" style={{ animationDuration: '3.5s' }} />
+                <span className="absolute inline-flex h-7 w-7 rounded-full bg-[#7030A0]/10 animate-pulse" />
+                
+                {/* Clinically precise search-pin inline SVG */}
+                <svg className="w-8 h-8 text-[#7030A0] relative z-20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                  <circle cx="12" cy="10" r="3" />
+                </svg>
               </div>
-              <code className="block text-xs font-mono text-slate-600 text-left overflow-x-auto select-all whitespace-nowrap">
-                {path}
-              </code>
             </div>
-          )}
+          </div>
 
           {/* Primary/Secondary Actions */}
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
@@ -159,15 +175,15 @@ export default async function NotFound() {
               <>
                 <Link 
                   href={context.primary_href} 
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 min-h-[2.75rem] px-5 rounded-lg border border-[#5d2588] bg-[#7030A0] !text-white text-xs font-bold shadow-sm transition-colors hover:bg-[#481D64] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d1abe7] focus-visible:ring-offset-2"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 min-h-[2.5rem] px-5 rounded-md bg-[#7030A0] hover:bg-[#481D64] text-white font-bold text-xs transition-colors shadow-xs"
                 >
-                  <span className="!text-white">{context.primary_label}</span>
-                  <ChevronRight className="w-3.5 h-3.5 !text-white" />
+                  {context.primary_label}
+                  <ChevronRight className="w-3.5 h-3.5 text-white" />
                 </Link>
                 
                 <Link 
                   href={context.dashboard_href}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 min-h-[2.75rem] px-5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-[#B8CABE] text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d1abe7] focus-visible:ring-offset-2"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 min-h-[2.5rem] px-5 rounded-md bg-white hover:bg-slate-50 text-slate-700 border border-[#B8CABE] text-xs font-bold transition-colors"
                 >
                   <Home className="w-3.5 h-3.5 text-slate-500" />
                   Return to Dashboard
@@ -177,15 +193,15 @@ export default async function NotFound() {
               <>
                 <Link 
                   href={context.login_href}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 min-h-[2.75rem] px-5 rounded-lg border border-[#5d2588] bg-[#7030A0] !text-white text-xs font-bold shadow-sm transition-colors hover:bg-[#481D64] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d1abe7] focus-visible:ring-offset-2"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 min-h-[2.5rem] px-5 rounded-md bg-[#7030A0] hover:bg-[#481D64] text-white font-bold text-xs transition-colors shadow-xs"
                 >
-                  <LogIn className="w-3.5 h-3.5 !text-white" />
-                  <span className="!text-white">Sign in to continue</span>
+                  <LogIn className="w-3.5 h-3.5 text-white" />
+                  Sign in to continue
                 </Link>
 
                 <Link 
                   href="/login"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 min-h-[2.75rem] px-5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-[#B8CABE] text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d1abe7] focus-visible:ring-offset-2"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 min-h-[2.5rem] px-5 rounded-md bg-white hover:bg-slate-50 text-slate-700 border border-[#B8CABE] text-xs font-bold transition-colors"
                 >
                   <LogIn className="w-3.5 h-3.5 text-slate-400" />
                   Go to Login Screen
