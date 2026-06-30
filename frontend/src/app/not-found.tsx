@@ -159,15 +159,15 @@ export default async function NotFound() {
               <>
                 <Link 
                   href={context.primary_href} 
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 min-h-[2.5rem] px-5 rounded-md bg-[#7030A0] hover:bg-[#481D64] text-white text-xs font-bold transition-colors shadow-xs"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 min-h-[2.75rem] px-5 rounded-lg border border-[#5d2588] bg-[#7030A0] !text-white text-xs font-bold shadow-sm transition-colors hover:bg-[#481D64] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d1abe7] focus-visible:ring-offset-2"
                 >
-                  {context.primary_label}
-                  <ChevronRight className="w-3.5 h-3.5" />
+                  <span className="!text-white">{context.primary_label}</span>
+                  <ChevronRight className="w-3.5 h-3.5 !text-white" />
                 </Link>
                 
                 <Link 
                   href={context.dashboard_href}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 min-h-[2.5rem] px-5 rounded-md bg-white hover:bg-slate-50 text-slate-700 border border-[#B8CABE] text-xs font-bold transition-colors"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 min-h-[2.75rem] px-5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-[#B8CABE] text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d1abe7] focus-visible:ring-offset-2"
                 >
                   <Home className="w-3.5 h-3.5 text-slate-500" />
                   Return to Dashboard
@@ -177,15 +177,15 @@ export default async function NotFound() {
               <>
                 <Link 
                   href={context.login_href}
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 min-h-[2.5rem] px-5 rounded-md bg-[#7030A0] hover:bg-[#481D64] text-white text-xs font-bold transition-colors shadow-xs"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 min-h-[2.75rem] px-5 rounded-lg border border-[#5d2588] bg-[#7030A0] !text-white text-xs font-bold shadow-sm transition-colors hover:bg-[#481D64] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d1abe7] focus-visible:ring-offset-2"
                 >
-                  <LogIn className="w-3.5 h-3.5" />
-                  Sign in to continue
+                  <LogIn className="w-3.5 h-3.5 !text-white" />
+                  <span className="!text-white">Sign in to continue</span>
                 </Link>
 
                 <Link 
                   href="/login"
-                  className="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 min-h-[2.5rem] px-5 rounded-md bg-white hover:bg-slate-50 text-slate-700 border border-[#B8CABE] text-xs font-bold transition-colors"
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 min-h-[2.75rem] px-5 rounded-lg bg-white hover:bg-slate-50 text-slate-700 border border-[#B8CABE] text-xs font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d1abe7] focus-visible:ring-offset-2"
                 >
                   <LogIn className="w-3.5 h-3.5 text-slate-400" />
                   Go to Login Screen
