@@ -257,7 +257,7 @@ function TopBar({
           {/* Queue Pill */}
           {summary && (
             <Link
-              href="/patient-flow"
+              href="/patient-flow/queue"
               className="inline-flex h-9 items-center gap-1.5 rounded-full bg-emerald-500/15 border border-emerald-400/30 px-3 py-1 text-xs font-bold text-emerald-200 hover:bg-emerald-500/25 transition-colors shrink-0"
               title={`${summary.counters.waiting_queue} patients in waiting list`}
             >

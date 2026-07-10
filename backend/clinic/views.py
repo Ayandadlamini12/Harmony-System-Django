@@ -1908,6 +1908,32 @@ def _safe_user_label(user):
     return user.get_full_name() or user.username or user.email or f"User {user.pk}"
 
 
+def _active_queue_stages():
+    return [
+        PatientJourney.Stage.QUEUED,
+        PatientJourney.Stage.CHECKED_IN,
+        PatientJourney.Stage.VITALS_RECORDED,
+        PatientJourney.Stage.WAITING_CLINICIAN,
+        PatientJourney.Stage.IN_CONSULTATION,
+    ]
+
+
+def _appointment_time_label(appointment):
+    if not appointment or not appointment.start_at:
+        return None
+    return timezone.localtime(appointment.start_at).strftime("%H:%M")
+
+
+def _journey_visit_type(journey):
+    if journey.check_in_id and journey.check_in:
+        return journey.check_in.visit_type
+    if journey.visit_id and journey.visit:
+        return journey.visit.visit_type
+    if journey.appointment_id and journey.appointment and journey.appointment.appointment_type_id:
+        return journey.appointment.appointment_type.name
+    return ""
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def navigation_summary(request):
@@ -1919,16 +1945,10 @@ def navigation_summary(request):
     day_end = day_start + timedelta(days=1)
     alert_since = now - timedelta(hours=24)
 
-    active_queue_stages = [
-        PatientJourney.Stage.QUEUED,
-        PatientJourney.Stage.CHECKED_IN,
-        PatientJourney.Stage.VITALS_RECORDED,
-        PatientJourney.Stage.WAITING_CLINICIAN,
-    ]
     waiting_queue = PatientJourney.objects.filter(
         service_date=today,
         is_active=True,
-        current_stage__in=active_queue_stages,
+        current_stage__in=_active_queue_stages(),
     ).count()
 
     appointment_statuses = [
@@ -2017,7 +2037,7 @@ def navigation_summary(request):
             "label": f"{waiting_queue} patient{'s' if waiting_queue != 1 else ''} active in today's flow",
             "detail": "Queue, vitals, or clinician handover",
             "priority": "high" if waiting_queue >= 10 else "normal",
-            "href": "/patient-flow",
+            "href": "/patient-flow/queue",
             "created_at": now.isoformat(),
         })
 
@@ -2072,6 +2092,86 @@ def navigation_summary(request):
             "default_interval_seconds": 30,
             "background_interval_seconds": 300,
         },
+        "generated_at": now.isoformat(),
+    })
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def patient_flow_today_queue(request):
+    service_date = parse_date(request.query_params.get("date", "")) or timezone.localdate()
+    now = timezone.now()
+    queryset = (
+        PatientJourney.objects.select_related(
+            "patient",
+            "check_in",
+            "appointment",
+            "appointment__appointment_type",
+            "appointment__practitioner",
+            "appointment__room",
+            "visit",
+        )
+        .filter(
+            service_date=service_date,
+            is_active=True,
+            current_stage__in=_active_queue_stages(),
+        )
+        .order_by("queue_number", "created_at")
+    )
+
+    stage = request.query_params.get("stage")
+    if stage:
+        queryset = queryset.filter(current_stage=stage)
+
+    flow_type = request.query_params.get("flow_type")
+    if flow_type:
+        queryset = queryset.filter(flow_type=flow_type)
+
+    items = []
+    for journey in queryset[:200]:
+        patient = journey.patient
+        appointment = journey.appointment
+        practitioner = appointment.practitioner if appointment and appointment.practitioner_id else None
+        room = appointment.room if appointment and appointment.room_id else None
+        wait_start = journey.created_at
+        if journey.check_in_id and journey.check_in:
+            wait_start = journey.check_in.created_at
+        wait_minutes = max(0, int((now - wait_start).total_seconds() // 60)) if wait_start else 0
+        patient_public_id = str(patient.public_id) if getattr(patient, "public_id", None) else None
+
+        items.append({
+            "id": journey.id,
+            "queue_number": journey.queue_number,
+            "patient_id": patient.id,
+            "patient_public_id": patient_public_id,
+            "patient_code": patient.patient_code,
+            "patient_name": patient.full_name_display,
+            "current_stage": journey.current_stage,
+            "current_stage_label": journey.get_current_stage_display(),
+            "flow_type": journey.flow_type,
+            "flow_type_label": journey.get_flow_type_display(),
+            "visit_type": _journey_visit_type(journey),
+            "wait_minutes": wait_minutes,
+            "appointment_id": appointment.id if appointment else None,
+            "appointment_time": _appointment_time_label(appointment),
+            "practitioner_id": practitioner.id if practitioner else None,
+            "practitioner_name": _safe_user_label(practitioner) if practitioner else None,
+            "room_id": room.id if room else None,
+            "room_name": room.name if room else None,
+            "href": f"/patients/{patient_public_id}" if patient_public_id else f"/patients?search={patient.patient_code}",
+            "created_at": journey.created_at.isoformat(),
+            "updated_at": journey.updated_at.isoformat(),
+        })
+
+    return Response({
+        "service_date": service_date.isoformat(),
+        "count": queryset.count(),
+        "items": items,
+        "stage_options": [
+            {"value": value, "label": label}
+            for value, label in PatientJourney.Stage.choices
+            if value in _active_queue_stages()
+        ],
         "generated_at": now.isoformat(),
     })
 

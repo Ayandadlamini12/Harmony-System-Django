@@ -70,6 +70,8 @@ class NavigationSummaryApiTests(APITestCase):
         self.assertEqual(response.data["counters"]["support_tickets_open"], 1)
         self.assertFalse(response.data["system_health"]["visible"])
         self.assertGreaterEqual(len(response.data["alerts"]), 1)
+        queue_alert = next(alert for alert in response.data["alerts"] if alert["category"] == "patient_flow")
+        self.assertEqual(queue_alert["href"], "/patient-flow/queue")
 
     def test_clinician_appointments_are_scoped_to_their_schedule(self):
         now = timezone.now()
@@ -124,6 +126,106 @@ class NavigationSummaryApiTests(APITestCase):
         self.assertTrue(response.data["system_health"]["visible"])
         self.assertEqual(response.data["system_health"]["status"], "attention")
         self.assertEqual(response.data["counters"]["system_alerts"], 2)
+
+
+class PatientFlowTodayQueueApiTests(APITestCase):
+    def setUp(self):
+        self.receptionist = User.objects.create_user(username="queue_reception", password="password123", role="receptionist")
+        self.clinician = User.objects.create_user(
+            username="queue_clinician",
+            password="password123",
+            role="clinician",
+            first_name="Queue",
+            last_name="Clinician",
+        )
+        self.patient = Patient.objects.create(first_name="Queue", last_name="Patient", gender="female")
+        self.room = ResourceRoom.objects.create(name="Consultation Room 1")
+        self.appointment_type = AppointmentType.objects.create(name="Consultation", default_duration_minutes=30)
+
+    def test_today_queue_requires_authentication(self):
+        response = self.client.get("/api/patient-flow/today-queue/")
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_today_queue_returns_active_queue_rows(self):
+        now = timezone.now()
+        check_in = PatientCheckIn.objects.create(
+            patient=self.patient,
+            visit_type=Visit.VisitType.FOLLOW_UP,
+            status=PatientCheckIn.Status.WAITING,
+            checked_in_by=self.receptionist,
+        )
+        appointment = Appointment.objects.create(
+            patient=self.patient,
+            appointment_type=self.appointment_type,
+            start_at=now + timedelta(hours=1),
+            end_at=now + timedelta(hours=1, minutes=30),
+            status=Appointment.Status.BOOKED,
+            practitioner=self.clinician,
+            room=self.room,
+        )
+        journey = PatientJourney.objects.create(
+            patient=self.patient,
+            check_in=check_in,
+            appointment=appointment,
+            service_date=timezone.localdate(),
+            current_stage=PatientJourney.Stage.VITALS_RECORDED,
+            flow_type=PatientJourney.FlowType.APPOINTMENT_CHECKIN,
+            queue_number=3,
+            is_active=True,
+        )
+        PatientJourney.objects.create(
+            patient=self.patient,
+            service_date=timezone.localdate(),
+            current_stage=PatientJourney.Stage.COMPLETED,
+            flow_type=PatientJourney.FlowType.WALK_IN_QUEUE,
+            queue_number=99,
+            is_active=False,
+        )
+
+        self.client.force_authenticate(self.receptionist)
+        response = self.client.get("/api/patient-flow/today-queue/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(len(response.data["items"]), 1)
+        item = response.data["items"][0]
+        self.assertEqual(item["id"], journey.id)
+        self.assertEqual(item["queue_number"], 3)
+        self.assertEqual(item["patient_code"], self.patient.patient_code)
+        self.assertEqual(item["patient_name"], self.patient.full_name_display)
+        self.assertEqual(item["current_stage"], PatientJourney.Stage.VITALS_RECORDED)
+        self.assertEqual(item["current_stage_label"], "Vitals recorded")
+        self.assertEqual(item["visit_type"], Visit.VisitType.FOLLOW_UP)
+        self.assertEqual(item["appointment_id"], appointment.id)
+        self.assertEqual(item["practitioner_name"], "Queue Clinician")
+        self.assertEqual(item["room_name"], self.room.name)
+        self.assertEqual(item["href"], f"/patients/{self.patient.public_id}")
+        self.assertGreaterEqual(item["wait_minutes"], 0)
+
+    def test_today_queue_supports_stage_filter(self):
+        PatientJourney.objects.create(
+            patient=self.patient,
+            service_date=timezone.localdate(),
+            current_stage=PatientJourney.Stage.QUEUED,
+            flow_type=PatientJourney.FlowType.WALK_IN_QUEUE,
+            queue_number=1,
+            is_active=True,
+        )
+        PatientJourney.objects.create(
+            patient=self.patient,
+            service_date=timezone.localdate(),
+            current_stage=PatientJourney.Stage.WAITING_CLINICIAN,
+            flow_type=PatientJourney.FlowType.WALK_IN_QUEUE,
+            queue_number=2,
+            is_active=True,
+        )
+
+        self.client.force_authenticate(self.receptionist)
+        response = self.client.get(f"/api/patient-flow/today-queue/?stage={PatientJourney.Stage.WAITING_CLINICIAN}")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["count"], 1)
+        self.assertEqual(response.data["items"][0]["current_stage"], PatientJourney.Stage.WAITING_CLINICIAN)
 
 
 class SystemAuditLogsApiTests(APITestCase):
