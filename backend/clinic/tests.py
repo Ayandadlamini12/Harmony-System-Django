@@ -196,11 +196,42 @@ class PatientFlowTodayQueueApiTests(APITestCase):
         self.assertEqual(item["current_stage"], PatientJourney.Stage.VITALS_RECORDED)
         self.assertEqual(item["current_stage_label"], "Vitals recorded")
         self.assertEqual(item["visit_type"], Visit.VisitType.FOLLOW_UP)
+        self.assertEqual(item["visit_type_label"], "Follow up")
         self.assertEqual(item["appointment_id"], appointment.id)
         self.assertEqual(item["practitioner_name"], "Queue Clinician")
         self.assertEqual(item["room_name"], self.room.name)
+        self.assertEqual(item["stage_context"]["current_step"]["title"], "Vitals completed")
+        self.assertEqual(item["stage_context"]["current_step"]["primary_action"]["id"], "assign_or_handover")
+        self.assertEqual(item["stage_context"]["allocation_visibility"], "partial")
+        self.assertEqual(item["stage_context"]["allocation"]["clinician"]["status"], "available")
+        self.assertEqual(item["stage_context"]["allocation"]["room"]["status"], "available")
+        self.assertEqual(item["stage_context"]["allocation"]["visit_type"]["label"], "Follow up")
         self.assertEqual(item["href"], f"/patients/{self.patient.public_id}")
         self.assertGreaterEqual(item["wait_minutes"], 0)
+
+    def test_today_queue_marks_allocation_fields_pending_before_assignment(self):
+        PatientJourney.objects.create(
+            patient=self.patient,
+            service_date=timezone.localdate(),
+            current_stage=PatientJourney.Stage.QUEUED,
+            flow_type=PatientJourney.FlowType.WALK_IN_QUEUE,
+            queue_number=1,
+            is_active=True,
+        )
+
+        self.client.force_authenticate(self.receptionist)
+        response = self.client.get("/api/patient-flow/today-queue/")
+
+        self.assertEqual(response.status_code, 200)
+        item = response.data["items"][0]
+        self.assertIsNone(item["practitioner_name"])
+        self.assertIsNone(item["room_name"])
+        self.assertEqual(item["stage_context"]["current_step"]["title"], "Awaiting check-in workflow")
+        self.assertEqual(item["stage_context"]["allocation_visibility"], "minimal")
+        self.assertEqual(item["stage_context"]["allocation"]["clinician"]["status"], "pending")
+        self.assertEqual(item["stage_context"]["allocation"]["clinician"]["label"], "Not assigned yet")
+        self.assertEqual(item["stage_context"]["allocation"]["room"]["label"], "Not allocated yet")
+        self.assertEqual(item["stage_context"]["allocation"]["visit_type"]["label"], "Not set yet")
 
     def test_today_queue_supports_stage_filter(self):
         PatientJourney.objects.create(

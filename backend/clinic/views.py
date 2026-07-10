@@ -1934,6 +1934,114 @@ def _journey_visit_type(journey):
     return ""
 
 
+def _journey_visit_type_label(journey):
+    if journey.check_in_id and journey.check_in:
+        return journey.check_in.get_visit_type_display()
+    if journey.visit_id and journey.visit:
+        return journey.visit.get_visit_type_display()
+    if journey.appointment_id and journey.appointment and journey.appointment.appointment_type_id:
+        return journey.appointment.appointment_type.name
+    return None
+
+
+def _queue_field_state(value, pending_label, available_hint="", pending_hint=""):
+    if value:
+        return {
+            "status": "available",
+            "label": value,
+            "hint": available_hint,
+        }
+    return {
+        "status": "pending",
+        "label": pending_label,
+        "hint": pending_hint,
+    }
+
+
+def _queue_stage_context(journey, practitioner_name, room_name, visit_type_label, appointment_time):
+    stage = journey.current_stage
+
+    step_map = {
+        PatientJourney.Stage.QUEUED: {
+            "title": "Awaiting check-in workflow",
+            "detail": "Patient is active in today's queue. Record vitals when the patient is ready.",
+            "primary_action": {"id": "record_vitals", "label": "Record vitals"},
+            "allocation_visibility": "minimal",
+        },
+        PatientJourney.Stage.CHECKED_IN: {
+            "title": "Checked in",
+            "detail": "Patient has checked in and is waiting for vitals to be recorded.",
+            "primary_action": {"id": "record_vitals", "label": "Record vitals"},
+            "allocation_visibility": "minimal",
+        },
+        PatientJourney.Stage.VITALS_RECORDED: {
+            "title": "Vitals completed",
+            "detail": "Patient is ready for clinician assignment or clinician handover.",
+            "primary_action": {"id": "assign_or_handover", "label": "Assign clinician / room"},
+            "allocation_visibility": "partial",
+        },
+        PatientJourney.Stage.WAITING_CLINICIAN: {
+            "title": "Ready for clinician",
+            "detail": "Patient is ready for clinician handover. Show allocation details if already assigned.",
+            "primary_action": {"id": "start_consultation", "label": "Start consultation"},
+            "allocation_visibility": "full",
+        },
+        PatientJourney.Stage.IN_CONSULTATION: {
+            "title": "In consultation",
+            "detail": "Consultation has started. Keep allocation and visit context visible.",
+            "primary_action": {"id": "open_consultation", "label": "Open consultation"},
+            "allocation_visibility": "full",
+        },
+    }
+    step = step_map.get(stage, {
+        "title": journey.get_current_stage_display(),
+        "detail": "Patient is active in today's workflow.",
+        "primary_action": {"id": "open_patient", "label": "Open patient"},
+        "allocation_visibility": "partial",
+    })
+
+    allocation = {
+        "clinician": _queue_field_state(
+            practitioner_name,
+            "Not assigned yet",
+            "Clinician assignment is available for this stage.",
+            "Available after clinician assignment.",
+        ),
+        "room": _queue_field_state(
+            room_name,
+            "Not allocated yet",
+            "Room allocation is available for this stage.",
+            "Available after room allocation.",
+        ),
+        "visit_type": _queue_field_state(
+            visit_type_label,
+            "Not set yet",
+            "Visit type has been captured for this flow.",
+            "Available after check-in or appointment matching.",
+        ),
+        "appointment_time": _queue_field_state(
+            appointment_time,
+            "No appointment time",
+            "Appointment time is linked to this queue entry.",
+            "Only available for appointment-linked flows.",
+        ),
+    }
+
+    if step["allocation_visibility"] == "minimal":
+        allocation["clinician"]["hint"] = "Usually assigned after vitals are recorded."
+        allocation["room"]["hint"] = "Usually allocated after vitals or clinician handover."
+
+    return {
+        "current_step": {
+            "title": step["title"],
+            "detail": step["detail"],
+            "primary_action": step["primary_action"],
+        },
+        "allocation_visibility": step["allocation_visibility"],
+        "allocation": allocation,
+    }
+
+
 @api_view(["GET"])
 @permission_classes([IsAuthenticated])
 def navigation_summary(request):
@@ -2133,6 +2241,11 @@ def patient_flow_today_queue(request):
         appointment = journey.appointment
         practitioner = appointment.practitioner if appointment and appointment.practitioner_id else None
         room = appointment.room if appointment and appointment.room_id else None
+        practitioner_name = _safe_user_label(practitioner) if practitioner else None
+        room_name = room.name if room else None
+        visit_type = _journey_visit_type(journey)
+        visit_type_label = _journey_visit_type_label(journey)
+        appointment_time = _appointment_time_label(appointment)
         wait_start = journey.created_at
         if journey.check_in_id and journey.check_in:
             wait_start = journey.check_in.created_at
@@ -2150,14 +2263,16 @@ def patient_flow_today_queue(request):
             "current_stage_label": journey.get_current_stage_display(),
             "flow_type": journey.flow_type,
             "flow_type_label": journey.get_flow_type_display(),
-            "visit_type": _journey_visit_type(journey),
+            "visit_type": visit_type,
+            "visit_type_label": visit_type_label,
             "wait_minutes": wait_minutes,
             "appointment_id": appointment.id if appointment else None,
-            "appointment_time": _appointment_time_label(appointment),
+            "appointment_time": appointment_time,
             "practitioner_id": practitioner.id if practitioner else None,
-            "practitioner_name": _safe_user_label(practitioner) if practitioner else None,
+            "practitioner_name": practitioner_name,
             "room_id": room.id if room else None,
-            "room_name": room.name if room else None,
+            "room_name": room_name,
+            "stage_context": _queue_stage_context(journey, practitioner_name, room_name, visit_type_label, appointment_time),
             "href": f"/patients/{patient_public_id}" if patient_public_id else f"/patients?search={patient.patient_code}",
             "created_at": journey.created_at.isoformat(),
             "updated_at": journey.updated_at.isoformat(),
