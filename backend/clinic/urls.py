@@ -8,7 +8,7 @@ from .views import (
     VisitViewSet, VitalViewSet, ZulipMessagesViewSet, ZulipOutboundEventViewSet,
     ZulipPostUpdateViewSet, ZulipRetryPostViewSet, dashboard_stats, patient_import_webhook,
     board_view, range_appointments_view, resources_metadata_view, capabilities_view,
-    PractitionerAvailabilityViewSet
+    navigation_summary, PractitionerAvailabilityViewSet
 )
 
 router = DefaultRouter()
@@ -41,4 +41,5 @@ urlpatterns = [
     path("scheduling/appointments/", range_appointments_view, name="scheduling-appointments"),
     path("scheduling/resources/", resources_metadata_view, name="scheduling-resources"),
     path("me/capabilities/", capabilities_view, name="user-capabilities"),
+    path("navigation/summary/", navigation_summary, name="navigation-summary"),
 ] + router.urls

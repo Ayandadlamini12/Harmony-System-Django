@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 import csv
 import re
 import uuid
@@ -1888,6 +1888,192 @@ def create_internal_deliveries(message):
         )
     if deliveries:
         MessageDelivery.objects.bulk_create(deliveries)
+
+
+def _workspace_label_for_role(role):
+    return {
+        "admin": "System Admin",
+        "clinician": "Clinician Workspace",
+        "receptionist": "Reception Desk",
+        "supplier_contact": "Supplier Portal",
+        "supplier_manager": "Supplier Management",
+        "partner_contact": "Partner Portal",
+        "partner_manager": "Partner Management",
+    }.get(role or "", "Harmony Workspace")
+
+
+def _safe_user_label(user):
+    if not user:
+        return "System"
+    return user.get_full_name() or user.username or user.email or f"User {user.pk}"
+
+
+@api_view(["GET"])
+@permission_classes([IsAuthenticated])
+def navigation_summary(request):
+    user = request.user
+    role = getattr(user, "role", "")
+    today = timezone.localdate()
+    now = timezone.now()
+    day_start = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+    day_end = day_start + timedelta(days=1)
+    alert_since = now - timedelta(hours=24)
+
+    active_queue_stages = [
+        PatientJourney.Stage.QUEUED,
+        PatientJourney.Stage.CHECKED_IN,
+        PatientJourney.Stage.VITALS_RECORDED,
+        PatientJourney.Stage.WAITING_CLINICIAN,
+    ]
+    waiting_queue = PatientJourney.objects.filter(
+        service_date=today,
+        is_active=True,
+        current_stage__in=active_queue_stages,
+    ).count()
+
+    appointment_statuses = [
+        Appointment.Status.BOOKED,
+        Appointment.Status.CONFIRMED,
+        Appointment.Status.CHECKED_IN,
+        Appointment.Status.IN_QUEUE,
+        Appointment.Status.IN_VISIT,
+    ]
+    appointments_qs = Appointment.objects.filter(
+        start_at__gte=day_start,
+        start_at__lt=day_end,
+        status__in=appointment_statuses,
+    )
+    if role == "clinician":
+        appointments_qs = appointments_qs.filter(practitioner=user)
+    appointments_today = appointments_qs.count()
+
+    unread_deliveries = MessageDelivery.objects.filter(
+        recipient_user=user,
+        channel=Message.Channel.INTERNAL,
+        read_at__isnull=True,
+    ).exclude(status__in=[MessageDelivery.Status.READ, MessageDelivery.Status.SKIPPED])
+    inbox_unread = unread_deliveries.count()
+
+    mention_query = Q(message__body__icontains=f"@{user.username}")
+    if user.email:
+        mention_query |= Q(message__body__icontains=f"@{user.email}")
+    full_name = (user.get_full_name() or "").strip()
+    if full_name:
+        mention_query |= Q(message__body__icontains=f"@{full_name}")
+    mentions = unread_deliveries.filter(mention_query).count()
+
+    support_ticket_qs = SupportTicket.objects.filter(status=SupportTicket.TicketStatus.OPEN)
+    if role not in {"admin", "receptionist"}:
+        support_ticket_qs = support_ticket_qs.filter(created_by=user)
+    support_tickets_open = support_ticket_qs.count()
+
+    failed_zulip_qs = ZulipOutboundEvent.objects.filter(
+        status__in=[ZulipOutboundEvent.Status.FAILED, ZulipOutboundEvent.Status.RETRY_BUFFERED],
+        created_at__gte=alert_since,
+    )
+    failed_scheduling_qs = SchedulingOutboxEvent.objects.filter(
+        status=SchedulingOutboxEvent.Status.FAILED,
+        created_at__gte=alert_since,
+    )
+    system_alerts = failed_zulip_qs.count() + failed_scheduling_qs.count() if role == "admin" else 0
+
+    alerts = []
+
+    recent_delivery = (
+        unread_deliveries.select_related("message", "message__thread", "message__sender")
+        .order_by("-created_at")
+        .first()
+    )
+    if recent_delivery:
+        message = recent_delivery.message
+        thread = message.thread
+        alerts.append({
+            "id": f"message-{message.id}",
+            "category": "messages",
+            "label": f"Unread message in {thread.subject}",
+            "detail": f"From {_safe_user_label(message.sender)}",
+            "priority": "normal",
+            "href": "/messages",
+            "created_at": message.sent_at.isoformat() if message.sent_at else message.created_at.isoformat(),
+        })
+
+    next_appointment = appointments_qs.select_related("patient").order_by("start_at").first()
+    if next_appointment and next_appointment.start_at:
+        patient_name = next_appointment.patient.full_name_display if next_appointment.patient_id else "patient"
+        alerts.append({
+            "id": f"appointment-{next_appointment.id}",
+            "category": "appointments",
+            "label": f"Next appointment: {patient_name}",
+            "detail": timezone.localtime(next_appointment.start_at).strftime("%H:%M"),
+            "priority": "normal",
+            "href": "/appointments",
+            "created_at": next_appointment.start_at.isoformat(),
+        })
+
+    if waiting_queue:
+        alerts.append({
+            "id": "patient-flow-waiting-queue",
+            "category": "patient_flow",
+            "label": f"{waiting_queue} patient{'s' if waiting_queue != 1 else ''} active in today's flow",
+            "detail": "Queue, vitals, or clinician handover",
+            "priority": "high" if waiting_queue >= 10 else "normal",
+            "href": "/patient-flow",
+            "created_at": now.isoformat(),
+        })
+
+    if role == "admin":
+        failed_event = failed_zulip_qs.order_by("-created_at").first()
+        if failed_event:
+            alerts.append({
+                "id": f"zulip-event-{failed_event.id}",
+                "category": "system",
+                "label": "Zulip delivery requires attention",
+                "detail": failed_event.topic,
+                "priority": "high",
+                "href": "/administration/security",
+                "created_at": failed_event.created_at.isoformat(),
+            })
+        failed_outbox = failed_scheduling_qs.order_by("-created_at").first()
+        if failed_outbox:
+            alerts.append({
+                "id": f"scheduling-outbox-{failed_outbox.id}",
+                "category": "system",
+                "label": "Scheduling integration event failed",
+                "detail": failed_outbox.event_type,
+                "priority": "high",
+                "href": "/administration/security",
+                "created_at": failed_outbox.created_at.isoformat(),
+            })
+
+    alerts = sorted(alerts, key=lambda item: item["created_at"], reverse=True)[:8]
+
+    return Response({
+        "workspace": {
+            "label": _workspace_label_for_role(role),
+            "role": role,
+            "environment": "Clinic Live" if not settings.DEBUG else "Development",
+        },
+        "counters": {
+            "waiting_queue": waiting_queue,
+            "appointments_today": appointments_today,
+            "inbox_unread": inbox_unread,
+            "mentions": mentions,
+            "support_tickets_open": support_tickets_open,
+            "system_alerts": system_alerts,
+        },
+        "alerts": alerts,
+        "system_health": {
+            "visible": role == "admin",
+            "status": "attention" if system_alerts else "ok",
+            "failed_zulip_events_24h": failed_zulip_qs.count() if role == "admin" else 0,
+            "failed_scheduling_events_24h": failed_scheduling_qs.count() if role == "admin" else 0,
+        },
+        "polling": {
+            "default_interval_seconds": 30,
+            "background_interval_seconds": 300,
+        },
+        "generated_at": now.isoformat(),
+    })
 
 
 class MessageThreadViewSet(viewsets.ModelViewSet):

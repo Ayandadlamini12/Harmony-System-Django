@@ -12,10 +12,118 @@ from .models import (
     FormDraft, Message, MessageDelivery, MessageParticipant, MessageThread, 
     Patient, PatientCheckIn, PatientCondition, PatientDocument, PatientJourney, 
     PatientProfile, PractitionerAvailability, ResourceRoom, SchedulingOutboxEvent, 
-    Visit, VisitSymptomProblem, Vital, ZulipOutboundEvent
+    SupportTicket, Visit, VisitSymptomProblem, Vital, ZulipOutboundEvent
 )
 
 User = get_user_model()
+
+
+class NavigationSummaryApiTests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(username="nav_admin", password="password123", role="admin")
+        self.clinician = User.objects.create_user(username="nav_clinician", password="password123", role="clinician")
+        self.receptionist = User.objects.create_user(username="nav_reception", password="password123", role="receptionist")
+        self.patient = Patient.objects.create(first_name="Navi", last_name="Patient", gender="female")
+
+    def test_navigation_summary_requires_authentication(self):
+        response = self.client.get("/api/navigation/summary/")
+        self.assertIn(response.status_code, (401, 403))
+
+    def test_receptionist_summary_returns_operational_counters(self):
+        now = timezone.now()
+        PatientJourney.objects.create(
+            patient=self.patient,
+            service_date=timezone.localdate(),
+            current_stage=PatientJourney.Stage.QUEUED,
+            flow_type=PatientJourney.FlowType.WALK_IN_QUEUE,
+            queue_number=1,
+            is_active=True,
+        )
+        Appointment.objects.create(
+            patient=self.patient,
+            start_at=now + timedelta(hours=1),
+            end_at=now + timedelta(hours=1, minutes=30),
+            status=Appointment.Status.BOOKED,
+            practitioner=self.clinician,
+        )
+        thread = MessageThread.objects.create(subject="Front Desk", thread_type=MessageThread.ThreadType.GROUP)
+        MessageParticipant.objects.create(thread=thread, user=self.receptionist)
+        message = Message.objects.create(thread=thread, sender=self.admin, body=f"@{self.receptionist.username} please review queue")
+        MessageDelivery.objects.create(
+            message=message,
+            channel=Message.Channel.INTERNAL,
+            status=MessageDelivery.Status.DELIVERED,
+            recipient_user=self.receptionist,
+            delivered_at=now,
+        )
+        SupportTicket.objects.create(title="Printer issue", description="Reception printer offline.", created_by=self.receptionist)
+
+        self.client.force_authenticate(self.receptionist)
+        response = self.client.get("/api/navigation/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["workspace"]["label"], "Reception Desk")
+        self.assertEqual(response.data["counters"]["waiting_queue"], 1)
+        self.assertEqual(response.data["counters"]["appointments_today"], 1)
+        self.assertEqual(response.data["counters"]["inbox_unread"], 1)
+        self.assertEqual(response.data["counters"]["mentions"], 1)
+        self.assertEqual(response.data["counters"]["support_tickets_open"], 1)
+        self.assertFalse(response.data["system_health"]["visible"])
+        self.assertGreaterEqual(len(response.data["alerts"]), 1)
+
+    def test_clinician_appointments_are_scoped_to_their_schedule(self):
+        now = timezone.now()
+        other_clinician = User.objects.create_user(username="other_nav_clinician", password="password123", role="clinician")
+        Appointment.objects.create(
+            patient=self.patient,
+            start_at=now + timedelta(hours=1),
+            end_at=now + timedelta(hours=1, minutes=30),
+            status=Appointment.Status.BOOKED,
+            practitioner=self.clinician,
+        )
+        Appointment.objects.create(
+            patient=self.patient,
+            start_at=now + timedelta(hours=2),
+            end_at=now + timedelta(hours=2, minutes=30),
+            status=Appointment.Status.BOOKED,
+            practitioner=other_clinician,
+        )
+
+        self.client.force_authenticate(self.clinician)
+        response = self.client.get("/api/navigation/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["workspace"]["label"], "Clinician Workspace")
+        self.assertEqual(response.data["counters"]["appointments_today"], 1)
+
+    def test_admin_summary_includes_system_alerts(self):
+        ZulipOutboundEvent.objects.create(
+            actor=self.admin,
+            channel="front-desk",
+            topic="PATIENT FLOW",
+            linked_entity_type=ZulipOutboundEvent.LinkedType.PATIENT,
+            linked_entity_id=str(self.patient.id),
+            raw_payload="raw",
+            sanitized_payload="safe",
+            status=ZulipOutboundEvent.Status.FAILED,
+        )
+        SchedulingOutboxEvent.objects.create(
+            event_type="appointment.calendar_sync",
+            aggregate_type="appointment",
+            aggregate_id="1",
+            payload_json={},
+            safe_payload_json={},
+            status=SchedulingOutboxEvent.Status.FAILED,
+        )
+
+        self.client.force_authenticate(self.admin)
+        response = self.client.get("/api/navigation/summary/")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["workspace"]["label"], "System Admin")
+        self.assertTrue(response.data["system_health"]["visible"])
+        self.assertEqual(response.data["system_health"]["status"], "attention")
+        self.assertEqual(response.data["counters"]["system_alerts"], 2)
 
 
 class SystemAuditLogsApiTests(APITestCase):
