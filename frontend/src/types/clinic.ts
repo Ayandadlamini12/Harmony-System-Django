@@ -793,3 +793,50 @@ export type ApiTokenCreateResponse = ApiToken & {
   token: string;
 };
 
+export type NavigationWorkspace = {
+  label: string;
+  role: string;
+  environment: string;
+};
+
+export type NavigationCounters = {
+  waiting_queue: number;
+  appointments_today: number;
+  inbox_unread: number;
+  mentions: number;
+  support_tickets_open: number;
+  system_alerts: number;
+};
+
+export type NavigationAlert = {
+  id: string;
+  category: "messages" | "appointments" | "patient_flow" | "system" | string;
+  label: string;
+  detail: string;
+  priority: "normal" | "high" | string;
+  href: string;
+  created_at: string;
+};
+
+export type NavigationSystemHealth = {
+  visible: boolean;
+  status: "ok" | "attention";
+  failed_zulip_events_24h: number;
+  failed_scheduling_events_24h: number;
+};
+
+export type NavigationPolling = {
+  default_interval_seconds: number;
+  background_interval_seconds: number;
+};
+
+export type NavigationSummary = {
+  workspace: NavigationWorkspace;
+  counters: NavigationCounters;
+  alerts: NavigationAlert[];
+  system_health: NavigationSystemHealth;
+  polling: NavigationPolling;
+  generated_at: string;
+};
+
+
