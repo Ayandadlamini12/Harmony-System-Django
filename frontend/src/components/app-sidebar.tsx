@@ -5,7 +5,6 @@ import {
   ChevronDown,
   Menu,
   Search,
-  UserCog,
   LifeBuoy,
   Trash2,
 } from "lucide-react";
@@ -101,7 +100,6 @@ function TopBar({
   title: string;
 }) {
   const [summary, setSummary] = useState<NavigationSummary | null>(null);
-  const [errorCount, setErrorCount] = useState(0);
 
   // Focus global search when pressing '/' key
   useEffect(() => {
@@ -126,6 +124,11 @@ function TopBar({
 
     let timerId: NodeJS.Timeout | null = null;
     let isActive = true;
+    let consecutiveErrors = 0;
+    let pollingConfig = {
+      defaultIntervalSeconds: 30,
+      backgroundIntervalSeconds: 300,
+    };
 
     async function fetchSummary() {
       try {
@@ -136,12 +139,16 @@ function TopBar({
         const data: NavigationSummary = await res.json();
         if (isActive) {
           setSummary(data);
-          setErrorCount(0); // Reset successive errors on success
+          consecutiveErrors = 0;
+          pollingConfig = {
+            defaultIntervalSeconds: data.polling?.default_interval_seconds || 30,
+            backgroundIntervalSeconds: data.polling?.background_interval_seconds || 300,
+          };
         }
       } catch (err) {
         console.error("Navigation summary fetch error:", err);
         if (isActive) {
-          setErrorCount((prev) => prev + 1);
+          consecutiveErrors += 1;
         }
       }
     }
@@ -150,12 +157,12 @@ function TopBar({
       if (!isActive) return;
 
       const baseInterval = document.visibilityState === "hidden"
-        ? (summary?.polling?.background_interval_seconds || 300) * 1000
-        : (summary?.polling?.default_interval_seconds || 30) * 1000;
+        ? pollingConfig.backgroundIntervalSeconds * 1000
+        : pollingConfig.defaultIntervalSeconds * 1000;
 
       // Exponential backoff up to 5 minutes
-      const errorBackoff = errorCount > 0 
-        ? Math.min(Math.pow(2, errorCount) * 1000, 300000) 
+      const errorBackoff = consecutiveErrors > 0 
+        ? Math.min(Math.pow(2, consecutiveErrors) * 1000, 300000) 
         : 0;
 
       const finalDelay = baseInterval + errorBackoff;
@@ -190,7 +197,7 @@ function TopBar({
       if (timerId) clearTimeout(timerId);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
     };
-  }, [signedIn, errorCount, summary?.polling?.default_interval_seconds, summary?.polling?.background_interval_seconds]);
+  }, [signedIn]);
 
   const alertBadgeCount = summary ? (summary.counters.inbox_unread + summary.counters.mentions) : 0;
 
@@ -337,7 +344,7 @@ function TopBar({
                                     {alert.label}
                                   </span>
                                   {alert.priority === "high" && (
-                                    <span className="rounded bg-red-100 px-1.5 py-0.2 text-[8px] font-bold uppercase text-red-800 tracking-wider">
+                                    <span className="rounded bg-red-100 px-1.5 py-0.5 text-[8px] font-bold uppercase text-red-800 tracking-wider">
                                       High
                                     </span>
                                   )}
