@@ -839,4 +839,64 @@ export type NavigationSummary = {
   generated_at: string;
 };
 
+export type QueueAllocationField = {
+  status: "available" | "pending";
+  label: string;
+  hint: string;
+};
+
+export type QueueStageContext = {
+  current_step: {
+    title: string;
+    detail: string;
+    primary_action?: { id: string; label: string } | null;
+  };
+  allocation_visibility: "minimal" | "partial" | "full";
+  allocation: {
+    clinician: QueueAllocationField;
+    room: QueueAllocationField;
+    visit_type: QueueAllocationField;
+    appointment_time: QueueAllocationField;
+  };
+};
+
+export type PatientJourneyQueueItem = {
+  id: number;
+  queue_number: number;
+  patient_id: number;
+  patient_public_id: string | null;
+  patient_code: string;
+  patient_name: string;
+  current_stage: string;
+  current_stage_label: string;
+  flow_type: string;
+  flow_type_label: string;
+  visit_type: string;
+  visit_type_label: string | null;
+  wait_minutes: number;
+  appointment_id: number | null;
+  appointment_time: string | null;
+  practitioner_id: number | null;
+  practitioner_name: string | null;
+  room_id: number | null;
+  room_name: string | null;
+  stage_context: QueueStageContext;
+  href: string;
+  created_at: string;
+  updated_at: string;
+};
+
+export type PatientJourneyQueueStageOption = {
+  value: string;
+  label: string;
+};
+
+export type PatientJourneyQueueResponse = {
+  service_date: string;
+  count: number;
+  items: PatientJourneyQueueItem[];
+  stage_options: PatientJourneyQueueStageOption[];
+  generated_at: string;
+};
+
 
